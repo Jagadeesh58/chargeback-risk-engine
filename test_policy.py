@@ -7,6 +7,7 @@ confidence can never override the monetary safety ceiling (principle #6).
 import random
 
 from policy import decide, MONETARY_CEILING, compute_expected_value
+from evidence import assemble
 
 
 def test_ceiling_holds_even_at_maximum_confidence():
@@ -62,3 +63,50 @@ def test_expected_value_formula():
     ev = compute_expected_value(win_probability=0.8, amount=1000.0)
     # EV = 0.8 * 1000 - 150 - 0.2*0 = 650.0
     assert abs(ev - 650.0) < 0.01
+
+
+def test_high_probability_but_mostly_unconfirmed_evidence_blocks_auto_contest():
+    """Checkpoint 4 finding: 1 PASS out of 3 relevant fields can still
+    produce P(win) >= threshold, but should NOT be eligible for
+    AUTO-CONTEST once the evidence packet is factored in."""
+    dispute = {
+        "reason_code": "item_not_received",
+        "has_tracking_number": True,
+        "has_delivery_confirmation": None,
+        "has_signature_confirmation": None,
+    }
+    packet = assemble(dispute)
+    assert packet.pass_count == 1 and packet.total == 3  # sanity check on the setup
+
+    decision = decide(win_probability=0.697, amount=2000, evidence_packet=packet)
+    assert decision.action != "AUTO-CONTEST"
+    assert decision.action == "HUMAN REVIEW"
+
+
+def test_majority_confirmed_evidence_allows_auto_contest():
+    """Sanity check the gate isn't overly strict: majority-confirmed
+    evidence with high probability should still auto-contest."""
+    dispute = {
+        "reason_code": "item_not_received",
+        "has_tracking_number": True,
+        "has_delivery_confirmation": True,
+        "has_signature_confirmation": True,
+    }
+    packet = assemble(dispute)
+    decision = decide(win_probability=0.9, amount=2000, evidence_packet=packet)
+    assert decision.action == "AUTO-CONTEST"
+
+
+def test_evidence_gate_never_overrides_the_ceiling():
+    """Even with a perfect evidence packet, the monetary ceiling still
+    wins -- evidence completeness augments the probability check, it
+    never substitutes for the ceiling check."""
+    dispute = {
+        "reason_code": "item_not_received",
+        "has_tracking_number": True,
+        "has_delivery_confirmation": True,
+        "has_signature_confirmation": True,
+    }
+    packet = assemble(dispute)
+    decision = decide(win_probability=0.99, amount=MONETARY_CEILING + 1, evidence_packet=packet)
+    assert decision.action == "HUMAN REVIEW"
