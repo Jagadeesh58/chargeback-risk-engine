@@ -39,3 +39,18 @@ from Checkpoint 1 (0.691). This is a good sign: most of the achievable
 signal comes from knowing WHICH fields matter per reason code, not from
 sophisticated modeling on top of that. Directly relevant for Checkpoint
 8's honest rules-vs-ML comparison later.
+
+
+## Checkpoint 3
+
+### Proved the monetary ceiling danger, then fixed it structurally
+Built two intentionally-broken toy policy functions first: one where a
+"skip ahead if very confident" shortcut let a Rs 8,00,000 dispute at 98%
+confidence get auto-contested past a Rs 50,000 ceiling; a sneakier one
+where the ceiling check itself silently included `and probability < 0.99`,
+which looked like a safety rule but let a 99.5%-confidence case slip
+through the same way. Fixed by making the ceiling check the unconditional
+first line of `decide()`, structurally unable to reference
+`win_probability` at all. Verified with a fuzz test across 2000 random
+amount/probability combinations above the ceiling -- zero produced
+AUTO-CONTEST.
