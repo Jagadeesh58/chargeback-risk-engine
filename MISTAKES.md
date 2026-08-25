@@ -26,3 +26,16 @@ Fix: trained one submodel per reason code, each using only that reason's
 relevant evidence fields. Real gap: **+0.104 AUC** (0.586 -> 0.691) —
 meaningful and reproducible, and it directly justifies why Checkpoint 2's
 scorer applies reason-code-specific rules instead of one global rule.
+
+
+## Checkpoint 2
+
+### Rule-based scorer AUC on real dev set
+Built the reason-code-aware rule-based scorer with equal-weight voting
+per relevant field, squashed through a logistic function to produce a
+probability. Measured AUC on the actual dev.csv (not a toy example):
+**0.688** -- very close to the per-reason logistic regression submodel
+from Checkpoint 1 (0.691). This is a good sign: most of the achievable
+signal comes from knowing WHICH fields matter per reason code, not from
+sophisticated modeling on top of that. Directly relevant for Checkpoint
+8's honest rules-vs-ML comparison later.
