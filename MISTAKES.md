@@ -54,3 +54,22 @@ first line of `decide()`, structurally unable to reference
 `win_probability` at all. Verified with a fuzz test across 2000 random
 amount/probability combinations above the ceiling -- zero produced
 AUTO-CONTEST.
+
+
+## Checkpoint 4
+
+### Found and fixed a real gap between "high P(win)" and "enough confirmed evidence"
+While building the evidence packet assembler, tested whether a packet
+with only 1 PASS out of 3 relevant fields (2 WARN/unknown) would still
+be eligible for AUTO-CONTEST under the existing Checkpoint 3 policy.
+It was: P(win)=0.697 cleared the 0.65 threshold, because unknown fields
+are neutral (0) rather than negative in the scorer, so 1 strong PASS was
+enough to clear the bar alone. This meant the policy could auto-contest
+a dispute where we only actually CONFIRMED one piece of evidence.
+
+Fixed by adding an evidence-completeness gate to policy.decide(): even
+if P(win) clears the threshold, AUTO-CONTEST also now requires a
+majority (>50%) of relevant fields to be confirmed PASS, or it downgrades
+to HUMAN REVIEW. Verified this doesn't weaken the monetary ceiling (still
+checked first, unconditionally) and doesn't block genuinely strong cases
+(3/3 PASS still auto-contests).

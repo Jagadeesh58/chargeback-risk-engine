@@ -15,6 +15,15 @@ AUTO_CONTEST_THRESHOLD = 0.65   # P(win) above this -> auto-contest (if under ce
 ACCEPT_LOSS_THRESHOLD = 0.30    # P(win) below this -> accept loss (if under ceiling)
 # between the two thresholds -> human review (genuinely ambiguous case)
 
+# Checkpoint 4 finding: a high P(win) can occur with very little CONFIRMED
+# evidence, because None (unknown) is neutral rather than negative in the
+# scorer. A dispute with 1 PASS out of 3 relevant fields can still clear
+# AUTO_CONTEST_THRESHOLD. That's not safe to auto-submit -- we'd be
+# contesting on mostly-unconfirmed evidence. This gate requires a MAJORITY
+# of relevant evidence fields to be confirmed PASS before AUTO-CONTEST is
+# allowed, regardless of how high the probability is.
+MIN_PASS_FRACTION_FOR_AUTO_CONTEST = 0.5  # >50% of relevant fields must be PASS
+
 CONTEST_COST = 150.0            # flat cost of assembling+filing evidence
 RISK_COST_IF_LOSE_CONTEST = 0.0  # simplification: losing a contest doesn't add
                                   # extra penalty beyond the lost amount itself
@@ -42,7 +51,7 @@ def compute_expected_value(win_probability: float, amount: float) -> float:
     )
 
 
-def decide(win_probability: float, amount: float) -> PolicyDecision:
+def decide(win_probability: float, amount: float, evidence_packet=None) -> PolicyDecision:
     # --- STEP 1: monetary ceiling check. UNCONDITIONAL. This is the
     # very first thing that happens, and it never reads win_probability.
     # Nothing below this line can produce a different outcome for an
@@ -59,10 +68,27 @@ def decide(win_probability: float, amount: float) -> PolicyDecision:
     ev = compute_expected_value(win_probability, amount)
 
     if win_probability >= AUTO_CONTEST_THRESHOLD:
+        # --- STEP 2b: evidence-completeness gate. A high probability
+        # alone is not enough -- we also need a majority of relevant
+        # evidence to be CONFIRMED (PASS), not just "not contradicted".
+        # If evidence_packet isn't provided, this gate is skipped (e.g.
+        # for callers that only care about probability/ceiling behavior).
+        if evidence_packet is not None and evidence_packet.total > 0:
+            pass_fraction = evidence_packet.pass_count / evidence_packet.total
+            if pass_fraction < MIN_PASS_FRACTION_FOR_AUTO_CONTEST:
+                return PolicyDecision(
+                    action="HUMAN REVIEW",
+                    reason=f"P(win)={win_probability:.2f} clears the threshold, but only "
+                           f"{evidence_packet.pass_count}/{evidence_packet.total} relevant "
+                           f"fields are confirmed (PASS) -- below the "
+                           f"{MIN_PASS_FRACTION_FOR_AUTO_CONTEST:.0%} confirmation bar "
+                           f"required for auto-contest. EV={ev:.2f}.",
+                    expected_value=ev,
+                )
         return PolicyDecision(
             action="AUTO-CONTEST",
             reason=f"P(win)={win_probability:.2f} >= {AUTO_CONTEST_THRESHOLD}, "
-                   f"under ceiling, EV={ev:.2f}.",
+                   f"under ceiling, evidence confirmed sufficiently, EV={ev:.2f}.",
             expected_value=ev,
         )
     elif win_probability <= ACCEPT_LOSS_THRESHOLD:
