@@ -73,3 +73,32 @@ majority (>50%) of relevant fields to be confirmed PASS, or it downgrades
 to HUMAN REVIEW. Verified this doesn't weaken the monetary ceiling (still
 checked first, unconditionally) and doesn't block genuinely strong cases
 (3/3 PASS still auto-contests).
+
+
+## Checkpoint 6
+
+### Naive baseline comparison -- an honest, slightly uncomfortable result
+Built the "contest everything" naive baseline and compared it against
+the real pipeline on the same held-out test.csv:
+
+| Metric | Naive (contest all) | Real pipeline |
+|---|---|---|
+| Precision | 0.564 | 0.703 |
+| Recall | 1.000 | 0.569 |
+| F1 | 0.722 | 0.629 |
+| False-positive cost | Rs 17,29,985.26 (392 FPs) | Rs 5,21,716.65 (122 FPs) |
+| Net money recovered | Rs 19,83,612.30 | Rs 11,62,088.53 |
+
+Honest finding: the naive baseline's F1 and total net-recovered money are
+actually HIGHER than the real pipeline's. Verified this makes sense
+before treating it as a "problem": F1 and total-recovered both reward
+raw volume, and the naive baseline contests all 900 disputes while the
+real pipeline only auto-contests 411 -- more attempts means more total
+wins even with a worse hit rate. But false-positive cost is the number
+that matters most for an AUTONOMOUS system, and there the real pipeline
+wins by more than 3x (Rs 5.2L vs Rs 17.3L) with a third of the bad calls
+(122 vs 392). The tradeoff (lower recall, in exchange for lower risk per
+autonomous decision) is the deliberate design goal of the monetary
+ceiling and evidence-completeness gate from Checkpoints 3-4, not a flaw.
+This needs to be stated honestly in the pitch, not hidden behind the F1
+number alone.
