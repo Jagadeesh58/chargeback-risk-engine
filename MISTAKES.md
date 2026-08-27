@@ -102,3 +102,26 @@ autonomous decision) is the deliberate design goal of the monetary
 ceiling and evidence-completeness gate from Checkpoints 3-4, not a flaw.
 This needs to be stated honestly in the pitch, not hidden behind the F1
 number alone.
+
+
+## Checkpoint 7
+
+### Sensitivity analysis revealed two honest, useful findings
+Swept AUTO_CONTEST_THRESHOLD from 0.50 to 0.90 and MONETARY_CEILING from
+Rs 5,000 to Rs 5,00,000 on the real test set:
+
+- Threshold sweep confirmed the expected precision/recall tradeoff
+  cleanly and monotonically (e.g. 0.65 -> precision 0.703/recall 0.569;
+  0.90 -> precision 0.792/recall 0.270). Also found that 0.55, 0.60, and
+  0.65 all produce IDENTICAL results -- no test dispute has a P(win) in
+  that narrow band, so our current threshold has some unused "slack".
+
+- Ceiling sweep found something more surprising: raising the ceiling
+  from Rs 10,000 all the way to Rs 5,00,000 changes NOTHING in this test
+  set -- identical precision, identical counts. This means our current
+  Rs 50,000 ceiling isn't actually binding on this particular synthetic
+  dataset (no disputes fall in the range where it would matter day to
+  day). Worth stating honestly rather than implying the ceiling is doing
+  visible work here -- its value is proven separately by the Checkpoint 3
+  fuzz test (it WOULD block an over-ceiling auto-contest if one existed),
+  not by this sensitivity sweep.
