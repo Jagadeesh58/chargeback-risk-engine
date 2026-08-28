@@ -75,6 +75,28 @@ checked first, unconditionally) and doesn't block genuinely strong cases
 (3/3 PASS still auto-contests).
 
 
+## Checkpoint 5
+
+### First real look at test.csv -- confusion matrix, precision/recall, cost, calibration
+Ran the full scorer -> evidence -> policy pipeline against the held-out
+test set (900 disputes, touched for the first time in this project) with
+AUTO-CONTEST treated as a positive prediction:
+
+- Precision: 0.703, Recall: 0.569, F1: 0.629
+- False-positive cost: Rs 5,21,716.65 across 122 false positives (this
+  is contest_cost + lost amount, for every AUTO-CONTEST that lost)
+- Action breakdown: 411 AUTO-CONTEST, 317 HUMAN REVIEW, 172 ACCEPT LOSS
+
+Calibration check (5 bins) showed the scorer is NOT well-calibrated,
+honestly: underconfident at the low end (predicted ~0.125, actual
+~0.349) and overconfident at the high end (predicted ~0.884, actual
+~0.771). This makes sense -- the logistic squashing function in
+scorer.py was hand-picked (k=2.5) to look reasonable, not fit to match
+true probabilities. Worth stating plainly in the README rather than
+hiding: the scorer ranks disputes reasonably (AUC 0.688) but its raw
+probability numbers should not be read as precise likelihoods.
+
+
 ## Checkpoint 6
 
 ### Naive baseline comparison -- an honest, slightly uncomfortable result
@@ -171,3 +193,17 @@ between the two.
 
 Small technical note: FastAPI's TestClient needs the `httpx` package
 installed separately -- not automatically pulled in by fastapi itself.
+
+### Real bug: pydantic v1/v2 incompatibility on a different machine
+When testing api.py on a second machine (Windows, different pytest run),
+`request.model_dump()` failed with `AttributeError: 'DisputeRequest'
+object has no attribute 'model_dump'`. Root cause: model_dump() only
+exists in pydantic v2; that machine had an older pydantic v1 already
+installed (visible from the stack trace using the older `requests`-based
+TestClient instead of `httpx`). Fixed with a one-line compatibility
+check: `request.model_dump() if hasattr(request, "model_dump") else
+request.dict()` -- works on either version without forcing an upgrade
+that could break other already-working dependencies on that machine.
+Real lesson: don't assume everyone's environment has the same library
+versions, especially for a fast-moving library like pydantic that made
+a breaking v1->v2 change to a commonly-used method name.
