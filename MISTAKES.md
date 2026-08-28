@@ -125,3 +125,49 @@ Rs 5,000 to Rs 5,00,000 on the real test set:
   visible work here -- its value is proven separately by the Checkpoint 3
   fuzz test (it WOULD block an over-ceiling auto-contest if one existed),
   not by this sensitivity sweep.
+
+
+## Checkpoint 8
+
+### Trained ML scorer tied the rule-based scorer exactly -- and we found out WHY
+Trained a per-reason-code Logistic Regression (same submodel structure
+validated in Checkpoint 1) on train.csv, evaluated honestly on test.csv
+(never touched during training or rule design) against the rule-based
+scorer.py on the same test set:
+
+Rule-based AUC: 0.6882
+ML scorer AUC:  0.6882 (identical to 4 decimal places)
+
+Rather than treat this as a disappointing null result, inspected the ML
+model's actual learned coefficients directly. For item_not_received:
+has_tracking_number=0.748, has_delivery_confirmation=0.903,
+has_signature_confirmation=0.834 -- nearly equal, with no strong
+preference for any one field. Traced this back to hidden_truth.py:
+RELEVANT_FIELD_RATE_IF_LEGIT/NOT_LEGIT apply the SAME correlation
+strength to every relevant field for a reason code, by design. There is
+no hidden per-field weighting pattern in the data for ML to discover, so
+an algorithm free to learn any weights converges to nearly the same
+equal weighting we hand-picked in scorer.py's FIELD_WEIGHT = 1.0.
+
+Per principle #2, keeping the rule-based scorer as primary since ML did
+not measurably beat it. This is documented as a genuine, explained
+finding, not an unexplained tie.
+
+
+## Checkpoint 9
+
+### FastAPI backend, verified to preserve safety behavior end-to-end
+Built api.py with a single /score endpoint that calls scorer.py,
+evidence.py, and policy.py directly -- zero business logic duplicated in
+the API layer. Verified by actually running the server and sending real
+HTTP requests (not just unit tests): the exact Checkpoint-3 dangerous
+case (Rs 8,00,000 dispute with strong evidence) correctly returned
+HUMAN REVIEW with the ceiling-exceeded reason message through the full
+HTTP round trip, proving the API wrapper didn't accidentally
+reimplement (and potentially weaken) the safety logic. Also added a
+cross-check test comparing the API's evidence output directly against
+calling evidence.assemble() in-process, to catch any future drift
+between the two.
+
+Small technical note: FastAPI's TestClient needs the `httpx` package
+installed separately -- not automatically pulled in by fastapi itself.
