@@ -271,3 +271,30 @@ audit_log.db before/after each test run) once tests started writing to
 a persistent file -- otherwise re-running the test suite twice in a row
 would make previously-tested dispute_ids always show as replayed from
 the prior run, which could mask a real bug in future test runs.
+
+
+## Checkpoint 12
+
+### Deployable Streamlit app, refactored for clean testability
+Built app_deployed.py for public deployment (Streamlit Community Cloud)
+where a separate FastAPI server isn't available -- it calls
+scorer.py/evidence.py/policy.py/audit_log.py directly instead of over
+HTTP, with ZERO business logic duplicated (same functions api.py calls).
+
+Initial version mixed the scoring logic directly into the same file as
+the Streamlit UI code. Testing revealed a real problem: importing that
+file for tests triggered Streamlit to try to render the entire page
+outside a real browser context, producing dozens of harmless-but-noisy
+"missing ScriptRunContext" warnings and making the actual test output
+hard to read. Fixed by extracting the pipeline-calling logic into a
+separate module, local_pipeline.py, with zero Streamlit imports --
+app_deployed.py now just imports and calls it. This also enabled a
+genuinely valuable cross-check test: score_dispute_locally() and the
+real api.py's /score endpoint are asserted to produce byte-identical
+output for the same input, proving the deployed version's logic hasn't
+silently diverged from the tested API.
+
+Kept the original app.py (calls the real API over HTTP) for local
+development and pitch-video demos of the actual backend + audit trail;
+app_deployed.py exists specifically so a reviewer can click one public
+link with zero setup on their end.
