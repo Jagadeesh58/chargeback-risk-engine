@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from scorer import predict_win_probability
 from evidence import assemble
 from policy import decide
+from audit_log import get_or_create_decision
 
 app = FastAPI(title="Chargeback Risk Engine API")
 
@@ -55,6 +56,7 @@ class DecisionResponse(BaseModel):
     action: str
     reason: str
     expected_value: float
+    replayed: bool  # True if this exact dispute_id was already decided before
 
 
 @app.get("/health")
@@ -66,26 +68,40 @@ def health():
 
 @app.post("/score", response_model=DecisionResponse)
 def score_dispute(request: DisputeRequest) -> DecisionResponse:
+    # Support both pydantic v2 (model_dump) and v1 (dict) -- different
+    # machines may have different versions installed already.
     dispute = request.model_dump() if hasattr(request, "model_dump") else request.dict()
 
-    # These three calls are the ENTIRE decision -- all logic lives in
-    # the already-tested modules, not here.
-    win_probability = predict_win_probability(dispute)
-    evidence_packet = assemble(dispute)
-    decision = decide(
-        win_probability=win_probability,
-        amount=dispute["amount"],
-        evidence_packet=evidence_packet,
+    def compute():
+        # These three calls are the ENTIRE decision -- all logic lives in
+        # the already-tested modules, not here. Only invoked if this
+        # dispute_id has never been decided before (see audit_log.py).
+        win_probability = predict_win_probability(dispute)
+        evidence_packet = assemble(dispute)
+        decision = decide(
+            win_probability=win_probability,
+            amount=dispute["amount"],
+            evidence_packet=evidence_packet,
+        )
+        evidence_list = [
+            {"field": item.field, "status": item.status}
+            for item in evidence_packet.items
+        ]
+        return win_probability, evidence_list, decision.action, decision.reason, decision.expected_value
+
+    logged = get_or_create_decision(
+        dispute_id=request.dispute_id,
+        reason_code=request.reason_code,
+        amount=request.amount,
+        compute_decision_fn=compute,
     )
 
     return DecisionResponse(
-        dispute_id=request.dispute_id,
-        win_probability=win_probability,
-        evidence=[
-            EvidenceItemResponse(field=item.field, status=item.status)
-            for item in evidence_packet.items
-        ],
-        action=decision.action,
-        reason=decision.reason,
-        expected_value=decision.expected_value,
+        dispute_id=logged.dispute_id,
+        win_probability=logged.win_probability,
+        evidence=[EvidenceItemResponse(**item) for item in logged.evidence],
+        action=logged.action,
+        reason=logged.reason,
+        expected_value=logged.expected_value,
+        replayed=logged.replayed,
     )

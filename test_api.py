@@ -5,11 +5,26 @@ still exercises the full request -> validation -> pipeline -> response
 path exactly as a real HTTP call would.
 """
 
+import os
+
+import pytest
 from fastapi.testclient import TestClient
 
 from api import app
+from audit_log import DB_PATH
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def clean_audit_db():
+    """Ensures each test run starts with a fresh audit log, so repeated
+    test runs don't accidentally see old dispute_ids as replays."""
+    if os.path.exists(DB_PATH):
+        os.remove(DB_PATH)
+    yield
+    if os.path.exists(DB_PATH):
+        os.remove(DB_PATH)
 
 
 def test_health_check():
@@ -34,6 +49,30 @@ def test_score_strong_evidence_auto_contests():
     assert 0.0 <= data["win_probability"] <= 1.0
     assert len(data["evidence"]) == 3
     assert all(item["status"] == "PASS" for item in data["evidence"])
+    assert data["replayed"] is False
+
+
+def test_duplicate_submission_is_replayed_via_api():
+    """Checkpoint 11: submitting the exact same dispute_id twice through
+    the real API should return an identical decision, with replayed=True
+    on the second call."""
+    payload = {
+        "dispute_id": "D_API_IDEMPOTENCY_TEST",
+        "payment_id": "pay_dup",
+        "reason_code": "item_not_received",
+        "amount": 3000,
+        "has_tracking_number": True,
+        "has_delivery_confirmation": True,
+        "has_signature_confirmation": True,
+    }
+    first = client.post("/score", json=payload).json()
+    second = client.post("/score", json=payload).json()
+
+    assert first["replayed"] is False
+    assert second["replayed"] is True
+    assert first["action"] == second["action"]
+    assert first["win_probability"] == second["win_probability"]
+    assert first["expected_value"] == second["expected_value"]
 
 
 def test_score_over_ceiling_amount_forces_human_review_via_api():

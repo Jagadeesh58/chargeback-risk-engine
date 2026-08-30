@@ -1,3 +1,5 @@
 __pycache__/
 *.pyc
 .txt
+audit_log.db
+test_audit_log_pytest.db

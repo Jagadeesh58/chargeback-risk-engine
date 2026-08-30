@@ -207,3 +207,67 @@ that could break other already-working dependencies on that machine.
 Real lesson: don't assume everyone's environment has the same library
 versions, especially for a fast-moving library like pydantic that made
 a breaking v1->v2 change to a commonly-used method name.
+
+
+## Checkpoint 10
+
+### Streamlit frontend with two tabs, decided to go beyond the minimum
+Built app.py with two tabs: "Score a Dispute" (calls the real API from
+Checkpoint 9, zero scoring logic in the frontend itself) and "Model
+Performance Dashboard" (visualizes precision/recall/calibration/
+sensitivity from Checkpoints 5-7, reusing those exact tested modules
+directly rather than reimplementing any of the calculations).
+
+Verified end-to-end with curl before trusting the UI: sent the exact
+payload shape the Streamlit form builds (mixed True/None/False evidence)
+to the real running API and confirmed the response matched expected
+values (P(win)=0.5 for one PASS + one WARN + one FAIL, since they
+cancel out -> HUMAN REVIEW). Chose to add the dashboard tab beyond the
+minimum single-dispute form because it showcases the honest metrics
+work from earlier checkpoints (including the not-fully-calibrated
+scorer and the naive-baseline comparison) rather than hiding them --
+consistent with principle #1 (substance-first UI, not flashy for its
+own sake).
+
+
+### Real dependency conflict: installing Streamlit broke FastAPI's pinned version
+Installing streamlit pulled in a newer starlette (1.6.0), but the
+machine's existing fastapi (0.68.2, quite old) was hard-pinned to
+starlette==0.14.2. pip explicitly warned about this incompatibility
+during install rather than failing silently. Fixed with `pip install
+--upgrade fastapi` to bring FastAPI itself to a version compatible with
+the newer starlette. Verified nothing broke by re-running the full test
+suite (62/62 still passing) and confirming the API still starts cleanly
+-- didn't just trust that the upgrade "probably worked". Real lesson:
+when installing a new library changes a shared dependency's version,
+always re-run the full test suite afterward, not just the tests for the
+thing you just added -- a change in one part of the stack can silently
+affect unrelated code that happens to sit on the same shared dependency.
+
+
+## Checkpoint 11
+
+### Added SQLite audit trail + idempotency guarantee, inspired by a competitor's strongest pattern
+While researching competing Track 02 submissions for calibration, found
+that other repos (e.g. one built around payment-retry recovery) tested
+idempotency and concurrent-request handling more rigorously than this
+project did at the time -- a real, legitimate gap. This project had no
+persistent record of past decisions, and could silently re-score the
+same dispute_id multiple times (e.g. on a network retry), a real risk
+for a system meant to make autonomous financial decisions.
+
+Fixed with audit_log.py: a local SQLite file (audit_log.db) storing
+every decision keyed by dispute_id as a PRIMARY KEY, so a duplicate
+dispute_id physically cannot be double-inserted, even under a race
+condition (verified with a 20-thread concurrency fuzz test -- all 20
+threads converged to the identical stored decision, not
+double-computed). Wired into api.py's /score endpoint: submitting the
+same dispute_id twice now returns replayed=true with the byte-for-byte
+identical original decision, verified end-to-end through a real HTTP
+round trip (matching win_probability to 16 decimal places).
+
+Small real gotcha: had to add explicit test isolation (deleting
+audit_log.db before/after each test run) once tests started writing to
+a persistent file -- otherwise re-running the test suite twice in a row
+would make previously-tested dispute_ids always show as replayed from
+the prior run, which could mask a real bug in future test runs.
