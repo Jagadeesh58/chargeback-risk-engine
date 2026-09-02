@@ -37,6 +37,11 @@ policy.py            -- monetary ceiling (unconditional) + evidence gate
 audit_log.py         -- SQLite, one row per dispute_id, idempotent replay
             |
             v
+calibration.py       -- corrects the raw P(win) against real outcomes on
+                         dev.csv (isotonic regression); informational only,
+                         does NOT feed back into the decision above
+            |
+            v
 razorpay_adapter.py  -- (only if AUTO-CONTEST) draft evidence submission
                          in Razorpay's real API shape -- never submitted
             |
@@ -49,7 +54,8 @@ logic of their own — they only call the modules above and format the
 result. `ml_scorer.py` is an alternate, optional scorer kept for
 comparison; `policy.py` never calls it. `metrics.py`, `baseline.py`, and
 `sensitivity.py` evaluate the pipeline after the fact — they don't feed
-back into it.
+back into it. `calibration.py` is similar: it corrects the probability
+*shown*, never the probability the routing decision was made from.
 
 ## Trust boundary
 
@@ -64,6 +70,7 @@ What's allowed to act on its own, and what isn't:
 | `razorpay_adapter.py` draft | Generated automatically | The function the pipeline calls has no way to request anything but `action="draft"` — submitting for real needs a separate, human-triggered call this pipeline never makes |
 | `audit_log.py` | Yes, append-only | Every decision is recorded once; a duplicate `dispute_id` can't overwrite it (SQLite primary key), so nothing can be silently re-decided |
 | `ml_scorer.py` | Not in the trusted path | Built and evaluated for comparison only; `policy.py` never imports it |
+| `calibration.py` | Advisory only | Corrects the probability shown to a human; `policy.py`'s ceiling/threshold checks still run on the raw, uncalibrated score they were fuzz-tested against |
 
 ## Results
 
@@ -78,6 +85,7 @@ fixed seed, never touched during scorer or policy design):
 | False-positive cost, real pipeline | Rs 18,300.00 (122 false positives) |
 | False-positive cost, naive "contest everything" baseline | Rs 58,800.00 (392 false positives) |
 | Optional trained ML scorer AUC | 0.6882 — ties the rule-based scorer exactly (investigated why in `MISTAKES.md`) |
+| Calibration error, raw scorer -> after isotonic calibration | 0.1218 -> 0.0849 (mean absolute error, dev-fit, measured on the held-out test set) |
 
 All numbers above describe performance **inside this synthetic evaluation
 environment only** — they are not a claim about real-world chargeback
@@ -85,10 +93,15 @@ outcomes.
 
 ## Honest limitations
 
-- **Calibration is imperfect.** The scorer ranks disputes reasonably
-  (AUC 0.688) but its raw probabilities aren't well-calibrated — it's
-  underconfident at the low end and overconfident at the high end. See
-  the calibration check in the Streamlit dashboard.
+- **The raw scorer's probabilities are still miscalibrated** — it ranks
+  disputes reasonably (AUC 0.688) but is underconfident at the low end and
+  overconfident at the high end. `calibration.py` corrects this with an
+  isotonic curve fit on `dev.csv`, cutting the measured error on the
+  held-out test set from 0.1218 to 0.0849 — but this correction is
+  informational only. `policy.py`'s ceiling and threshold checks
+  deliberately still run on the raw score, not the calibrated one, so the
+  already fuzz-tested safety behavior doesn't need to be re-validated
+  under new probability semantics.
 - **The monetary ceiling isn't binding on this particular test set** — no
   dispute happens to fall where raising or lowering it would change the
   outcome. Its safety guarantee is proven separately by a fuzz test, not
@@ -113,6 +126,7 @@ outcomes.
 
 - `generate_data.py`, `hidden_truth.py`, `config.py`, `models.py` — synthetic data generation
 - `scorer.py`, `ml_scorer.py` — win-probability scoring (rule-based, primary; ML, comparison-only)
+- `calibration.py` — isotonic calibration of the raw score against dev.csv, display-only
 - `evidence.py` — PASS/WARN/FAIL evidence packet assembly
 - `policy.py` — routing decision, monetary ceiling, expected value
 - `audit_log.py` — SQLite decision log + idempotency
@@ -120,7 +134,7 @@ outcomes.
 - `metrics.py`, `baseline.py`, `sensitivity.py` — evaluation on the held-out test set
 - `api.py` — FastAPI backend
 - `app.py`, `app_deployed.py`, `local_pipeline.py` — Streamlit frontends (API-backed and self-contained)
-- `test_*.py` — the test suite (89 tests)
+- `test_*.py` — the test suite (100 tests)
 - `DATA_DICTIONARY.md` — every CSV column, explained
 - `MISTAKES.md` — every real bug hit while building this, and how it was fixed
 - `NOTES.md` — design decisions behind the choices above
@@ -137,6 +151,10 @@ python generate_data.py --n 6000 --seed 42
 
 # check the generator doesn't leak the label into any single evidence field
 python verify_no_leakage.py
+
+# fit the calibration curve on dev.csv (also happens automatically, lazily,
+# on first API/UI request if calibration_points.json doesn't exist yet)
+python calibration.py
 
 # run the full test suite
 pytest -v

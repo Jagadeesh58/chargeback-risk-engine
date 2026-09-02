@@ -15,6 +15,7 @@ import pandas as pd
 from metrics import run_pipeline, confusion_matrix_for_auto_contest, precision_recall_f1, false_positive_cost, calibration_check
 from baseline import run_naive_baseline
 from sensitivity import sweep_auto_contest_threshold
+from calibration import fit_calibration_points, calibration_error
 
 
 def test_dashboard_data_pipeline_produces_expected_shape():
@@ -38,6 +39,19 @@ def test_calibration_check_produces_columns_app_expects():
     calibration = calibration_check(results, n_bins=5)
     assert "avg_predicted" in calibration.columns
     assert "actual_win_rate" in calibration.columns
+
+
+def test_calibration_error_comparison_matches_app_logic():
+    """Confirms the exact sequence app.py's dashboard uses to show the
+    raw-vs-calibrated comparison runs without error and that calibration
+    doesn't make things worse on the real held-out test set."""
+    test = pd.read_csv("test.csv")
+    results = run_pipeline(test)
+    calib_points = fit_calibration_points("dev.csv")
+    pairs = list(zip(results["p_win"], results["would_win"].astype(float)))
+    raw_error = calibration_error(pairs, points=None)
+    calibrated_err = calibration_error(pairs, points=calib_points)
+    assert calibrated_err <= raw_error
 
 
 def test_threshold_sweep_produces_columns_app_expects():

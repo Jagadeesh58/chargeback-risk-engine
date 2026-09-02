@@ -11,6 +11,7 @@ from evidence import assemble
 from policy import decide
 from audit_log import get_or_create_decision
 from razorpay_adapter import generate_contest_draft
+from calibration import apply_calibration, load_or_fit_calibration_points
 
 
 def score_dispute_locally(dispute: dict) -> dict:
@@ -48,8 +49,12 @@ def score_dispute_locally(dispute: dict) -> dict:
             summary=logged.reason,
         )
 
+    calibration_points = load_or_fit_calibration_points()
+    calibrated_probability = apply_calibration(calibration_points, logged.win_probability)
+
     return {
         "win_probability": logged.win_probability,
+        "calibrated_win_probability": calibrated_probability,
         "evidence": logged.evidence,
         "action": logged.action,
         "reason": logged.reason,

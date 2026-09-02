@@ -93,6 +93,13 @@ def test_full_pipeline_from_generated_data_through_api_to_audit_log():
     assert data["expected_value"] == pytest.approx(expected_decision.expected_value)
     assert data["replayed"] is False
 
+    # --- Calibration: a second, informational probability that must sit
+    # alongside the decision without having driven it -- the action above
+    # was already decided from the raw (uncalibrated) probability. ---
+    from calibration import apply_calibration, load_or_fit_calibration_points
+    expected_calibrated = apply_calibration(load_or_fit_calibration_points(), expected_probability)
+    assert data["calibrated_win_probability"] == pytest.approx(expected_calibrated)
+
     api_statuses = {item["field"]: item["status"] for item in data["evidence"]}
     expected_statuses = {item.field: item.status for item in expected_packet.items}
     assert api_statuses == expected_statuses
@@ -129,6 +136,7 @@ def test_full_pipeline_from_generated_data_through_api_to_audit_log():
     assert replay_data["replayed"] is True
     assert replay_data["action"] == data["action"]
     assert replay_data["win_probability"] == data["win_probability"]
+    assert replay_data["calibrated_win_probability"] == data["calibrated_win_probability"]
     assert replay_data["expected_value"] == data["expected_value"]
     assert replay_data["contest_draft"] == data["contest_draft"]
 
