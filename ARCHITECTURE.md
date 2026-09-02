@@ -19,7 +19,6 @@ flowchart TD
         GD --> CSV[("train.csv / dev.csv / test.csv")]
         CSV --> VNL["verify_no_leakage.py"]
         CSV --> EVAL["metrics.py / baseline.py / sensitivity.py<br/>test.csv read once, for final reporting only"]
-        CSV --> MLCMP["ml_scorer.py<br/>comparison only -- policy.py never imports it"]
     end
 
     subgraph ONLINE[" Online -- one dispute in, one decision out "]
@@ -42,6 +41,10 @@ flowchart TD
     SCORER -. "apply curve to the raw score" .-> CALIB
     CALIB --> CALOUT(["calibrated_win_probability -- shown alongside the decision, never decides it"])
 
+    CSV -. "train one LogisticRegression per reason on train.csv" .-> MLSCORE["ml_scorer.py"]
+    EVID -. "reconstruct evidence, apply live model" .-> MLSCORE
+    MLSCORE --> MLOUT(["ml_win_probability -- shown alongside the decision, never decides it"])
+
     APIL["api.py (FastAPI)"] --> ONLINE
     STL1["app.py -- Streamlit over real HTTP"] --> APIL
     STL2["app_deployed.py -- Streamlit, direct call via local_pipeline.py"] --> ONLINE
@@ -51,7 +54,7 @@ flowchart TD
     classDef neverAuto fill:#ffcccc,stroke:#cc0000,color:#660000,stroke-dasharray:5,5
     classDef storage fill:#cce5ff,stroke:#004080,color:#00264d
 
-    class SCORER,EVID,MLCMP,CALIB,CALOUT advisory
+    class SCORER,EVID,CALIB,CALOUT,MLSCORE,MLOUT advisory
     class POLICY safety
     class ADAPTER,DRAFT neverAuto
     class AUDIT storage
@@ -61,17 +64,17 @@ flowchart TD
 
 - **Offline never feeds a live decision.** `test.csv` is read by the
   evaluation modules to report honest numbers after the fact; it isn't
-  read by `scorer.py`/`policy.py` at request time. `ml_scorer.py` is
-  trained and measured for comparison and is never imported by
-  `policy.py`.
-- **`scorer.py`, `evidence.py`, and `calibration.py` are all advisory
-  (grey).** They only ever produce a number or a packet — none of them
-  can take an action. `calibration.py` in particular straddles both
-  halves of the diagram on purpose: it *fits* its curve offline against
-  `dev.csv`, but *applies* that curve online to the live raw score --
-  yet its output never flows back into `policy.py`. The decision is made
-  from the raw score alone; the calibrated number exists only to be shown
-  alongside it.
+  read by `scorer.py`/`policy.py` at request time.
+- **`scorer.py`, `evidence.py`, `calibration.py`, and `ml_scorer.py` are
+  all advisory (grey).** They only ever produce a number or a packet —
+  none of them can take an action. `calibration.py` and `ml_scorer.py`
+  both straddle the diagram on purpose: each *fits* something offline
+  (a curve against `dev.csv`; a Logistic Regression per reason code
+  against `train.csv`) but *applies* it online, to the live request --
+  and neither one's output ever flows back into `policy.py`. The
+  decision is made from the raw rule-based score alone; the calibrated
+  number and the trained model's own probability both exist only to be
+  shown alongside it, in every response.
 - **`policy.py` is the only place a routing decision is made (orange),**
   and the two safety checks inside it (monetary ceiling, evidence
   completeness) are unconditional — they run before `win_probability` is

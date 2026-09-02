@@ -4,6 +4,7 @@ __pycache__/
 audit_log.db
 test_audit_log_pytest.db
 calibration_points.json
+ml_scorer_model.pkl
 .devcontainer
 NOTES.md
 INTERVIEW_PREP.md

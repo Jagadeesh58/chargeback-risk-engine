@@ -2,13 +2,36 @@
 test_ml_scorer.py — real, runnable tests for ml_scorer.py.
 """
 
+import os
+
 import pandas as pd
+import pytest
 from sklearn.metrics import roc_auc_score
 
-from ml_scorer import MLScorer, evaluate_on
+from ml_scorer import (
+    MLScorer,
+    dispute_from_evidence_items,
+    evaluate_on,
+    load_or_fit_ml_scorer,
+)
 from scorer import predict_win_probability
+from evidence import assemble
 from metrics import _row_to_dispute
 from config import REASON_CODES
+
+TEST_MODEL_PATH = "test_ml_scorer_model_pytest.pkl"
+
+
+@pytest.fixture(autouse=True)
+def clean_model_file():
+    if os.path.exists(TEST_MODEL_PATH):
+        os.remove(TEST_MODEL_PATH)
+    import ml_scorer
+    ml_scorer._cached_scorer = None
+    yield
+    if os.path.exists(TEST_MODEL_PATH):
+        os.remove(TEST_MODEL_PATH)
+    ml_scorer._cached_scorer = None
 
 
 def test_ml_scorer_trains_one_model_per_reason_code():
@@ -84,3 +107,61 @@ def test_ml_scorer_learned_weights_are_roughly_equal_per_reason():
             f"{reason}: learned coefficients {coefs} have spread {spread:.3f}, "
             f"expected them to be roughly equal given the generator's design"
         )
+
+
+def test_dispute_from_evidence_items_reconstructs_true_false_none():
+    evidence_items = [
+        {"field": "has_tracking_number", "status": "PASS"},
+        {"field": "has_delivery_confirmation", "status": "FAIL"},
+        {"field": "has_signature_confirmation", "status": "WARN"},
+    ]
+    dispute = dispute_from_evidence_items("item_not_received", evidence_items)
+    assert dispute["reason_code"] == "item_not_received"
+    assert dispute["has_tracking_number"] is True
+    assert dispute["has_delivery_confirmation"] is False
+    assert dispute["has_signature_confirmation"] is None
+
+
+def test_dispute_from_evidence_items_matches_assemble_round_trip():
+    """The reconstruction must exactly invert evidence.assemble() -- a
+    dispute assembled into a packet and reconstructed back should
+    produce the same True/False/None values it started with."""
+    original = {
+        "reason_code": "duplicate_charge",
+        "has_duplicate_transaction_proof": True,
+        "has_refund_already_issued": False,
+    }
+    packet = assemble(original)
+    evidence_items = [{"field": i.field, "status": i.status} for i in packet.items]
+    reconstructed = dispute_from_evidence_items("duplicate_charge", evidence_items)
+    assert reconstructed["has_duplicate_transaction_proof"] is True
+    assert reconstructed["has_refund_already_issued"] is False
+
+
+def test_load_or_fit_ml_scorer_trains_and_caches():
+    scorer = load_or_fit_ml_scorer(path=TEST_MODEL_PATH, train_csv="train.csv")
+    assert set(scorer.models.keys()) == set(REASON_CODES)
+    assert os.path.exists(TEST_MODEL_PATH)
+
+    second = load_or_fit_ml_scorer(path=TEST_MODEL_PATH, train_csv="train.csv")
+    assert second is scorer  # in-process cache, not refit
+
+
+def test_load_or_fit_ml_scorer_reloads_from_saved_file():
+    """A fresh call after clearing the in-process cache should load the
+    pickled model from disk rather than retraining, and produce the
+    same prediction as the original."""
+    import ml_scorer as ml_scorer_module
+
+    first = load_or_fit_ml_scorer(path=TEST_MODEL_PATH, train_csv="train.csv")
+    dispute = {
+        "reason_code": "item_not_received",
+        "has_tracking_number": True,
+        "has_delivery_confirmation": True,
+        "has_signature_confirmation": True,
+    }
+    first_prediction = first.predict_win_probability(dispute)
+
+    ml_scorer_module._cached_scorer = None  # simulate a fresh process
+    reloaded = load_or_fit_ml_scorer(path=TEST_MODEL_PATH, train_csv="train.csv")
+    assert reloaded.predict_win_probability(dispute) == first_prediction

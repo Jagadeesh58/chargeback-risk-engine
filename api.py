@@ -21,6 +21,7 @@ from policy import decide
 from audit_log import get_or_create_decision
 from razorpay_adapter import generate_contest_draft
 from calibration import apply_calibration, load_or_fit_calibration_points
+from ml_scorer import dispute_from_evidence_items, load_or_fit_ml_scorer
 
 app = FastAPI(title="Chargeback Risk Engine API")
 
@@ -57,6 +58,9 @@ class DecisionResponse(BaseModel):
     calibrated_win_probability: float  # win_probability corrected against real
     # observed outcomes on dev.csv (see calibration.py) -- informational only,
     # NOT what action/reason/expected_value below were decided from
+    ml_win_probability: float  # trained Logistic Regression's own estimate
+    # (ml_scorer.py), for live comparison against the rule-based score --
+    # also informational only, policy.py never reads this
     evidence: list[EvidenceItemResponse]
     action: str
     reason: str
@@ -130,10 +134,15 @@ def score_dispute(request: DisputeRequest) -> DecisionResponse:
     calibration_points = load_or_fit_calibration_points()
     calibrated_probability = apply_calibration(calibration_points, logged.win_probability)
 
+    ml_scorer_instance = load_or_fit_ml_scorer()
+    ml_dispute = dispute_from_evidence_items(logged.reason_code, logged.evidence)
+    ml_probability = ml_scorer_instance.predict_win_probability(ml_dispute)
+
     return DecisionResponse(
         dispute_id=logged.dispute_id,
         win_probability=logged.win_probability,
         calibrated_win_probability=calibrated_probability,
+        ml_win_probability=ml_probability,
         evidence=[EvidenceItemResponse(**item) for item in logged.evidence],
         action=logged.action,
         reason=logged.reason,

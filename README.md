@@ -42,6 +42,10 @@ calibration.py       -- corrects the raw P(win) against real outcomes on
                          does NOT feed back into the decision above
             |
             v
+ml_scorer.py         -- trained Logistic Regression's own live P(win),
+                         for comparison; also informational only
+            |
+            v
 razorpay_adapter.py  -- (only if AUTO-CONTEST) draft evidence submission
                          in Razorpay's real API shape -- never submitted
             |
@@ -51,11 +55,12 @@ api.py (FastAPI)  <---calls--- app.py / app_deployed.py (Streamlit)
 
 `api.py` and `app.py`/`app_deployed.py` contain no scoring or policy
 logic of their own — they only call the modules above and format the
-result. `ml_scorer.py` is an alternate, optional scorer kept for
-comparison; `policy.py` never calls it. `metrics.py`, `baseline.py`, and
-`sensitivity.py` evaluate the pipeline after the fact — they don't feed
-back into it. `calibration.py` is similar: it corrects the probability
-*shown*, never the probability the routing decision was made from.
+result. `metrics.py`, `baseline.py`, and `sensitivity.py` evaluate the
+pipeline after the fact — they don't feed back into it. `calibration.py`
+and `ml_scorer.py` are both live in every request now (the API returns
+all three probabilities), but neither one drives the decision: `policy.py`
+still reads only the raw, rule-based `win_probability` it was
+fuzz-tested against.
 
 ## Trust boundary
 
@@ -69,7 +74,7 @@ What's allowed to act on its own, and what isn't:
 | `AUTO-CONTEST` decision | Yes, but bounded | Only reachable under the ceiling AND with sufficient confirmed evidence |
 | `razorpay_adapter.py` draft | Generated automatically | The function the pipeline calls has no way to request anything but `action="draft"` — submitting for real needs a separate, human-triggered call this pipeline never makes |
 | `audit_log.py` | Yes, append-only | Every decision is recorded once; a duplicate `dispute_id` can't overwrite it (SQLite primary key), so nothing can be silently re-decided |
-| `ml_scorer.py` | Not in the trusted path | Built and evaluated for comparison only; `policy.py` never imports it |
+| `ml_scorer.py` | Advisory only | Trained model's own live probability, returned in every response for comparison; `policy.py` never imports it, so it can never affect the routing decision |
 | `calibration.py` | Advisory only | Corrects the probability shown to a human; `policy.py`'s ceiling/threshold checks still run on the raw, uncalibrated score they were fuzz-tested against |
 
 ## Results
@@ -84,7 +89,7 @@ fixed seed, never touched during scorer or policy design):
 | Action breakdown | 411 `AUTO-CONTEST`, 317 `HUMAN REVIEW`, 172 `ACCEPT LOSS` |
 | False-positive cost, real pipeline | Rs 18,300.00 (122 false positives) |
 | False-positive cost, naive "contest everything" baseline | Rs 58,800.00 (392 false positives) |
-| Optional trained ML scorer AUC | 0.6882 — ties the rule-based scorer exactly (investigated why in `MISTAKES.md`) |
+| Trained ML scorer AUC (now live, `ml_win_probability` in every response) | 0.6882 — ties the rule-based scorer exactly (investigated why in `MISTAKES.md`) |
 | Calibration error, raw scorer -> after isotonic calibration | 0.1218 -> 0.0849 (mean absolute error, dev-fit, measured on the held-out test set) |
 
 All numbers above describe performance **inside this synthetic evaluation
@@ -125,7 +130,8 @@ outcomes.
 ## Repository layout
 
 - `generate_data.py`, `hidden_truth.py`, `config.py`, `models.py` — synthetic data generation
-- `scorer.py`, `ml_scorer.py` — win-probability scoring (rule-based, primary; ML, comparison-only)
+- `scorer.py` — rule-based win-probability scoring; the only score `policy.py` decides from
+- `ml_scorer.py` — trained Logistic Regression scorer, live in every response, display-only
 - `calibration.py` — isotonic calibration of the raw score against dev.csv, display-only
 - `evidence.py` — PASS/WARN/FAIL evidence packet assembly
 - `policy.py` — routing decision, monetary ceiling, expected value
@@ -151,9 +157,11 @@ python generate_data.py --n 6000 --seed 42
 # check the generator doesn't leak the label into any single evidence field
 python verify_no_leakage.py
 
-# fit the calibration curve on dev.csv (also happens automatically, lazily,
-# on first API/UI request if calibration_points.json doesn't exist yet)
+# fit the calibration curve on dev.csv, and train+cache the ML scorer
+# (both also happen automatically, lazily, on first API/UI request if
+# calibration_points.json / ml_scorer_model.pkl don't exist yet)
 python calibration.py
+python ml_scorer.py
 
 # run the full test suite
 pytest -v
