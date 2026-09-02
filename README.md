@@ -18,6 +18,9 @@ below.
 
 ## Architecture
 
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full diagram, color-coded
+against the trust boundary below. Quick version:
+
 ```
 generate_data.py / hidden_truth.py        (synthetic dispute data, held-out train/dev/test split)
             |
@@ -121,6 +124,7 @@ outcomes.
 - `DATA_DICTIONARY.md` — every CSV column, explained
 - `MISTAKES.md` — every real bug hit while building this, and how it was fixed
 - `NOTES.md` — design decisions behind the choices above
+- `ARCHITECTURE.md` — the full diagram, color-coded against the trust boundary
 
 ## How to reproduce
 
