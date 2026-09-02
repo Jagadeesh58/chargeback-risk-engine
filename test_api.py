@@ -50,6 +50,28 @@ def test_score_strong_evidence_auto_contests():
     assert len(data["evidence"]) == 3
     assert all(item["status"] == "PASS" for item in data["evidence"])
     assert data["replayed"] is False
+    assert data["contest_draft"] is not None
+    assert data["contest_draft"]["action"] == "draft"
+    assert len(data["contest_draft"]["shipping_proof"]) == 3
+
+
+def test_score_human_review_has_no_contest_draft():
+    """A contest draft only makes sense for AUTO-CONTEST -- there's
+    nothing to draft for a dispute that was routed to a human or
+    accepted as a loss."""
+    response = client.post("/score", json={
+        "dispute_id": "D0007",
+        "payment_id": "pay_PQR",
+        "reason_code": "item_not_received",
+        "amount": 1000,
+        "has_tracking_number": True,
+        "has_delivery_confirmation": None,
+        "has_signature_confirmation": False,
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["action"] != "AUTO-CONTEST"
+    assert data["contest_draft"] is None
 
 
 def test_duplicate_submission_is_replayed_via_api():
@@ -73,6 +95,7 @@ def test_duplicate_submission_is_replayed_via_api():
     assert first["action"] == second["action"]
     assert first["win_probability"] == second["win_probability"]
     assert first["expected_value"] == second["expected_value"]
+    assert first["contest_draft"] == second["contest_draft"]
 
 
 def test_score_over_ceiling_amount_forces_human_review_via_api():

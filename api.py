@@ -19,6 +19,7 @@ from scorer import predict_win_probability
 from evidence import assemble
 from policy import decide
 from audit_log import get_or_create_decision
+from razorpay_adapter import generate_contest_draft
 
 app = FastAPI(title="Chargeback Risk Engine API")
 
@@ -57,6 +58,8 @@ class DecisionResponse(BaseModel):
     reason: str
     expected_value: float
     replayed: bool  # True if this exact dispute_id was already decided before
+    contest_draft: dict | None = None  # only populated for AUTO-CONTEST; always a
+    # DRAFT in Razorpay's evidence-submission shape, never auto-submitted
 
 
 @app.get("/health")
@@ -106,6 +109,20 @@ def score_dispute(request: DisputeRequest) -> DecisionResponse:
         compute_decision_fn=compute,
     )
 
+    # A contest draft only makes sense when the decision was to contest.
+    # Recomputed fresh from the logged decision rather than stored in the
+    # audit log -- generate_contest_draft() is deterministic given the
+    # same inputs, so a replayed decision still gets a byte-identical
+    # draft without needing a database schema change to persist it.
+    contest_draft = None
+    if logged.action == "AUTO-CONTEST":
+        contest_draft = generate_contest_draft(
+            dispute_id=logged.dispute_id,
+            amount=logged.amount,
+            evidence_items=logged.evidence,
+            summary=logged.reason,
+        )
+
     return DecisionResponse(
         dispute_id=logged.dispute_id,
         win_probability=logged.win_probability,
@@ -114,4 +131,5 @@ def score_dispute(request: DisputeRequest) -> DecisionResponse:
         reason=logged.reason,
         expected_value=logged.expected_value,
         replayed=logged.replayed,
+        contest_draft=contest_draft,
     )
