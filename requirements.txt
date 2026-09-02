@@ -1,3 +1,10 @@
 streamlit
 pandas
 altair
+fastapi
+uvicorn
+pydantic
+scikit-learn
+pytest
+httpx
+requests
