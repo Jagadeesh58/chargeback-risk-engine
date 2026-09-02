@@ -1,8 +1,8 @@
 """
 baseline.py — the naive "contest everything" baseline, compared
 honestly against the real scorer+evidence+policy pipeline on the same
-held-out test set. Per Checkpoint 6: proves (or disproves) that the
-pipeline's added complexity is actually earning its keep.
+held-out test set. Proves (or disproves) that the pipeline's added
+complexity is actually earning its keep.
 """
 
 import pandas as pd
@@ -24,10 +24,12 @@ def run_naive_baseline(df: pd.DataFrame, contest_cost: float = 150.0) -> dict:
     recall = 1.0
     f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
 
-    # False-positive cost: every LOST dispute we contested costs the fee
-    # plus the amount itself.
+    # False-positive cost: every LOST dispute we contested costs just the
+    # fee -- matches policy.py's EV assumption (RISK_COST_IF_LOSE_CONTEST
+    # = 0.0). The amount was already gone via the chargeback regardless
+    # of the contest decision, so it isn't an extra cost of contesting.
     lost_disputes = df[df["would_win"] == False]
-    fp_cost = float((lost_disputes["amount"] + contest_cost).sum())
+    fp_cost = float(len(lost_disputes) * contest_cost)
 
     # Total money recovered from WON contests, for a fuller picture
     won_disputes = df[df["would_win"] == True]
