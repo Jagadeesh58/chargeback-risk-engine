@@ -1,7 +1,7 @@
 """
 metrics.py — evaluates the full scorer -> evidence -> policy pipeline
 against a held-out set. Computes the confusion matrix, precision,
-recall, F1, false-positive cost, and a calibration check (principle #9).
+recall, F1, false-positive cost, and a calibration check.
 
 IMPORTANT: this is meant to be run against test.csv exactly once for
 final reporting -- not used repeatedly to tune the scorer or policy
@@ -84,13 +84,16 @@ def precision_recall_f1(cm: dict) -> dict:
 
 def false_positive_cost(results: pd.DataFrame, contest_cost: float = 150.0) -> float:
     """
-    Total cost of AUTO-CONTEST decisions that turned out to lose:
-    the contest fee PLUS the disputed amount itself (we contested,
-    lost, and are out both the fee and the money).
+    Total cost of AUTO-CONTEST decisions that turned out to lose: just
+    the contest fee. Matches policy.py's own EV assumption
+    (RISK_COST_IF_LOSE_CONTEST = 0.0) -- the disputed amount was already
+    reversed from the merchant by the chargeback itself, contest or not,
+    so losing a contest doesn't cost the amount AGAIN on top of the fee.
+    Contesting and losing is only ever worse than not contesting by the
+    wasted fee, not by the full amount.
     """
     false_positives = results[(results["action"] == "AUTO-CONTEST") & (~results["would_win"])]
-    total_cost = (false_positives["amount"] + contest_cost).sum()
-    return float(total_cost)
+    return float(len(false_positives) * contest_cost)
 
 
 def calibration_check(results: pd.DataFrame, n_bins: int = 5) -> pd.DataFrame:

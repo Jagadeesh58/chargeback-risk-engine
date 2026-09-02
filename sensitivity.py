@@ -1,8 +1,8 @@
 """
-sensitivity.py — Checkpoint 7: measures how precision, recall, and
-false-positive cost change as we sweep AUTO_CONTEST_THRESHOLD and
-MONETARY_CEILING across a range of values, instead of trusting the
-single hand-picked values in policy.py by assumption alone.
+sensitivity.py — measures how precision, recall, and false-positive
+cost change as we sweep AUTO_CONTEST_THRESHOLD and MONETARY_CEILING
+across a range of values, instead of trusting the single hand-picked
+values in policy.py by assumption alone.
 """
 
 import pandas as pd
@@ -71,7 +71,8 @@ def sweep_auto_contest_threshold(df: pd.DataFrame, thresholds: list[float],
                 tp += 1
             elif predicted_win and not actual_win:
                 fp += 1
-                fp_cost += row["amount"] + contest_cost
+                fp_cost += contest_cost  # matches policy.py's EV assumption: losing
+                # costs just the fee, not the fee plus the amount (see metrics.py)
             elif not predicted_win and not actual_win:
                 tn += 1
             else:
@@ -125,7 +126,8 @@ def sweep_monetary_ceiling(df: pd.DataFrame, ceilings: list[float],
                 tp += 1
             elif predicted_win and not actual_win:
                 fp += 1
-                fp_cost += row["amount"] + contest_cost
+                fp_cost += contest_cost  # matches policy.py's EV assumption: losing
+                # costs just the fee, not the fee plus the amount (see metrics.py)
 
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
         results.append({

@@ -31,7 +31,10 @@ def test_recall_is_always_100_percent():
 
 def test_false_positive_cost_matches_hand_calculation():
     result = run_naive_baseline(_tiny_dataset())
-    assert result["false_positive_cost"] == 5300.0
+    # 2 losses (disputes 2 and 4) x 150 contest fee each -- NOT + amount,
+    # since the disputed amount was already gone via the chargeback
+    # regardless of the contest decision (matches policy.py's EV model).
+    assert result["false_positive_cost"] == 300.0
 
 
 def test_false_positive_count_matches_actual_losses():
