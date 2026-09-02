@@ -1,22 +1,21 @@
 """
 policy.py — deterministic policy engine. Takes a scorer's P(win) and
-turns it into a routing decision. Per principle #6: the monetary safety
-ceiling can NEVER be overridden by model confidence -- enforced here by
-checking amount FIRST, unconditionally, before dispute_probability is
-ever read.
+turns it into a routing decision. The monetary safety ceiling can NEVER
+be overridden by model confidence -- enforced here by checking amount
+FIRST, unconditionally, before dispute_probability is ever read.
 """
 
 from dataclasses import dataclass
 
-# --- Tunable policy parameters, all in one place for Checkpoint 7's
-# sensitivity analysis later ---
+# --- Tunable policy parameters, all in one place so a later sensitivity
+# analysis can sweep them without touching the decision logic ---
 MONETARY_CEILING = 50_000.0     # above this, ALWAYS human review, no exceptions
 AUTO_CONTEST_THRESHOLD = 0.65   # P(win) above this -> auto-contest (if under ceiling)
 ACCEPT_LOSS_THRESHOLD = 0.30    # P(win) below this -> accept loss (if under ceiling)
 # between the two thresholds -> human review (genuinely ambiguous case)
 
-# Checkpoint 4 finding: a high P(win) can occur with very little CONFIRMED
-# evidence, because None (unknown) is neutral rather than negative in the
+# A high P(win) can occur with very little CONFIRMED evidence, because
+# None (unknown) is neutral rather than negative in the
 # scorer. A dispute with 1 PASS out of 3 relevant fields can still clear
 # AUTO_CONTEST_THRESHOLD. That's not safe to auto-submit -- we'd be
 # contesting on mostly-unconfirmed evidence. This gate requires a MAJORITY
@@ -39,10 +38,10 @@ class PolicyDecision:
 
 def compute_expected_value(win_probability: float, amount: float) -> float:
     """
-    EV = P(win) * recoverable_amount - contest_cost - expected_risk_cost
-    per principle #8. Assumptions stated explicitly above, not invented
-    silently: contest cost is a flat fee, and we assume no extra penalty
-    beyond the lost amount if a contest is lost.
+    EV = P(win) * recoverable_amount - contest_cost - expected_risk_cost.
+    Assumptions stated explicitly above, not invented silently: contest
+    cost is a flat fee, and we assume no extra penalty beyond the lost
+    amount if a contest is lost.
     """
     return (
         win_probability * amount

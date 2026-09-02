@@ -10,8 +10,8 @@ from config import RELEVANT_EVIDENCE_BY_REASON, ALL_EVIDENCE_FIELDS, REASON_CODE
 
 
 def test_irrelevant_evidence_does_not_affect_score():
-    """Core principle #7 requirement: evidence irrelevant to a dispute's
-    reason_code must not change its score, no matter what value it holds."""
+    """Evidence irrelevant to a dispute's reason_code must not change
+    its score, no matter what value it holds."""
     for reason in REASON_CODES:
         relevant = RELEVANT_EVIDENCE_BY_REASON[reason]
         irrelevant = [f for f in ALL_EVIDENCE_FIELDS if f not in relevant]
@@ -44,7 +44,7 @@ def test_all_true_scores_higher_than_all_false():
 
 def test_unknown_evidence_is_neutral():
     """All-None relevant evidence should produce exactly 0.5 -- no signal
-    either way, per the missingness design from Checkpoint 1."""
+    either way, matching how the scorer treats missingness."""
     for reason in REASON_CODES:
         relevant = RELEVANT_EVIDENCE_BY_REASON[reason]
         dispute = {"reason_code": reason, **{f: None for f in relevant}}

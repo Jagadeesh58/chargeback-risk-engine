@@ -1,7 +1,7 @@
 """
 evidence.py — assembles a reason-code-aware evidence packet with honest
-PASS/WARN/FAIL status per field (principle #10). Never fabricates
-evidence: an unknown field is WARN, never silently treated as present.
+PASS/WARN/FAIL status per field. Never fabricates evidence: an unknown
+field is WARN, never silently treated as present.
 """
 
 from dataclasses import dataclass

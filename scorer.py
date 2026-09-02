@@ -1,11 +1,10 @@
 """
 scorer.py — interpretable, rule-based, reason-code-aware scorer.
 
-Per principle #2: start with an interpretable rule-based scorer. Only
-add ML later if it measurably beats this. Per principle #7: evidence
-irrelevant to a dispute's reason_code must never affect its score --
-enforced structurally here by only ever reading
-RELEVANT_EVIDENCE_BY_REASON[reason_code], nothing else.
+Start with an interpretable rule-based scorer. Only add ML later if it
+measurably beats this. Evidence irrelevant to a dispute's reason_code
+must never affect its score -- enforced structurally here by only ever
+reading RELEVANT_EVIDENCE_BY_REASON[reason_code], nothing else.
 """
 
 import math

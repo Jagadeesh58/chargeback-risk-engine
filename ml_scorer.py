@@ -1,9 +1,9 @@
 """
-ml_scorer.py — Checkpoint 8: an OPTIONAL trained Logistic Regression
-scorer, one submodel per reason code (same structure that proved useful
-in Checkpoint 1's leakage check). Per principle #2: only worth keeping
-if it measurably beats scorer.py's rule-based AUC on the SAME held-out
-test set -- not dev, since dev already informed rule design.
+ml_scorer.py — an OPTIONAL trained Logistic Regression scorer, one
+submodel per reason code (same structure that proved useful in the
+earlier leakage check). Only worth keeping if it measurably beats
+scorer.py's rule-based AUC on the SAME held-out test set -- not dev,
+since dev already informed rule design.
 """
 
 import pandas as pd
@@ -15,7 +15,7 @@ from config import RELEVANT_EVIDENCE_BY_REASON, REASON_CODES
 
 def _encode_evidence(df: pd.DataFrame, fields: list[str]) -> pd.DataFrame:
     """True->1.0, False->0.0, missing/None->0.5 (neutral), matching the
-    same encoding scheme used in Checkpoint 1's verify_no_leakage.py."""
+    same encoding scheme used in verify_no_leakage.py."""
     X = df[fields].copy()
     for col in fields:
         X[col] = X[col].map({True: 1.0, False: 0.0}).fillna(0.5)

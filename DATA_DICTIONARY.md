@@ -27,15 +27,15 @@ defined in `models.py` (`Dispute` dataclass) and `config.py`.
 
 All evidence fields are `bool | None`: `True` = confirmed present,
 `False` = confirmed absent, `None` = unknown / not collected for this
-dispute (see Checkpoint 1's missingness lesson — `None` is NOT the same
-as `False`).
+dispute (`None` is NOT the same as `False` — see `MISTAKES.md` for why
+that distinction matters).
 
 Each field is only **relevant** to specific reason code(s), per
 `config.RELEVANT_EVIDENCE_BY_REASON`. For a dispute filed under a
 different reason code, the field still has a value in the CSV (the
 generator fills every field for every row) but that value carries no
 real signal for that dispute's outcome and must not influence its score
-(Checkpoint 2's scorer enforces this structurally).
+(`scorer.py` enforces this structurally).
 
 | Field | Relevant to |
 |---|---|

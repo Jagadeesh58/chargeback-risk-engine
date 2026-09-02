@@ -1,7 +1,7 @@
 """
 test_policy.py — real, runnable tests for policy.py. The ceiling test is
 the single most important test in this project: it proves model
-confidence can never override the monetary safety ceiling (principle #6).
+confidence can never override the monetary safety ceiling.
 """
 
 import random
@@ -66,9 +66,9 @@ def test_expected_value_formula():
 
 
 def test_high_probability_but_mostly_unconfirmed_evidence_blocks_auto_contest():
-    """Checkpoint 4 finding: 1 PASS out of 3 relevant fields can still
-    produce P(win) >= threshold, but should NOT be eligible for
-    AUTO-CONTEST once the evidence packet is factored in."""
+    """1 PASS out of 3 relevant fields can still produce P(win) >=
+    threshold, but should NOT be eligible for AUTO-CONTEST once the
+    evidence packet is factored in."""
     dispute = {
         "reason_code": "item_not_received",
         "has_tracking_number": True,
