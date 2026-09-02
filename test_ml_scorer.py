@@ -40,8 +40,8 @@ def test_ml_scorer_auc_beats_random_on_test_set():
 
 def test_ml_scorer_does_not_dramatically_beat_rule_based_scorer():
     """
-    Checkpoint 8 finding: the trained ML scorer's AUC on test.csv should
-    be very close to the rule-based scorer's AUC -- NOT dramatically
+    The trained ML scorer's AUC on test.csv should be very close to the
+    rule-based scorer's AUC -- NOT dramatically
     better -- because the synthetic generator gives every relevant field
     equal correlation strength by design (see hidden_truth.py), so there
     is no hidden per-field weighting pattern for ML to discover.

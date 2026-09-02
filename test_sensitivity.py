@@ -39,10 +39,10 @@ def test_higher_threshold_never_increases_recall():
     )
 
 
-def test_default_threshold_matches_checkpoint_5_metrics():
+def test_default_threshold_matches_metrics_module():
     """Sanity check: sweeping at exactly our real policy's threshold (0.65)
     should reproduce the same precision/recall we already measured in
-    Checkpoint 5's metrics.py on the real test set."""
+    metrics.py on the real test set."""
     test = pd.read_csv("test.csv")
     result = sweep_auto_contest_threshold(test, [0.65])
     row = result.iloc[0]

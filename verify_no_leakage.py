@@ -1,7 +1,7 @@
 """
-verify_no_leakage.py — one-off empirical check (Checkpoint 1 requirement,
-principle #3). Not part of the pipeline; run manually after generating
-data.
+verify_no_leakage.py — one-off empirical check that the synthetic data
+generator doesn't leak the label into any single evidence field. Not
+part of the pipeline; run manually after generating data.
 """
 
 import pandas as pd

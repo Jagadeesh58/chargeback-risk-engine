@@ -21,8 +21,7 @@ def test_false_maps_to_fail():
 
 
 def test_none_maps_to_warn_never_pass():
-    """Core principle #10 requirement: unknown evidence must never be
-    fabricated as PASS."""
+    """Unknown evidence must never be fabricated as PASS."""
     dispute = {"reason_code": "item_not_received", "has_tracking_number": None}
     packet = assemble(dispute)
     item = next(i for i in packet.items if i.field == "has_tracking_number")

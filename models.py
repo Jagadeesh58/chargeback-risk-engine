@@ -9,8 +9,8 @@ from datetime import date
 
 @dataclass
 class Dispute:
-    # --- Core identifiers (field names mirror Razorpay's dispute API shape,
-    # per principle #13 -- this is a demonstration layer, not the foundation) ---
+    # --- Core identifiers (field names mirror a typical payments dispute
+    # API shape -- this is a demonstration layer, not the foundation) ---
     dispute_id: str
     payment_id: str
     reason_code: str
@@ -19,8 +19,8 @@ class Dispute:
 
     # --- Evidence fields: every one is bool | None.
     # True = confirmed present, False = confirmed absent, None = unknown/
-    # not collected. See Checkpoint 1's missingness lesson -- collapsing
-    # None into False silently corrupts the signal.
+    # not collected. Collapsing None into False would silently corrupt
+    # the signal, so this distinction is kept explicit everywhere.
     has_tracking_number: bool | None = None
     has_delivery_confirmation: bool | None = None
     has_signature_confirmation: bool | None = None

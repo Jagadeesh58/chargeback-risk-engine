@@ -1,7 +1,7 @@
 """
 test_generator.py — real, runnable tests for hidden_truth.py and
-generate_data.py. Asserts, in code, the properties Checkpoint 1 claims
-to have verified -- not just prose in chat.
+generate_data.py. Asserts, in code, the properties the generator is
+supposed to guarantee -- not just prose in a design note.
 """
 
 import random

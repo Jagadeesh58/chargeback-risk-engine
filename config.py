@@ -4,7 +4,7 @@ config.py — shared constants for the chargeback risk engine.
 Four reason codes, each with evidence fields that are RELEVANT to that
 specific reason. This matters later: evidence relevant to one reason code
 should not be able to influence the score for a dispute filed under a
-different reason code (see principle #7 / Checkpoint 2).
+different reason code (enforced structurally in scorer.py).
 """
 
 REASON_CODES = [
@@ -15,8 +15,8 @@ REASON_CODES = [
 ]
 
 # Which evidence fields matter for each reason code.
-# (Used by the scorer in Checkpoint 2 — defined here now so hidden_truth.py
-# and the scorer share one source of truth for "what's relevant to what".)
+# (Used by the scorer -- defined here so hidden_truth.py and the scorer
+# share one source of truth for "what's relevant to what".)
 RELEVANT_EVIDENCE_BY_REASON = {
     "item_not_received": [
         "has_tracking_number",

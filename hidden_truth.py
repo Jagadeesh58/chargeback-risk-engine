@@ -1,15 +1,15 @@
 """
 hidden_truth.py — THE ONLY place `would_win` gets decided.
 
-Design (per master prompt principle #3):
+Design:
 - would_win is generated from a HIDDEN variable (hidden_seller_legitimate)
   that the scorer never sees.
 - Evidence fields RELEVANT to a dispute's reason code are noisy proxies
   for the hidden variable (correlated, not identical).
 - Evidence fields IRRELEVANT to a dispute's reason code are generated
   independently of the hidden variable -- they carry no real signal for
-  that dispute, on purpose (this is what principle #7's "irrelevant
-  evidence must not affect the score" test will check downstream).
+  that dispute, on purpose (this is what the "irrelevant evidence must
+  not affect the score" test checks downstream).
 - Every evidence field also has: occasional contradiction (a small chance
   the "relevant" field is flipped against the hidden truth anyway) and
   missingness (a chance the field is None instead of True/False).
