@@ -53,9 +53,9 @@ def test_score_strong_evidence_auto_contests():
 
 
 def test_duplicate_submission_is_replayed_via_api():
-    """Checkpoint 11: submitting the exact same dispute_id twice through
-    the real API should return an identical decision, with replayed=True
-    on the second call."""
+    """Submitting the exact same dispute_id twice through the real API
+    should return an identical decision, with replayed=True on the
+    second call."""
     payload = {
         "dispute_id": "D_API_IDEMPOTENCY_TEST",
         "payment_id": "pay_dup",
@@ -120,6 +120,19 @@ def test_score_missing_required_field_returns_422():
         "payment_id": "pay_GHI",
         "amount": 1000,
         # reason_code missing entirely
+    })
+    assert response.status_code == 422
+
+
+def test_score_invalid_reason_code_returns_422():
+    """An unrecognized reason_code must be rejected with a clean 422
+    at the API boundary, not allowed to fall through to scorer.py's
+    dict lookup and raise an unhandled KeyError (a 500)."""
+    response = client.post("/score", json={
+        "dispute_id": "D0006",
+        "payment_id": "pay_MNO",
+        "reason_code": "not_a_real_reason_code",
+        "amount": 1000,
     })
     assert response.status_code == 422
 
