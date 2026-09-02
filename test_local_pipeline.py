@@ -34,6 +34,7 @@ def test_strong_evidence_auto_contests():
     assert result["action"] == "AUTO-CONTEST"
     assert result["replayed"] is False
     assert result["contest_draft"]["action"] == "draft"
+    assert 0.0 <= result["ml_win_probability"] <= 1.0
 
 
 def test_matches_api_pipeline_exactly():
@@ -68,6 +69,7 @@ def test_matches_api_pipeline_exactly():
     assert local_result["action"] == api_result["action"]
     assert local_result["win_probability"] == api_result["win_probability"]
     assert local_result["calibrated_win_probability"] == api_result["calibrated_win_probability"]
+    assert local_result["ml_win_probability"] == api_result["ml_win_probability"]
     assert local_result["expected_value"] == api_result["expected_value"]
     assert local_result["contest_draft"] == api_result["contest_draft"]
 
@@ -101,4 +103,5 @@ def test_idempotency_same_dispute_id_twice():
     assert second["replayed"] is True
     assert first["win_probability"] == second["win_probability"]
     assert first["calibrated_win_probability"] == second["calibrated_win_probability"]
+    assert first["ml_win_probability"] == second["ml_win_probability"]
     assert first["contest_draft"] == second["contest_draft"]

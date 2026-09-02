@@ -81,14 +81,16 @@ with tab1:
             "ACCEPT LOSS": "red",
         }.get(result["action"], "gray")
 
-        colA, colB, colC, colD = st.columns(4)
+        colA, colB, colC, colD, colE = st.columns(5)
         colA.metric("Win Probability (raw)", f"{result['win_probability']:.1%}")
         colB.metric("Calibrated", f"{result['calibrated_win_probability']:.1%}")
-        colC.markdown(f"### :{action_color}[{result['action']}]")
-        colD.metric("Expected Value", f"Rs {result['expected_value']:,.2f}")
+        colC.metric("Trained ML model", f"{result['ml_win_probability']:.1%}")
+        colD.markdown(f"### :{action_color}[{result['action']}]")
+        colE.metric("Expected Value", f"Rs {result['expected_value']:,.2f}")
         st.caption(
-            "The decision above was made from the raw probability, not the calibrated "
-            "one -- calibration only corrects the number for a human to read."
+            "The decision above was made from the raw (rule-based) probability only. "
+            "Calibrated and trained-ML-model probabilities are shown for comparison and "
+            "for a human to read -- neither one ever decides the action."
         )
 
         st.markdown(f"**Reason:** {result['reason']}")

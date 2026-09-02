@@ -100,6 +100,15 @@ def test_full_pipeline_from_generated_data_through_api_to_audit_log():
     expected_calibrated = apply_calibration(load_or_fit_calibration_points(), expected_probability)
     assert data["calibrated_win_probability"] == pytest.approx(expected_calibrated)
 
+    # --- Third probability: the trained ML scorer's own live estimate,
+    # also purely informational -- reconstructed from the same evidence
+    # the API just persisted, so it must match calling the model directly. ---
+    from ml_scorer import dispute_from_evidence_items, load_or_fit_ml_scorer
+    ml_scorer_instance = load_or_fit_ml_scorer()
+    ml_dispute = dispute_from_evidence_items(reason_code, data["evidence"])
+    expected_ml_probability = ml_scorer_instance.predict_win_probability(ml_dispute)
+    assert data["ml_win_probability"] == pytest.approx(expected_ml_probability)
+
     api_statuses = {item["field"]: item["status"] for item in data["evidence"]}
     expected_statuses = {item.field: item.status for item in expected_packet.items}
     assert api_statuses == expected_statuses
@@ -137,6 +146,7 @@ def test_full_pipeline_from_generated_data_through_api_to_audit_log():
     assert replay_data["action"] == data["action"]
     assert replay_data["win_probability"] == data["win_probability"]
     assert replay_data["calibrated_win_probability"] == data["calibrated_win_probability"]
+    assert replay_data["ml_win_probability"] == data["ml_win_probability"]
     assert replay_data["expected_value"] == data["expected_value"]
     assert replay_data["contest_draft"] == data["contest_draft"]
 
@@ -162,6 +172,10 @@ def test_full_pipeline_over_ceiling_generated_dispute_never_auto_contests():
     assert data["action"] == "HUMAN REVIEW"
     assert "ceiling" in data["reason"].lower()
     assert data["contest_draft"] is None
+    # The ceiling blocks the ACTION, not the informational probabilities --
+    # both are still computed and returned even when routed to a human.
+    assert 0.0 <= data["calibrated_win_probability"] <= 1.0
+    assert 0.0 <= data["ml_win_probability"] <= 1.0
 
     logged = get_existing_decision(dispute_id)
     assert logged is not None
