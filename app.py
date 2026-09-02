@@ -87,6 +87,14 @@ with tab1:
             evidence_df = pd.DataFrame(result["evidence"])
             st.dataframe(evidence_df, hide_index=True, use_container_width=True)
 
+            if result.get("contest_draft"):
+                with st.expander("Contest draft (Razorpay evidence-submission shape)"):
+                    st.caption(
+                        "Auto-generated because the decision was AUTO-CONTEST. "
+                        "Always action=\"draft\" -- nothing in this system ever submits it."
+                    )
+                    st.json(result["contest_draft"])
+
         except requests.exceptions.ConnectionError:
             st.error(
                 "Could not connect to the API. Make sure it's running: "

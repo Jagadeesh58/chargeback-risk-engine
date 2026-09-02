@@ -97,6 +97,15 @@ def test_full_pipeline_from_generated_data_through_api_to_audit_log():
     expected_statuses = {item.field: item.status for item in expected_packet.items}
     assert api_statuses == expected_statuses
 
+    # --- Razorpay adapter: an AUTO-CONTEST decision must come with a
+    # ready-to-review draft in Razorpay's real evidence-submission shape,
+    # and that draft must always say "draft", never "submit". ---
+    if data["action"] == "AUTO-CONTEST":
+        assert data["contest_draft"] is not None
+        assert data["contest_draft"]["action"] == "draft"
+    else:
+        assert data["contest_draft"] is None
+
     # --- Audit trail: the decision the API just made must be durably
     # persisted under this dispute_id, independently readable via a
     # fresh connection (simulating a server restart / separate process). ---
@@ -121,6 +130,7 @@ def test_full_pipeline_from_generated_data_through_api_to_audit_log():
     assert replay_data["action"] == data["action"]
     assert replay_data["win_probability"] == data["win_probability"]
     assert replay_data["expected_value"] == data["expected_value"]
+    assert replay_data["contest_draft"] == data["contest_draft"]
 
 
 def test_full_pipeline_over_ceiling_generated_dispute_never_auto_contests():
@@ -143,6 +153,7 @@ def test_full_pipeline_over_ceiling_generated_dispute_never_auto_contests():
 
     assert data["action"] == "HUMAN REVIEW"
     assert "ceiling" in data["reason"].lower()
+    assert data["contest_draft"] is None
 
     logged = get_existing_decision(dispute_id)
     assert logged is not None

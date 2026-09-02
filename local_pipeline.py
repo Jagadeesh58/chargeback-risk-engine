@@ -10,6 +10,7 @@ from scorer import predict_win_probability
 from evidence import assemble
 from policy import decide
 from audit_log import get_or_create_decision
+from razorpay_adapter import generate_contest_draft
 
 
 def score_dispute_locally(dispute: dict) -> dict:
@@ -37,6 +38,16 @@ def score_dispute_locally(dispute: dict) -> dict:
         amount=dispute["amount"],
         compute_decision_fn=compute,
     )
+
+    contest_draft = None
+    if logged.action == "AUTO-CONTEST":
+        contest_draft = generate_contest_draft(
+            dispute_id=logged.dispute_id,
+            amount=logged.amount,
+            evidence_items=logged.evidence,
+            summary=logged.reason,
+        )
+
     return {
         "win_probability": logged.win_probability,
         "evidence": logged.evidence,
@@ -44,4 +55,5 @@ def score_dispute_locally(dispute: dict) -> dict:
         "reason": logged.reason,
         "expected_value": logged.expected_value,
         "replayed": logged.replayed,
+        "contest_draft": contest_draft,
     }

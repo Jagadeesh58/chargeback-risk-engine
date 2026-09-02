@@ -30,12 +30,7 @@ from sensitivity import sweep_auto_contest_threshold
 
 st.set_page_config(page_title="Chargeback Risk Engine", layout="wide")
 st.title("Chargeback Risk Engine")
-st.caption(
-    "Razorpay AI Buildathon 2026 — Track 02: AI Risk Manager. "
-    "This public demo calls the same tested scorer/evidence/policy pipeline "
-    "directly (no separate API server needed for this deployed version) — "
-    "see api.py in the repo for the full REST API + audit trail."
-)
+st.caption("Razorpay AI Buildathon 2026")
 
 tab1, tab2 = st.tabs(["Score a Dispute", "Model Performance Dashboard"])
 
@@ -95,6 +90,14 @@ with tab1:
         st.markdown("**Evidence packet:**")
         evidence_df = pd.DataFrame(result["evidence"])
         st.dataframe(evidence_df, hide_index=True, use_container_width=True)
+
+        if result.get("contest_draft"):
+            with st.expander("Contest draft (Razorpay evidence-submission shape)"):
+                st.caption(
+                    "Auto-generated because the decision was AUTO-CONTEST. "
+                    "Always action=\"draft\" -- nothing in this system ever submits it."
+                )
+                st.json(result["contest_draft"])
 
 with tab2:
     st.subheader("Performance on held-out test set (900 disputes)")
