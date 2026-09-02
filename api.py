@@ -1,7 +1,7 @@
 """
 api.py — FastAPI backend. Contains ZERO business logic of its own.
 Every decision is made by scorer.py, evidence.py, and policy.py, which
-were already built and tested in Checkpoints 2-4. This file only:
+are already built and tested separately. This file only:
   1. Validates incoming request shape (via Pydantic)
   2. Calls the already-tested pipeline functions
   3. Formats the response
@@ -11,9 +11,10 @@ scoring or policy decision, that logic belongs in scorer.py/policy.py
 instead, not here.
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+from config import REASON_CODES
 from scorer import predict_win_probability
 from evidence import assemble
 from policy import decide
@@ -23,9 +24,8 @@ app = FastAPI(title="Chargeback Risk Engine API")
 
 
 class DisputeRequest(BaseModel):
-    """Mirrors the real Dispute fields a caller (e.g. Razorpay's
-    dashboard) would send. Field shapes match models.Dispute, per
-    principle #13."""
+    """Mirrors the real Dispute fields a caller (e.g. a payments
+    dashboard) would send. Field shapes match models.Dispute."""
     dispute_id: str
     payment_id: str
     reason_code: str
@@ -68,6 +68,16 @@ def health():
 
 @app.post("/score", response_model=DecisionResponse)
 def score_dispute(request: DisputeRequest) -> DecisionResponse:
+    # Validated here, not left to fall through to scorer.py's dict lookup --
+    # an unknown reason_code would otherwise raise an unhandled KeyError
+    # deep in the pipeline (a 500), instead of a clean 422 at the door.
+    if request.reason_code not in REASON_CODES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown reason_code '{request.reason_code}'. "
+                   f"Must be one of {REASON_CODES}.",
+        )
+
     # Support both pydantic v2 (model_dump) and v1 (dict) -- different
     # machines may have different versions installed already.
     dispute = request.model_dump() if hasattr(request, "model_dump") else request.dict()
