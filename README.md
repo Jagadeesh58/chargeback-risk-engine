@@ -140,7 +140,7 @@ outcomes.
 - `metrics.py`, `baseline.py`, `sensitivity.py` — evaluation on the held-out test set
 - `api.py` — FastAPI backend
 - `app.py`, `app_deployed.py`, `local_pipeline.py` — Streamlit frontends (API-backed and self-contained)
-- `test_*.py` — the test suite (100 tests)
+- `test_*.py` — the test suite (100 tests, 100 passing via `pytest -v`)
 - `DATA_DICTIONARY.md` — every CSV column, explained
 - `MISTAKES.md` — every real bug hit while building this, and how it was fixed
 - `ARCHITECTURE.md` — the full diagram, color-coded against the trust boundary
