@@ -20,6 +20,7 @@ from evidence import assemble
 from policy import decide
 from audit_log import get_or_create_decision
 from razorpay_adapter import generate_contest_draft
+from calibration import apply_calibration, load_or_fit_calibration_points
 
 app = FastAPI(title="Chargeback Risk Engine API")
 
@@ -53,6 +54,9 @@ class EvidenceItemResponse(BaseModel):
 class DecisionResponse(BaseModel):
     dispute_id: str
     win_probability: float
+    calibrated_win_probability: float  # win_probability corrected against real
+    # observed outcomes on dev.csv (see calibration.py) -- informational only,
+    # NOT what action/reason/expected_value below were decided from
     evidence: list[EvidenceItemResponse]
     action: str
     reason: str
@@ -123,9 +127,13 @@ def score_dispute(request: DisputeRequest) -> DecisionResponse:
             summary=logged.reason,
         )
 
+    calibration_points = load_or_fit_calibration_points()
+    calibrated_probability = apply_calibration(calibration_points, logged.win_probability)
+
     return DecisionResponse(
         dispute_id=logged.dispute_id,
         win_probability=logged.win_probability,
+        calibrated_win_probability=calibrated_probability,
         evidence=[EvidenceItemResponse(**item) for item in logged.evidence],
         action=logged.action,
         reason=logged.reason,

@@ -3,4 +3,5 @@ __pycache__/
 .txt
 audit_log.db
 test_audit_log_pytest.db
+calibration_points.json
 .devcontainer

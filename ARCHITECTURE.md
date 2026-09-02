@@ -38,6 +38,10 @@ flowchart TD
     POLICY --> AUDIT[("audit_log.py<br/>SQLite, dispute_id is the PRIMARY KEY")]
     AUDIT -. "same dispute_id again, replay, never recompute" .-> POLICY
 
+    CSV -. "fit isotonic curve on dev.csv" .-> CALIB["calibration.py"]
+    SCORER -. "apply curve to the raw score" .-> CALIB
+    CALIB --> CALOUT(["calibrated_win_probability -- shown alongside the decision, never decides it"])
+
     APIL["api.py (FastAPI)"] --> ONLINE
     STL1["app.py -- Streamlit over real HTTP"] --> APIL
     STL2["app_deployed.py -- Streamlit, direct call via local_pipeline.py"] --> ONLINE
@@ -47,7 +51,7 @@ flowchart TD
     classDef neverAuto fill:#ffcccc,stroke:#cc0000,color:#660000,stroke-dasharray:5,5
     classDef storage fill:#cce5ff,stroke:#004080,color:#00264d
 
-    class SCORER,EVID,MLCMP advisory
+    class SCORER,EVID,MLCMP,CALIB,CALOUT advisory
     class POLICY safety
     class ADAPTER,DRAFT neverAuto
     class AUDIT storage
@@ -60,8 +64,14 @@ flowchart TD
   read by `scorer.py`/`policy.py` at request time. `ml_scorer.py` is
   trained and measured for comparison and is never imported by
   `policy.py`.
-- **`scorer.py` and `evidence.py` are advisory (grey).** They only ever
-  produce a number and a packet — neither can take an action.
+- **`scorer.py`, `evidence.py`, and `calibration.py` are all advisory
+  (grey).** They only ever produce a number or a packet — none of them
+  can take an action. `calibration.py` in particular straddles both
+  halves of the diagram on purpose: it *fits* its curve offline against
+  `dev.csv`, but *applies* that curve online to the live raw score --
+  yet its output never flows back into `policy.py`. The decision is made
+  from the raw score alone; the calibrated number exists only to be shown
+  alongside it.
 - **`policy.py` is the only place a routing decision is made (orange),**
   and the two safety checks inside it (monetary ceiling, evidence
   completeness) are unconditional — they run before `win_probability` is

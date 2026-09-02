@@ -67,6 +67,7 @@ def test_matches_api_pipeline_exactly():
 
     assert local_result["action"] == api_result["action"]
     assert local_result["win_probability"] == api_result["win_probability"]
+    assert local_result["calibrated_win_probability"] == api_result["calibrated_win_probability"]
     assert local_result["expected_value"] == api_result["expected_value"]
     assert local_result["contest_draft"] == api_result["contest_draft"]
 
@@ -99,4 +100,5 @@ def test_idempotency_same_dispute_id_twice():
     assert first["replayed"] is False
     assert second["replayed"] is True
     assert first["win_probability"] == second["win_probability"]
+    assert first["calibrated_win_probability"] == second["calibrated_win_probability"]
     assert first["contest_draft"] == second["contest_draft"]

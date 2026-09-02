@@ -18,6 +18,42 @@ pattern for a model to discover that the hand-picked equal weighting in
 `scorer.py` doesn't already capture. The rule-based scorer stays primary;
 `policy.py` never imports `ml_scorer.py`.
 
+## Why calibration is a separate module, and why it's hand-rolled
+
+The rule-based scorer ranks disputes reasonably (AUC 0.688) but its raw
+probabilities are honestly disclosed as poorly calibrated -- underconfident
+at the low end, overconfident at the high end, because the logistic
+squashing function in `scorer.py` was hand-picked to look reasonable, not
+fit to match true probabilities. `calibration.py` fixes that specific gap:
+it fits an isotonic regression (a monotonic, data-driven curve) mapping
+the raw score to the real observed win rate on `dev.csv`, then applies
+that curve to produce a second, more honest probability. Measured on the
+held-out test set (never touched while fitting): calibration error drops
+from 0.1218 to 0.0849.
+
+Two decisions worth explaining:
+
+- **It's implemented as Pool Adjacent Violators, by hand, instead of
+  importing `sklearn.isotonic.IsotonicRegression`.** This project already
+  depends on scikit-learn for `ml_scorer.py`, so this isn't about avoiding
+  the dependency -- it's that PAVA is short enough to read start to finish
+  and verify directly (and was, against a hand-checkable example before
+  ever running it against real data), which fits this project's general
+  preference for code that can be fully explained over an opaque library
+  call, the same reasoning that put a rule-based scorer ahead of ML in the
+  first place.
+- **It's deliberately not wired into `policy.py`'s decision.** The
+  monetary ceiling and the `AUTO_CONTEST_THRESHOLD`/`ACCEPT_LOSS_THRESHOLD`
+  cutoffs were fuzz-tested and tuned against the *raw* score. Feeding the
+  calibrated number into that logic instead would silently change what
+  counts as "confident enough" to auto-contest, and every safety test
+  built around the raw score's behavior would need re-validating under
+  new semantics -- not a trade worth making this close to a deadline for
+  a number that's currently only useful for reporting and for a human
+  reading a `HUMAN REVIEW` case. `calibrated_win_probability` is returned
+  by the API and shown in the UI strictly as a second, informational
+  number alongside the decision, never in place of it.
+
 ## Why 4 reason codes with their own relevant evidence fields
 
 Real chargebacks come with a reason code (item not received, item not as
@@ -107,6 +143,14 @@ asserts the two paths produce byte-identical output for the same input.
 - The scorer's raw probabilities are not well-calibrated at the extremes
   (see `MISTAKES.md` and the dashboard's calibration check) — they rank
   disputes reasonably but shouldn't be read as precise likelihoods.
+  `calibration.py` corrects this for display (0.1218 -> 0.0849 measured
+  error), but only for display — the raw score is still what `policy.py`
+  decides from.
+- The calibration curve is fit once on `dev.csv` and cached
+  (`calibration_points.json`, gitignored, regenerated on first use). It
+  isn't refit as new decisions accumulate in the audit log — there's no
+  feedback loop from real outcomes back into the calibration or the
+  scorer.
 - The monetary ceiling and evidence gate are proven correct by targeted
   tests, not by this particular dataset happening to exercise them —
   raising or lowering the ceiling changes nothing on the current test

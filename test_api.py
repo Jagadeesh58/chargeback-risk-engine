@@ -47,6 +47,7 @@ def test_score_strong_evidence_auto_contests():
     data = response.json()
     assert data["action"] == "AUTO-CONTEST"
     assert 0.0 <= data["win_probability"] <= 1.0
+    assert 0.0 <= data["calibrated_win_probability"] <= 1.0
     assert len(data["evidence"]) == 3
     assert all(item["status"] == "PASS" for item in data["evidence"])
     assert data["replayed"] is False
@@ -94,6 +95,7 @@ def test_duplicate_submission_is_replayed_via_api():
     assert second["replayed"] is True
     assert first["action"] == second["action"]
     assert first["win_probability"] == second["win_probability"]
+    assert first["calibrated_win_probability"] == second["calibrated_win_probability"]
     assert first["expected_value"] == second["expected_value"]
     assert first["contest_draft"] == second["contest_draft"]
 
@@ -184,3 +186,25 @@ def test_response_shape_matches_evidence_module_directly():
     api_statuses = {item["field"]: item["status"] for item in response.json()["evidence"]}
     direct_statuses = {item.field: item.status for item in direct_packet.items}
     assert api_statuses == direct_statuses
+
+
+def test_calibrated_win_probability_matches_calibration_module_directly():
+    """Cross-check: the API's calibrated_win_probability should exactly
+    match calling calibration.apply_calibration() directly on the same
+    win_probability -- proving api.py isn't reimplementing calibration
+    itself."""
+    from calibration import apply_calibration, load_or_fit_calibration_points
+
+    response = client.post("/score", json={
+        "dispute_id": "D0008",
+        "payment_id": "pay_STU",
+        "reason_code": "item_not_received",
+        "amount": 2000,
+        "has_tracking_number": True,
+        "has_delivery_confirmation": True,
+        "has_signature_confirmation": True,
+    })
+    data = response.json()
+    points = load_or_fit_calibration_points()
+    expected = apply_calibration(points, data["win_probability"])
+    assert data["calibrated_win_probability"] == expected

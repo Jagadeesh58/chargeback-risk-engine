@@ -26,6 +26,7 @@ from local_pipeline import score_dispute_locally
 from metrics import run_pipeline, confusion_matrix_for_auto_contest, precision_recall_f1, false_positive_cost, calibration_check
 from baseline import run_naive_baseline
 from sensitivity import sweep_auto_contest_threshold
+from calibration import fit_calibration_points, calibration_error
 
 
 st.set_page_config(page_title="Chargeback Risk Engine", layout="wide")
@@ -80,10 +81,15 @@ with tab1:
             "ACCEPT LOSS": "red",
         }.get(result["action"], "gray")
 
-        colA, colB, colC = st.columns(3)
-        colA.metric("Win Probability", f"{result['win_probability']:.1%}")
-        colB.markdown(f"### :{action_color}[{result['action']}]")
-        colC.metric("Expected Value", f"Rs {result['expected_value']:,.2f}")
+        colA, colB, colC, colD = st.columns(4)
+        colA.metric("Win Probability (raw)", f"{result['win_probability']:.1%}")
+        colB.metric("Calibrated", f"{result['calibrated_win_probability']:.1%}")
+        colC.markdown(f"### :{action_color}[{result['action']}]")
+        colD.metric("Expected Value", f"Rs {result['expected_value']:,.2f}")
+        st.caption(
+            "The decision above was made from the raw probability, not the calibrated "
+            "one -- calibration only corrects the number for a human to read."
+        )
 
         st.markdown(f"**Reason:** {result['reason']}")
 
@@ -140,6 +146,20 @@ with tab2:
         )
         st.altair_chart(chart, use_container_width=True)
         st.caption("Predicted vs actual win rate per bin. A perfectly calibrated scorer would have the two lines overlap.")
+
+        calib_points = fit_calibration_points("dev.csv")
+        pairs = list(zip(results["p_win"], results["would_win"].astype(float)))
+        raw_error = calibration_error(pairs, points=None)
+        calibrated_err = calibration_error(pairs, points=calib_points)
+        colX, colY = st.columns(2)
+        colX.metric("Calibration error (raw scorer)", f"{raw_error:.4f}")
+        colY.metric("After isotonic calibration (fit on dev.csv)", f"{calibrated_err:.4f}")
+        st.caption(
+            "Isotonic regression fit on dev.csv, measured here on the held-out test set. "
+            "Not used to decide AUTO-CONTEST / HUMAN REVIEW / ACCEPT LOSS -- that decision "
+            "still uses the raw score it was fuzz-tested against; this is a separate, more "
+            "honest probability for a human reviewing the case."
+        )
 
     with col2:
         st.markdown("### Threshold sensitivity")
