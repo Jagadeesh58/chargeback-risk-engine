@@ -138,7 +138,6 @@ outcomes.
 - `DATA_DICTIONARY.md` — every CSV column, explained
 - `MISTAKES.md` — every real bug hit while building this, and how it was fixed
 - `ARCHITECTURE.md` — the full diagram, color-coded against the trust boundary
-- `PITCH_SCRIPT.md` — the 5-minute pitch, built around three real, computed demo cases
 
 ## How to reproduce
 
