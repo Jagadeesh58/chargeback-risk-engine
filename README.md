@@ -16,6 +16,8 @@ out: `AUTO-CONTEST`, `HUMAN REVIEW`, or `ACCEPT LOSS`. Nothing it produces
 is ever submitted anywhere automatically — see the trust boundary table
 below.
 
+**Live demo:** https://chargeback-risk-engine.streamlit.app/
+
 ## Architecture
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full diagram, color-coded
@@ -122,10 +124,10 @@ outcomes.
 - **The SQLite audit trail is a single local file**, fine for a
   demo/single-instance deployment, not designed for multiple server
   instances writing concurrently across machines.
-- **Public deployment status is unresolved.** `app_deployed.py` is built
-  to run standalone with no separate API server, but as of this writing
-  there's no confirmed, actually-public hosted URL for it — run it
-  locally with the command below.
+- **`app_deployed.py` is live** at
+  https://chargeback-risk-engine.streamlit.app/ — a self-contained
+  Streamlit deployment with no separate API server behind it. It can
+  also be run locally with the command below.
 
 ## Repository layout
 
@@ -140,7 +142,7 @@ outcomes.
 - `metrics.py`, `baseline.py`, `sensitivity.py` — evaluation on the held-out test set
 - `api.py` — FastAPI backend
 - `app.py`, `app_deployed.py`, `local_pipeline.py` — Streamlit frontends (API-backed and self-contained)
-- `test_*.py` — the test suite (100 tests, 100 passing via `pytest -v`)
+- `test_*.py` — the test suite (105 tests, 105 passing via `pytest -v`)
 - `DATA_DICTIONARY.md` — every CSV column, explained
 - `MISTAKES.md` — every real bug hit while building this, and how it was fixed
 - `ARCHITECTURE.md` — the full diagram, color-coded against the trust boundary
