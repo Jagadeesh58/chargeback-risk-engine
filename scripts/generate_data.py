@@ -67,6 +67,7 @@ def main():
     parser.add_argument("--out-dir", type=str, default=".")
     args = parser.parse_args()
 
+    Path(args.out_dir).mkdir(parents=True, exist_ok=True)
     all_rows = generate_dataset(args.n, args.seed)
 
     # Simple 70/15/15 split, done by slicing a pre-shuffled list -- since
