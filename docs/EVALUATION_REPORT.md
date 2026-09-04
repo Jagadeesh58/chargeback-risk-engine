@@ -26,7 +26,7 @@ The suite verifies the following invariant: a high model probability cannot bypa
 
 ## Limitations
 - The dataset is synthetic.
-- The relationship graph is in-memory and not a distributed graph store.
+- The relationship graph is rebuilt from relationship identifiers stored in local SQLite; it is not a distributed graph store.
 - The feedback store is local SQLite.
 - Razorpay connectivity is not claimed as live.
 - Hybrid weights are explicit engineering choices, not statistically optimized on the held-out test set.

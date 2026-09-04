@@ -232,3 +232,62 @@ def test_ml_win_probability_matches_ml_scorer_module_directly():
     ml_dispute = dispute_from_evidence_items("item_not_received", data["evidence"])
     expected = ml_scorer_instance.predict_win_probability(ml_dispute)
     assert data["ml_win_probability"] == expected
+
+def test_mutated_replay_uses_only_original_request_context():
+    """A retry with changed evidence/amount must be a true replay of the
+    original response data, not a hybrid of old and new request fields."""
+    payload = {
+        "dispute_id": "D_API_MUTATED_REPLAY",
+        "payment_id": "pay_original",
+        "reason_code": "item_not_received",
+        "amount": 3000,
+        "device_id": "device-original",
+        "has_tracking_number": True,
+        "has_delivery_confirmation": True,
+        "has_signature_confirmation": True,
+    }
+    first = client.post("/score", json=payload)
+    assert first.status_code == 200
+    first_data = first.json()
+
+    mutated = dict(payload)
+    mutated.update({
+        "amount": 9999,
+        "device_id": "device-mutated",
+        "has_tracking_number": False,
+        "has_delivery_confirmation": False,
+        "has_signature_confirmation": False,
+    })
+    second = client.post("/score", json=mutated)
+    assert second.status_code == 200
+    second_data = second.json()
+
+    expected = dict(first_data)
+    expected["replayed"] = True
+    assert second_data == expected
+
+
+def test_live_api_graph_uses_persisted_relationship_history():
+    """The API must see identifiers from prior disputes instead of creating
+    a fresh empty graph for every request."""
+    common = {
+        "payment_id": "pay_graph",
+        "reason_code": "item_not_received",
+        "amount": 1000,
+        "device_id": "device-shared-live",
+        "has_tracking_number": True,
+        "has_delivery_confirmation": True,
+        "has_signature_confirmation": True,
+    }
+    for index in range(5):
+        response = client.post("/score", json={"dispute_id": f"D_GRAPH_{index}", **common})
+        assert response.status_code == 200
+
+    final = client.post("/score", json={"dispute_id": "D_GRAPH_FINAL", **common})
+    assert final.status_code == 200
+    data = final.json()
+
+    assert data["graph_analysis"]["cluster_size"] >= 6
+    assert data["graph_analysis"]["connected_accounts"] == 0
+    assert "device_id" in data["graph_analysis"]["shared_identifiers"]
+    assert data["graph_analysis"]["historical_disputed_value"] >= 6000.0
