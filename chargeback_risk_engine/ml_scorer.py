@@ -10,6 +10,7 @@ import os
 import pickle
 
 import pandas as pd
+import sklearn
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 
@@ -90,12 +91,20 @@ def load_or_fit_ml_scorer(path: str = MODEL_PATH, train_csv: str | None = None) 
 
     if os.path.exists(path):
         with open(path, "rb") as f:
-            _cached_scorer = pickle.load(f)
+            bundle = pickle.load(f)
+        if isinstance(bundle, dict) and "scorer" in bundle:
+            _cached_scorer = bundle["scorer"]
+        else:
+            # Backward compatibility with the pre-versioned artifact format.
+            _cached_scorer = bundle
     else:
         train_df = pd.read_csv(train_csv)
         _cached_scorer = MLScorer().fit(train_df)
         with open(path, "wb") as f:
-            pickle.dump(_cached_scorer, f)
+            pickle.dump(
+                {"scorer": _cached_scorer, "sklearn_version": sklearn.__version__},
+                f,
+            )
     return _cached_scorer
 
 
