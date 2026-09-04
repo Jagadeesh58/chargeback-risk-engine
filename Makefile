@@ -1,3 +1,6 @@
+data:
+	python scripts/generate_data.py --out-dir data
+
 test:
 	python -m pytest -q
 

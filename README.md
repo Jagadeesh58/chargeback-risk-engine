@@ -35,6 +35,7 @@ python -m venv .venv
 # Windows: .venv\Scripts\activate
 # Linux/macOS: source .venv/bin/activate
 pip install -e .
+python scripts/generate_data.py --out-dir data   # or: make data
 pytest -q
 python scripts/demo.py
 python training/train_models.py

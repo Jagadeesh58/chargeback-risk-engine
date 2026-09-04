@@ -6,12 +6,13 @@ All reported numbers are generated from the repository's synthetic dataset and s
 ## Evaluation commands
 
 ```bash
+python scripts/generate_data.py --out-dir data
 python training/train_models.py
 python training/evaluate_temporal.py
-python calibration.py
+python -m chargeback_risk_engine.calibration
 pytest -q
-python demo.py
-python benchmark.py
+python scripts/demo.py
+python scripts/benchmark.py
 ```
 
 ## Model comparison
