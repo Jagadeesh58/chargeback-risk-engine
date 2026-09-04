@@ -273,17 +273,13 @@ ever an attempt to recover money already gone. Charging the amount again
 on a loss double-counted a cost that was already implied by "not
 recovering the money."
 
-**Fix.** Changed all three places to charge just the flat contest fee per
-lost auto-contest, matching the policy engine's own model, and
-recalculated the headline numbers that had been reported with the old,
-incorrect formula: false-positive cost on the real held-out test set
-dropped from a previously-reported Rs 5,21,716.65 to a corrected
-**Rs 18,300.00** for the real pipeline (122 false positives), and from
-Rs 17,29,985.26 to **Rs 58,800.00** for the naive "contest everything"
-baseline (392 false positives). The comparative conclusion didn't change —
-the real pipeline still wins by the same ~3x margin, since with a flat
-fee the cost ratio is mechanically identical to the false-positive-count
-ratio.
+**Fix.** Changed the reporting paths and `training/train_models.py` to
+charge just the flat contest fee per lost auto-contest, matching the policy
+engine's own model. The current held-out evaluation now reports **Rs
+12,150.00** for the real pipeline (81 false positives), while the naive
+"contest everything" baseline remains **Rs 58,800.00** (392 false
+positives). The comparative conclusion is unchanged: with a flat fee,
+cost is directly proportional to the number of false-positive contests.
 
 **Verified.** Recomputed the real numbers from the held-out test set with
 both the old and new formulas to confirm the old numbers matched what had

@@ -6,7 +6,8 @@
   },
   "versions": {
     "model": "chargeback-hgb-v1",
-    "features": "features-v2"
+    "features": "features-v2",
+    "sklearn": "1.8.0"
   },
   "models": {
     "rules": {
@@ -92,7 +93,7 @@
       "precision": 0.7065217391304348,
       "recall": 0.3838582677165354,
       "f1": 0.4974489795918367,
-      "false_positive_cost": 339625.5
+      "false_positive_cost": 12150.0
     },
     "action_breakdown": {
       "AUTO-CONTEST": 276,
