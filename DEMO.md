@@ -4,19 +4,19 @@
 
 ```bash
 pip install -r requirements.txt
-streamlit run app_deployed.py
+streamlit run apps/app_deployed.py
 ```
 
 Optional API:
 
 ```bash
-uvicorn api:app --reload
+uvicorn apps.api:app --reload
 ```
 
 CLI demo:
 
 ```bash
-python demo.py
+python scripts/demo.py
 ```
 
 ## Core cases
