@@ -3,17 +3,12 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
-
-# Runtime state / generated model files
 audit_log.db
 *.pkl
 calibration_points.json
-
-# OS / IDE
 .DS_Store
 .vscode/
 .idea/
-
-# Local environment
 .env
 .env.*
+*.egg-info/
