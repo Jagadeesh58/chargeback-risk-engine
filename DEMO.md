@@ -28,7 +28,7 @@ Use fresh dispute IDs to demonstrate idempotency correctly.
 
 
 ## Failure-path demo coverage
-`python demo.py` now demonstrates:
+`python scripts/demo.py` now demonstrates:
 - strong evidence -> AUTO-CONTEST (draft only)
 - missing evidence -> HUMAN REVIEW
 - amount above the safety ceiling -> HUMAN REVIEW
