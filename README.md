@@ -4,6 +4,9 @@ Production-minded **AI chargeback risk and decision engine** for the Razorpay Bu
 
 > **AI proposes. Evidence verifies. Economics prioritizes. Policy decides.**
 
+**Live demo:** [chargebackriskengine.streamlit.app](https://chargebackriskengine.streamlit.app)
+*(Evidence fields default to "Unknown" — select "Yes" on all three to see the AUTO-CONTEST path; "Unknown" evidence is deliberately never treated as positive evidence, which is why it routes to HUMAN REVIEW by default.)*
+
 ## Repository structure
 
 ```text
