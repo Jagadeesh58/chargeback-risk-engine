@@ -19,6 +19,7 @@ from chargeback_risk_engine.metrics import run_pipeline, confusion_matrix_for_au
 from chargeback_risk_engine.baseline import run_naive_baseline
 from chargeback_risk_engine.sensitivity import sweep_auto_contest_threshold
 from chargeback_risk_engine.calibration import fit_calibration_points, calibration_error
+from chargeback_risk_engine.paths import DATA_DIR
 
 API_URL = "http://127.0.0.1:8000"
 
@@ -105,7 +106,7 @@ with tab1:
         except requests.exceptions.ConnectionError:
             st.error(
                 "Could not connect to the API. Make sure it's running: "
-                "`uvicorn api:app --reload` in another terminal."
+                "`uvicorn apps.api:app --reload` in another terminal."
             )
 
 # ============================================================
@@ -118,7 +119,7 @@ with tab2:
         "environment — not a claim about real-world chargeback accuracy."
     )
 
-    test = pd.read_csv("test.csv")
+    test = pd.read_csv(DATA_DIR / "test.csv")
     results = run_pipeline(test)
     cm = confusion_matrix_for_auto_contest(results)
     prf = precision_recall_f1(cm)
@@ -153,7 +154,7 @@ with tab2:
         st.altair_chart(chart, use_container_width=True)
         st.caption("Predicted vs actual win rate per bin. A perfectly calibrated scorer would have the two lines overlap.")
 
-        calib_points = fit_calibration_points("dev.csv")
+        calib_points = fit_calibration_points(str(DATA_DIR / "dev.csv"))
         pairs = list(zip(results["p_win"], results["would_win"].astype(float)))
         raw_error = calibration_error(pairs, points=None)
         calibrated_err = calibration_error(pairs, points=calib_points)
