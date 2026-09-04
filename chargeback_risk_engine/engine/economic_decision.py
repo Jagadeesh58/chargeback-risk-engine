@@ -15,7 +15,7 @@ class EconomicDecision:
     expected_recovery: float
     expected_cost: float
     expected_net_value: float
-    recommended_action: str
+    recommended_action: str  # informational only — policy.py never reads this
 
     def to_dict(self) -> dict:
         return asdict(self)

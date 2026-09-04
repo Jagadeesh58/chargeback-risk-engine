@@ -68,14 +68,14 @@ def score_hybrid(dispute: dict, *, risk_graph: RiskGraph | None = None, db_path:
     calibrated_probability = apply_calibration(points, logged.win_probability)
     ml_dispute = dispute_from_evidence_items(logged.reason_code, logged.evidence)
     logistic_probability = ml.predict_win_probability(ml_dispute)
-    tree_probability = float(predict_model(tree_model, tree_columns, pd.DataFrame([dispute]))[0])
 
     live_dispute = {"reason_code": logged.reason_code, "amount": logged.amount, **{
         i["field"]: {"PASS": True, "FAIL": False, "WARN": None}[i["status"]] for i in logged.evidence
     }}
+    tree_probability = float(predict_model(tree_model, tree_columns, pd.DataFrame([live_dispute]))[0])
     evidence_packet = assemble(live_dispute)
     evidence_quality = score_evidence(live_dispute, evidence_packet)
-    graph_result = graph.analyze(dispute)
+    graph_result = graph.analyze(live_dispute)
     economic = calculate_economic_value(logged.amount, logged.win_probability)
     contributions = logistic_feature_contributions(ml, ml_dispute)
     explanation = build_explanation(

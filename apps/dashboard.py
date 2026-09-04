@@ -1,5 +1,5 @@
 """
-app.py — Streamlit frontend. Contains ZERO scoring/policy business logic
+dashboard.py — Streamlit frontend. Contains ZERO scoring/policy business logic
 of its own for the "Score a Dispute" tab -- it calls the FastAPI backend
 (api.py) exactly like any other HTTP client would. The dashboard tab
 reuses the already-tested metrics.py/baseline.py/sensitivity.py modules
