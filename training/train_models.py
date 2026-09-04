@@ -1,26 +1,21 @@
 """Reproducible comparison of rules, Logistic Regression and tree model."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import pickle
 from pathlib import Path
 import sys
 
-# Allow direct execution from the repository root.
+# Allow direct execution from the repository root without duplicate path setup.
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-
-
-import sys
-from pathlib import Path as _Path
-ROOT = _Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-import json
-import pickle
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
+import sklearn
 from sklearn.calibration import calibration_curve
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
@@ -34,28 +29,44 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
-from chargeback_risk_engine.config import REASON_CODES, RELEVANT_EVIDENCE_BY_REASON, HYBRID_MODEL_WEIGHTS
-from chargeback_risk_engine.scorer import predict_win_probability
-from chargeback_risk_engine.evidence import assemble
-from chargeback_risk_engine.engine.evidence_score import score_evidence
+from chargeback_risk_engine.config import (
+    REASON_CODES,
+    RELEVANT_EVIDENCE_BY_REASON,
+    HYBRID_MODEL_WEIGHTS,
+)
 from chargeback_risk_engine.engine.economic_decision import calculate_economic_value
-from chargeback_risk_engine.policy import decide
+from chargeback_risk_engine.engine.evidence_score import score_evidence
+from chargeback_risk_engine.evidence import assemble
+from chargeback_risk_engine.paths import ARTIFACTS_DIR, DATA_DIR
+from chargeback_risk_engine.policy import CONTEST_COST, decide
+from chargeback_risk_engine.scorer import predict_win_probability
 
 MODEL_VERSION = "chargeback-hgb-v1"
 FEATURE_VERSION = "features-v2"
 
-TREE_MODEL_PATH = "artifacts/hgb_model.pkl"
+TREE_MODEL_PATH = ARTIFACTS_DIR / "hgb_model.pkl"
 
-def load_or_fit_tree_model(train_csv: str = "data/train.csv"):
-    Path("artifacts").mkdir(exist_ok=True)
-    if Path(TREE_MODEL_PATH).exists():
-        with open(TREE_MODEL_PATH, "rb") as f:
+
+def load_or_fit_tree_model(train_csv: str | Path | None = None):
+    ARTIFACTS_DIR.mkdir(exist_ok=True)
+    train_csv = Path(train_csv) if train_csv is not None else DATA_DIR / "train.csv"
+    if TREE_MODEL_PATH.exists():
+        with TREE_MODEL_PATH.open("rb") as f:
             bundle = pickle.load(f)
         return bundle["model"], bundle["columns"]
     train = pd.read_csv(train_csv)
     model, columns = fit_model(train)
-    with open(TREE_MODEL_PATH, "wb") as f:
-        pickle.dump({"model": model, "columns": columns, "model_version": MODEL_VERSION, "feature_version": FEATURE_VERSION}, f)
+    with TREE_MODEL_PATH.open("wb") as f:
+        pickle.dump(
+            {
+                "model": model,
+                "columns": columns,
+                "model_version": MODEL_VERSION,
+                "feature_version": FEATURE_VERSION,
+                "sklearn_version": sklearn.__version__,
+            },
+            f,
+        )
     return model, columns
 
 
@@ -72,18 +83,21 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
         vals = [_row_value(row.get(f)) for f in fields]
         values["amount_log1p"] = float(np.log1p(max(0.0, float(row["amount"]))))
         values["evidence_mean"] = float(np.mean(vals)) if vals else 0.5
-        values["missing_fraction"] = float(sum(row.get(f) is None or pd.isna(row.get(f)) for f in fields) / len(fields))
+        values["missing_fraction"] = float(
+            sum(row.get(f) is None or pd.isna(row.get(f)) for f in fields) / len(fields)
+        )
         values["reason_code"] = reason
         rows.append(values)
     out = pd.DataFrame(rows).fillna(0.5)
-    out = pd.get_dummies(out, columns=["reason_code"], dtype=float)
-    return out
+    return pd.get_dummies(out, columns=["reason_code"], dtype=float)
 
 
 def fit_model(train: pd.DataFrame):
     X = build_features(train)
     y = train["would_win"].astype(int)
-    model = HistGradientBoostingClassifier(max_depth=4, learning_rate=0.06, max_iter=180, random_state=42)
+    model = HistGradientBoostingClassifier(
+        max_depth=4, learning_rate=0.06, max_iter=180, random_state=42
+    )
     model.fit(X, y)
     return model, list(X.columns)
 
@@ -131,7 +145,6 @@ def decision_system_metrics(test: pd.DataFrame, hybrid: np.ndarray) -> dict:
     actions = []
     fp_cost = 0.0
     auto_true = 0
-    auto_total = 0
     predicted_losses = []
     for (_, row), probability in zip(test.iterrows(), hybrid):
         dispute = row.to_dict()
@@ -139,19 +152,22 @@ def decision_system_metrics(test: pd.DataFrame, hybrid: np.ndarray) -> dict:
         quality = score_evidence(dispute, packet)
         economic = calculate_economic_value(float(row["amount"]), float(probability))
         decision = decide(
-            float(probability), float(row["amount"]), evidence_packet=packet,
+            float(probability),
+            float(row["amount"]),
+            evidence_packet=packet,
             model_confidence=max(float(probability), 1.0 - float(probability)),
             expected_net_value=economic.expected_net_value,
             evidence_quality=quality,
         )
         actions.append(decision.action)
         if decision.action == "AUTO-CONTEST":
-            auto_total += 1
-            actual = bool(row["would_win"])
-            auto_true += int(actual)
-            if not actual:
-                fp_cost += float(row["amount"])
+            auto_true += int(bool(row["would_win"]))
+            # A false positive means we spent the flat contest cost; it does
+            # not mean we lost the entire disputed amount under this policy.
+            if not bool(row["would_win"]):
+                fp_cost += CONTEST_COST
         predicted_losses.append(int(decision.action == "ACCEPT LOSS"))
+
     human = actions.count("HUMAN REVIEW")
     no_action = actions.count("ACCEPT LOSS")
     auto = actions.count("AUTO-CONTEST")
@@ -159,8 +175,18 @@ def decision_system_metrics(test: pd.DataFrame, hybrid: np.ndarray) -> dict:
     recall = auto_true / int(test["would_win"].sum()) if int(test["would_win"].sum()) else 0.0
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
     return {
-        "auto_contest": {"count": auto, "precision": precision, "recall": recall, "f1": f1, "false_positive_cost": fp_cost},
-        "action_breakdown": {"AUTO-CONTEST": auto, "HUMAN REVIEW": human, "ACCEPT LOSS": no_action},
+        "auto_contest": {
+            "count": auto,
+            "precision": precision,
+            "recall": recall,
+            "f1": f1,
+            "false_positive_cost": fp_cost,
+        },
+        "action_breakdown": {
+            "AUTO-CONTEST": auto,
+            "HUMAN REVIEW": human,
+            "ACCEPT LOSS": no_action,
+        },
         "human_review_rate": human / len(test) if len(test) else 0.0,
     }
 
@@ -170,10 +196,17 @@ def calibration_error(y_true, probs, bins=10):
     return float(np.mean(np.abs(frac - mean))) if len(frac) else 0.0
 
 
-def main():
-    train = pd.read_csv("data/train.csv")
-    dev = pd.read_csv("data/dev.csv")
-    test = pd.read_csv("data/test.csv")
+def main(argv: list[str] | None = None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--train", type=Path, default=DATA_DIR / "train.csv")
+    parser.add_argument("--dev", type=Path, default=DATA_DIR / "dev.csv")
+    parser.add_argument("--test", type=Path, default=DATA_DIR / "test.csv")
+    parser.add_argument("--output", type=Path, default=ARTIFACTS_DIR / "model_evaluation.json")
+    args = parser.parse_args(argv)
+
+    train = pd.read_csv(args.train)
+    dev = pd.read_csv(args.dev)
+    test = pd.read_csv(args.test)
     hgb, columns = fit_model(train)
     hgb_probs = predict_model(hgb, columns, test)
     lr_probs = logistic_probs(train, test)
@@ -181,21 +214,28 @@ def main():
     hybrid = hybrid_probs(rule, lr_probs, hgb_probs)
     results = {
         "dataset": {"train": len(train), "dev": len(dev), "test": len(test)},
-        "versions": {"model": MODEL_VERSION, "features": FEATURE_VERSION},
+        "versions": {
+            "model": MODEL_VERSION,
+            "features": FEATURE_VERSION,
+            "sklearn": sklearn.__version__,
+        },
         "models": {
             "rules": {**metrics(test["would_win"], rule), "calibration_error": calibration_error(test["would_win"], rule)},
             "logistic_regression": {**metrics(test["would_win"], lr_probs), "calibration_error": calibration_error(test["would_win"], lr_probs)},
             "hist_gradient_boosting": {**metrics(test["would_win"], hgb_probs), "calibration_error": calibration_error(test["would_win"], hgb_probs)},
             "hybrid_risk": {**metrics(test["would_win"], hybrid), "calibration_error": calibration_error(test["would_win"], hybrid)},
         },
-        "hybrid_definition": {"weights": HYBRID_MODEL_WEIGHTS, "note": "Probability recommendation only; evidence/economics/policy remain deterministic safety layers."},
+        "hybrid_definition": {
+            "weights": HYBRID_MODEL_WEIGHTS,
+            "note": "Probability recommendation only; evidence/economics/policy remain deterministic safety layers.",
+        },
         "hybrid_decision_system": decision_system_metrics(test, hybrid),
     }
-    out = Path("artifacts")
-    out.mkdir(exist_ok=True)
-    with open(out / "model_evaluation.json", "w") as f:
+    args.output.parent.mkdir(exist_ok=True)
+    with args.output.open("w") as f:
         json.dump(results, f, indent=2)
     print(json.dumps(results, indent=2))
+    return results
 
 
 if __name__ == "__main__":

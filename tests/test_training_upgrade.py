@@ -20,3 +20,23 @@ def test_metrics_contains_fintech_relevant_fields():
     result = metrics(y, p)
     for key in ["roc_auc", "pr_auc", "precision", "recall", "f1", "brier_score", "false_positive_rate", "false_negative_rate", "confusion_matrix"]:
         assert key in result
+
+
+def test_decision_system_uses_flat_contest_cost_for_false_positives():
+    from training.train_models import decision_system_metrics
+    from chargeback_risk_engine.policy import CONTEST_COST
+
+    test = pd.DataFrame([
+        {
+            "reason_code": "item_not_received",
+            "amount": 1_000,
+            "would_win": False,
+            "has_tracking_number": True,
+            "has_delivery_confirmation": True,
+            "has_signature_confirmation": True,
+        }
+    ])
+    # The chosen probability makes the policy auto-contest, while the label
+    # makes it a false positive. Cost must be the flat contest fee, not amount.
+    result = decision_system_metrics(test, pd.Series([0.99]))
+    assert result["auto_contest"]["false_positive_cost"] == CONTEST_COST
