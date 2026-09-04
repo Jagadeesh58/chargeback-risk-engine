@@ -13,7 +13,9 @@ import sqlite3
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 
-DB_PATH = "audit_log.db"
+from chargeback_risk_engine.paths import REPO_ROOT
+
+DB_PATH = str(REPO_ROOT / "audit_log.db")
 
 
 def _get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:

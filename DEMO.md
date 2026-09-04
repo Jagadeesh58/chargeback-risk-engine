@@ -35,3 +35,13 @@ Use fresh dispute IDs to demonstrate idempotency correctly.
 - contradictory evidence -> HUMAN REVIEW
 - high shared-device/IP relationship risk -> HUMAN REVIEW
 - duplicate dispute ID -> original persisted decision is replayed
+
+
+## Note on the hosted demo
+
+The audit trail (`audit_log.db`) is a local SQLite file. On Streamlit
+Community Cloud, the filesystem is ephemeral — it resets on redeploys
+and on wake-from-sleep. If the idempotent-replay demo (submitting the
+same dispute_id twice) doesn't find an old dispute_id after a long
+gap, that's this hosting limitation, not a logic bug. Locally, the
+audit trail is fully persistent across restarts.
