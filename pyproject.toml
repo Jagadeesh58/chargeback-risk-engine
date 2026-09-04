@@ -15,7 +15,7 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["chargeback_risk_engine*"]
+include = ["chargeback_risk_engine*", "training*", "scripts*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
