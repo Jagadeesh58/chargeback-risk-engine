@@ -1,11 +1,19 @@
+# Python
 __pycache__/
-*.pyc
-.txt
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Runtime state / generated model files
 audit_log.db
-test_audit_log_pytest.db
+*.pkl
 calibration_points.json
-ml_scorer_model.pkl
-.devcontainer
-NOTES.md
-INTERVIEW_PREP.md
-PITCH_SCRIPT.md
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Local environment
+.env
+.env.*
