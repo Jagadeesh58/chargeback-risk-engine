@@ -26,7 +26,6 @@ chargeback-risk-engine/
 ├── SECURITY.md
 ├── DEMO.md
 ├── CONTRIBUTING.md
-├── INTERVIEW_PREP.md
 ├── pyproject.toml
 └── requirements.txt
 ```
