@@ -1,80 +1,49 @@
 # Architecture Audit
 
-## Current architecture
-The repository already has a clear pipeline: reason-code-aware rule scoring (`scorer.py`), evidence validation (`evidence.py`), deterministic policy (`policy.py`), SQLite idempotent audit logging (`audit_log.py`), calibration (`calibration.py`), Logistic Regression comparison (`ml_scorer.py`), FastAPI/Streamlit presentation, and a draft-only Razorpay adapter.
+## Audit outcome
 
-## Existing strengths
-- Deterministic monetary ceiling is checked before model probability.
-- Unknown evidence is explicitly WARN rather than positive evidence.
-- AUTO-CONTEST requires a majority of confirmed PASS evidence.
-- Duplicate dispute IDs replay the stored decision.
-- External Razorpay behavior is mock/draft-only.
-- Held-out synthetic evaluation and a fuzz test exist.
+The existing repository already had useful evidence, policy, economics, graph, audit, model, API, and test infrastructure. The upgrade therefore consolidates and simplifies rather than replacing the application.
 
-## Weaknesses / technical debt
-- The primary scorer is intentionally simple and uses equal evidence weights.
-- Economic value is represented by a single flat contest fee.
-- Evidence lacks provenance/quality metadata.
-- Relationship context is local and is rebuilt from persisted identifiers; it is not a distributed graph store.
-- ML is a comparison signal rather than a feature-rich predictive model.
-- Outcome feedback is local and temporal evaluation is available, but the store is still lightweight.
-- SQLite remains single-file/single-instance storage.
+The largest justified architectural change is the creation of a **single canonical decision path** and a bounded **counterfactual decision analysis** capability.
 
-## Upgrade architecture
-The upgrade layers AI prediction, evidence intelligence, economics, relationship analysis, structured explanations and reproducible ML evaluation around the existing deterministic policy boundary.
+## Kept
 
-```text
-Chargeback Event
-      |
-      v
-Feature Extraction -----> Risk Graph / relationship signals
-      |
-      +----> Rule scorer (baseline)
-      +----> Logistic Regression (baseline ML)
-      +----> Histogram Gradient Boosting (stronger tabular model)
-      |
-      v
-Evidence Intelligence (quality/completeness/validity/confidence)
-      |
-      v
-Economic Decision (expected recovery - contest/operational cost)
-      |
-      v
-DETERMINISTIC POLICY
-      |
-      +---- AUTO-CONTEST
-      +---- HUMAN REVIEW
-      +---- ACCEPT LOSS / NO_ACTION economics signal
-      |
-      v
-Structured Explanation + Audit + Draft-only external adapter
-      |
-      v
-Outcome Feedback (future retraining/evaluation data)
-```
+- synthetic train/dev/test dataset
+- rule scorer as a baseline/safety signal
+- reason-aware ML scorer
+- canonical evidence engine
+- lightweight relationship graph
+- economics calculation
+- deterministic policy authority
+- SQLite audit/idempotency
+- draft-only Razorpay-compatible adapter
+- existing regression suite and domain tests
+- calibration and leakage evaluation
+- feedback storage outside the critical decision path
 
-## Safety boundary
-The model remains advisory. Policy remains the only component allowed to choose an automatic action. Missing evidence, monetary limits and malformed/unsafe requests must be handled before any external action is considered.
+## Simplified
 
-## Migration plan
-1. Keep current scorer/evidence/policy contracts stable.
-2. Add richer evidence scoring and economic calculations as orthogonal modules.
-3. Add stronger model evaluation without changing policy authority.
-4. Add graph and explanation signals.
-5. Add feedback/version metadata to the audit trail.
-6. Expand adversarial, temporal and performance evaluation.
+- live model path reduced to one reason-aware Logistic Regression estimator
+- HGB retained only as an offline challenger
+- hybrid probability retained only for offline comparison
+- evidence status logic consolidated in `evidence.py`
+- economics object no longer exposes a second action recommendation
+- sensitivity analysis delegates to the canonical policy function
+- Streamlit experience consolidated to `apps/app_deployed.py`
+- benchmark and metrics execute the same canonical engine as the API
 
+## Added
 
-## Remediation implemented
-- ML is now an actual advisory risk recommendation rather than a display-only comparison.
-- Logistic Regression is the primary learned signal, HGB is retained as a challenger, and the rules score is a stable prior.
-- Evidence quality and contradictory evidence can hard-stop automated contesting.
-- High relationship-risk clusters force human review.
-**Remediation:** live scoring now rebuilds relationship history from
-persisted dispute/entity identifiers in the SQLite audit log, so API and
-local default scoring can detect cross-dispute clusters. Callers may still
-provide an explicit `RiskGraph` for demos or specialized workflows. This is
-local SQLite-backed history rather than a distributed graph service.
-- Logistic model contributions are wired into live explanations.
-- Feedback analytics and a confirmed-outcome retraining export were added without automatic retraining.
-- Hybrid evaluation is generated by the training script rather than written by hand.
+- `CanonicalDecision` result object
+- bounded read-only counterfactual analysis
+- focused adversarial/safety regression tests
+- fair six-strategy benchmark
+- local end-to-end latency benchmark
+- artifact compatibility metadata
+- explicit baseline benchmark artifact and candidate comparison
+
+## Decisions not taken
+
+No new database technology, queue, service mesh, graph database, model-serving infrastructure, LLM, or frontend framework was introduced. The existing stack was sufficient for the required behavior.
+
+No claim of temporal robustness was added because the available dates are synthetic.
