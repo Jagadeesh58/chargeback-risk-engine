@@ -17,4 +17,4 @@ api:
 	uvicorn apps.api:app --reload
 
 dashboard:
-	streamlit run apps/dashboard.py
+	streamlit run apps/app_deployed.py

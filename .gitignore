@@ -1,14 +1,11 @@
-# Python
 __pycache__/
 *.py[cod]
 .pytest_cache/
+*.egg-info/
 .venv/
-audit_log.db
-*.pkl
-calibration_points.json
-.DS_Store
-.vscode/
-.idea/
+venv/
 .env
 .env.*
-*.egg-info/
+*.db
+.DS_Store
+
