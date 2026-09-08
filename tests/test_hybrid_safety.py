@@ -23,12 +23,12 @@ def test_invalid_or_contradictory_evidence_cannot_auto_contest():
     packet = assemble(dispute)
     quality = score_evidence(dispute, packet)
     decision = decide(0.99, 1000, evidence_packet=packet, evidence_quality=quality, expected_net_value=1000)
-    assert decision.action == "HUMAN REVIEW"
+    assert decision.action == "HUMAN-REVIEW"
 
 
 def test_high_graph_risk_forces_human_review():
     decision = decide(0.99, 1000, evidence_packet=None, expected_net_value=1000, graph_risk_score=0.9)
-    assert decision.action == "HUMAN REVIEW"
+    assert decision.action == "HUMAN-REVIEW"
 
 
 def test_logistic_contributions_are_deterministic():
@@ -55,4 +55,4 @@ def test_missing_evidence_forces_human_review_even_when_probability_is_low():
     packet = assemble(dispute)
     quality = score_evidence(dispute, packet)
     decision = decide(0.05, 500, evidence_packet=packet, evidence_quality=quality, expected_net_value=-100)
-    assert decision.action == "HUMAN REVIEW"
+    assert decision.action == "HUMAN-REVIEW"

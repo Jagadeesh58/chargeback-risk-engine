@@ -40,3 +40,18 @@ def test_decision_system_uses_flat_contest_cost_for_false_positives():
     # makes it a false positive. Cost must be the flat contest fee, not amount.
     result = decision_system_metrics(test, pd.Series([0.99]))
     assert result["auto_contest"]["false_positive_cost"] == CONTEST_COST
+
+
+def test_live_model_selection_uses_dev_only():
+    from training.train_models import select_live_model
+
+    dev = pd.DataFrame({"would_win": [0, 1, 0, 1]})
+    models = {
+        "rules": [0.1, 0.6, 0.2, 0.7],
+        "logistic_regression": [0.2, 0.9, 0.1, 0.8],
+        "hist_gradient_boosting": [0.2, 0.85, 0.15, 0.75],
+        "hybrid_risk": [0.2, 0.86, 0.14, 0.76],
+    }
+    selected, details = select_live_model(dev, {k: __import__("numpy").array(v) for k, v in models.items()})
+    assert selected == "logistic_regression"
+    assert set(details) == set(models)

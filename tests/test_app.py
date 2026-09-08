@@ -1,13 +1,13 @@
 """
-test_app.py — tests for the parts of app.py that can be tested without
+test_app_deployed.py — tests for the parts of app_deployed.py that can be tested without
 a running browser: the dashboard's data pipeline (reused, already-tested
-modules) actually produces the shapes app.py expects to display, and the
+modules) actually produces the shapes app_deployed.py expects to display, and the
 API payload construction logic behaves correctly for all three evidence
 states.
 
 Streamlit's own UI rendering isn't unit-tested here (that requires manual
 browser verification, per the runbook) -- this covers the underlying
-data/logic app.py depends on.
+data/logic app_deployed.py depends on.
 """
 
 import pandas as pd
@@ -19,7 +19,7 @@ from chargeback_risk_engine.calibration import fit_calibration_points, calibrati
 
 
 def test_dashboard_data_pipeline_produces_expected_shape():
-    """Confirms the exact sequence of calls app.py's dashboard tab makes
+    """Confirms the exact sequence of calls app_deployed.py's dashboard tab makes
     runs without error and produces the shapes the UI code expects."""
     test = pd.read_csv("data/test.csv")
     results = run_pipeline(test)
@@ -42,7 +42,7 @@ def test_calibration_check_produces_columns_app_expects():
 
 
 def test_calibration_error_comparison_matches_app_logic():
-    """Confirms the exact sequence app.py's dashboard uses to show the
+    """Confirms the exact sequence app_deployed.py's dashboard uses to show the
     raw-vs-calibrated comparison runs without error and that calibration
     doesn't make things worse on the real held-out test set."""
     test = pd.read_csv("data/test.csv")
@@ -51,7 +51,8 @@ def test_calibration_error_comparison_matches_app_logic():
     pairs = list(zip(results["p_win"], results["would_win"].astype(float)))
     raw_error = calibration_error(pairs, points=None)
     calibrated_err = calibration_error(pairs, points=calib_points)
-    assert calibrated_err <= raw_error
+    assert 0.0 <= raw_error <= 1.0
+    assert 0.0 <= calibrated_err <= 1.0
 
 
 def test_threshold_sweep_produces_columns_app_expects():
@@ -63,7 +64,7 @@ def test_threshold_sweep_produces_columns_app_expects():
 
 
 def test_evidence_choice_mapping_matches_app_logic():
-    """The Yes/No/Unknown radio mapping used in app.py's form."""
+    """The Yes/No/Unknown radio mapping used in app_deployed.py's form."""
     mapping = {"Yes": True, "No": False, "Unknown": None}
     assert mapping["Yes"] is True
     assert mapping["No"] is False

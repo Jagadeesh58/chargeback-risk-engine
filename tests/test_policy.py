@@ -20,7 +20,7 @@ def test_ceiling_holds_even_at_maximum_confidence():
             f"SAFETY VIOLATION: amount={over_ceiling_amount}, "
             f"probability={probability} produced {decision.action}"
         )
-        assert decision.action == "HUMAN REVIEW"
+        assert decision.action == "HUMAN-REVIEW"
 
 
 def test_ceiling_holds_across_random_fuzzing():
@@ -37,25 +37,34 @@ def test_ceiling_holds_across_random_fuzzing():
         )
 
 
-def test_below_ceiling_high_confidence_auto_contests():
+def test_below_ceiling_high_confidence_without_evidence_requires_human_review():
     decision = decide(win_probability=0.95, amount=1000.0)
-    assert decision.action == "AUTO-CONTEST"
+    assert decision.action == "HUMAN-REVIEW"
 
 
 def test_below_ceiling_low_confidence_accepts_loss():
     decision = decide(win_probability=0.05, amount=1000.0)
-    assert decision.action == "ACCEPT LOSS"
+    assert decision.action == "ACCEPT-LOSS"
 
 
 def test_below_ceiling_ambiguous_goes_to_human_review():
     decision = decide(win_probability=0.5, amount=1000.0)
-    assert decision.action == "HUMAN REVIEW"
+    assert decision.action == "HUMAN-REVIEW"
 
 
 def test_exactly_at_ceiling_is_still_eligible_for_auto_decisioning():
     """Boundary check: the rule is 'exceeds', so an amount exactly AT the
-    ceiling should NOT be forced to human review by the ceiling rule."""
-    decision = decide(win_probability=0.95, amount=MONETARY_CEILING)
+    ceiling should NOT be forced to HUMAN-REVIEW by the ceiling rule."""
+    packet = assemble({
+        "reason_code": "item_not_received",
+        "has_tracking_number": True,
+        "has_delivery_confirmation": True,
+        "has_signature_confirmation": True,
+    })
+    decision = decide(win_probability=0.95, amount=MONETARY_CEILING, evidence_packet=packet)
+    from chargeback_risk_engine.engine.evidence_score import score_evidence
+    quality = score_evidence({"reason_code": "item_not_received", "has_tracking_number": True, "has_delivery_confirmation": True, "has_signature_confirmation": True}, packet)
+    decision = decide(win_probability=0.95, amount=MONETARY_CEILING, evidence_packet=packet, evidence_quality=quality, expected_net_value=1000)
     assert decision.action == "AUTO-CONTEST"
 
 
@@ -80,7 +89,7 @@ def test_high_probability_but_mostly_unconfirmed_evidence_blocks_auto_contest():
 
     decision = decide(win_probability=0.697, amount=2000, evidence_packet=packet)
     assert decision.action != "AUTO-CONTEST"
-    assert decision.action == "HUMAN REVIEW"
+    assert decision.action == "HUMAN-REVIEW"
 
 
 def test_majority_confirmed_evidence_allows_auto_contest():
@@ -93,7 +102,9 @@ def test_majority_confirmed_evidence_allows_auto_contest():
         "has_signature_confirmation": True,
     }
     packet = assemble(dispute)
-    decision = decide(win_probability=0.9, amount=2000, evidence_packet=packet)
+    from chargeback_risk_engine.engine.evidence_score import score_evidence
+    quality = score_evidence(dispute, packet)
+    decision = decide(win_probability=0.9, amount=2000, evidence_packet=packet, evidence_quality=quality, expected_net_value=500)
     assert decision.action == "AUTO-CONTEST"
 
 
@@ -109,4 +120,4 @@ def test_evidence_gate_never_overrides_the_ceiling():
     }
     packet = assemble(dispute)
     decision = decide(win_probability=0.99, amount=MONETARY_CEILING + 1, evidence_packet=packet)
-    assert decision.action == "HUMAN REVIEW"
+    assert decision.action == "HUMAN-REVIEW"
