@@ -30,19 +30,19 @@ from sklearn.metrics import (
 )
 
 from chargeback_risk_engine.config import (
-    REASON_CODES,
     RELEVANT_EVIDENCE_BY_REASON,
     HYBRID_MODEL_WEIGHTS,
+    LIVE_MODEL_VERSION,
+    CHALLENGER_MODEL_VERSION,
+    FEATURE_VERSION,
 )
+from chargeback_risk_engine.ml_scorer import MLScorer
 from chargeback_risk_engine.engine.economic_decision import calculate_economic_value
 from chargeback_risk_engine.engine.evidence_score import score_evidence
 from chargeback_risk_engine.evidence import assemble
 from chargeback_risk_engine.paths import ARTIFACTS_DIR, DATA_DIR
 from chargeback_risk_engine.policy import CONTEST_COST, decide
 from chargeback_risk_engine.scorer import predict_win_probability
-
-MODEL_VERSION = "chargeback-hgb-v1"
-FEATURE_VERSION = "features-v2"
 
 TREE_MODEL_PATH = ARTIFACTS_DIR / "hgb_model.pkl"
 
@@ -61,7 +61,7 @@ def load_or_fit_tree_model(train_csv: str | Path | None = None):
             {
                 "model": model,
                 "columns": columns,
-                "model_version": MODEL_VERSION,
+                "model_version": CHALLENGER_MODEL_VERSION,
                 "feature_version": FEATURE_VERSION,
                 "sklearn_version": sklearn.__version__,
             },
@@ -111,14 +111,6 @@ def rules_probs(df: pd.DataFrame) -> np.ndarray:
     return np.array([predict_win_probability(r.to_dict()) for _, r in df.iterrows()])
 
 
-def logistic_probs(train: pd.DataFrame, test: pd.DataFrame) -> np.ndarray:
-    X_train = build_features(train)
-    X_test = build_features(test).reindex(columns=X_train.columns, fill_value=0.0)
-    model = LogisticRegression(max_iter=1000, random_state=42)
-    model.fit(X_train, train["would_win"].astype(int))
-    return model.predict_proba(X_test)[:, 1]
-
-
 def hybrid_probs(rule_probs: np.ndarray, lr_probs: np.ndarray, tree_probs: np.ndarray) -> np.ndarray:
     w = HYBRID_MODEL_WEIGHTS
     total = sum(w.values())
@@ -166,10 +158,10 @@ def decision_system_metrics(test: pd.DataFrame, hybrid: np.ndarray) -> dict:
             # not mean we lost the entire disputed amount under this policy.
             if not bool(row["would_win"]):
                 fp_cost += CONTEST_COST
-        predicted_losses.append(int(decision.action == "ACCEPT LOSS"))
+        predicted_losses.append(int(decision.action == "ACCEPT-LOSS"))
 
-    human = actions.count("HUMAN REVIEW")
-    no_action = actions.count("ACCEPT LOSS")
+    human = actions.count("HUMAN-REVIEW")
+    no_action = actions.count("ACCEPT-LOSS")
     auto = actions.count("AUTO-CONTEST")
     precision = auto_true / auto if auto else 0.0
     recall = auto_true / int(test["would_win"].sum()) if int(test["would_win"].sum()) else 0.0
@@ -184,8 +176,8 @@ def decision_system_metrics(test: pd.DataFrame, hybrid: np.ndarray) -> dict:
         },
         "action_breakdown": {
             "AUTO-CONTEST": auto,
-            "HUMAN REVIEW": human,
-            "ACCEPT LOSS": no_action,
+            "HUMAN-REVIEW": human,
+            "ACCEPT-LOSS": no_action,
         },
         "human_review_rate": human / len(test) if len(test) else 0.0,
     }
@@ -194,6 +186,37 @@ def decision_system_metrics(test: pd.DataFrame, hybrid: np.ndarray) -> dict:
 def calibration_error(y_true, probs, bins=10):
     frac, mean = calibration_curve(y_true, probs, n_bins=bins, strategy="uniform")
     return float(np.mean(np.abs(frac - mean))) if len(frac) else 0.0
+
+
+def select_live_model(dev: pd.DataFrame, models: dict[str, np.ndarray]) -> tuple[str, dict]:
+    candidates = {}
+    for name, probabilities in models.items():
+        result = metrics(dev["would_win"], probabilities)
+        result["calibration_error"] = calibration_error(dev["would_win"], probabilities)
+        candidates[name] = result
+
+    ranked_by_pr_auc = sorted(candidates, key=lambda name: candidates[name]["pr_auc"], reverse=True)
+    top_pr_auc = candidates[ranked_by_pr_auc[0]]["pr_auc"]
+    near_ties = [
+        name for name in ranked_by_pr_auc
+        if top_pr_auc - candidates[name]["pr_auc"] <= 0.01
+    ]
+    materially_better = [
+        name for name in near_ties
+        if candidates[name]["pr_auc"] >= candidates["logistic_regression"]["pr_auc"] + 0.01
+    ]
+    if materially_better:
+        selected = min(
+            materially_better,
+            key=lambda name: (
+                candidates[name]["brier_score"],
+                candidates[name]["calibration_error"],
+                {"rules": 0, "logistic_regression": 1, "hist_gradient_boosting": 2, "hybrid_risk": 3}[name],
+            ),
+        )
+    else:
+        selected = "logistic_regression"
+    return selected, candidates
 
 
 def main(argv: list[str] | None = None):
@@ -209,15 +232,60 @@ def main(argv: list[str] | None = None):
     test = pd.read_csv(args.test)
     hgb, columns = fit_model(train)
     hgb_probs = predict_model(hgb, columns, test)
-    lr_probs = logistic_probs(train, test)
+    lr_model = MLScorer().fit(train)
+    from chargeback_risk_engine.ml_scorer import save_ml_scorer
+    save_ml_scorer(train_csv=str(args.train))
+    lr_probs = []
+    for _, row in test.iterrows():
+        dispute = row.to_dict()
+        for key, value in dispute.items():
+            if isinstance(value, float) and pd.isna(value):
+                dispute[key] = None
+        lr_probs.append(lr_model.predict_win_probability(dispute))
+    lr_probs = np.asarray(lr_probs, dtype=float)
     rule = rules_probs(test)
     hybrid = hybrid_probs(rule, lr_probs, hgb_probs)
+    dev_hgb_probs = predict_model(hgb, columns, dev)
+    dev_lr_probs = np.asarray([
+        lr_model.predict_win_probability(
+            {
+                key: (None if isinstance(value, float) and pd.isna(value) else value)
+                for key, value in row.items()
+            }
+        )
+        for row in dev.to_dict("records")
+    ], dtype=float)
+    dev_rule_probs = np.array([predict_win_probability(r) for r in dev.to_dict("records")])
+    dev_hybrid_probs = hybrid_probs(dev_rule_probs, dev_lr_probs, dev_hgb_probs)
+    selected_name, dev_selection = select_live_model(
+        dev,
+        {
+            "rules": dev_rule_probs,
+            "logistic_regression": dev_lr_probs,
+            "hist_gradient_boosting": dev_hgb_probs,
+            "hybrid_risk": dev_hybrid_probs,
+        },
+    )
+    if selected_name != "logistic_regression":
+        raise RuntimeError(
+            f"The existing live decision path supports Logistic Regression only, "
+            f"but dev-only model selection selected {selected_name}."
+        )
+
     results = {
         "dataset": {"train": len(train), "dev": len(dev), "test": len(test)},
         "versions": {
-            "model": MODEL_VERSION,
+            "live_model": LIVE_MODEL_VERSION,
+            "hgb_challenger": CHALLENGER_MODEL_VERSION,
             "features": FEATURE_VERSION,
             "sklearn": sklearn.__version__,
+        },
+        "model_selection": {
+            "selected": selected_name,
+            "challengers": ["rules-v1", CHALLENGER_MODEL_VERSION, "offline-hybrid"],
+            "selection_split": "dev",
+            "selection_metrics": dev_selection,
+            "selection_rule": "use Logistic Regression unless another candidate improves PR-AUC by at least 0.01 on dev; among qualifying alternatives prefer lower Brier score, then lower calibration error, then simpler implementation",
         },
         "models": {
             "rules": {**metrics(test["would_win"], rule), "calibration_error": calibration_error(test["would_win"], rule)},
@@ -225,9 +293,10 @@ def main(argv: list[str] | None = None):
             "hist_gradient_boosting": {**metrics(test["would_win"], hgb_probs), "calibration_error": calibration_error(test["would_win"], hgb_probs)},
             "hybrid_risk": {**metrics(test["would_win"], hybrid), "calibration_error": calibration_error(test["would_win"], hybrid)},
         },
+        "final_test_split": "test is used only for final evaluation after model selection is frozen",
         "hybrid_definition": {
             "weights": HYBRID_MODEL_WEIGHTS,
-            "note": "Probability recommendation only; evidence/economics/policy remain deterministic safety layers.",
+            "note": "Offline challenger only; evidence/economics/policy remain deterministic safety layers.",
         },
         "hybrid_decision_system": decision_system_metrics(test, hybrid),
     }

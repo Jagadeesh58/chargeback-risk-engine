@@ -1,0 +1,12 @@
+{
+  "strategy": "BASELINE-CURRENT-ENGINE",
+  "auto_contest_count": 310,
+  "auto_contest_precision": 0.7290322580645161,
+  "auto_contest_recall": 0.4448818897637795,
+  "auto_contest_f1": 0.5525672371638142,
+  "human_review_rate": 0.4988888888888889,
+  "expected_recovery": 1058933.256769999,
+  "expected_contest_cost": 46500.0,
+  "expected_net_value": 1012433.2567699989,
+  "synthetic_false_positive_count": 84
+}

@@ -1,0 +1,92 @@
+{
+  "dataset": {
+    "test_rows": 900,
+    "synthetic": true,
+    "outcome_prior_from_train": 0.5676190476190476
+  },
+  "strategies": [
+    {
+      "strategy": "ALWAYS-CONTEST",
+      "auto_contest_count": 900,
+      "auto_contest_precision": 0.5644444444444444,
+      "auto_contest_recall": 1.0,
+      "auto_contest_f1": 0.7215909090909092,
+      "human_review_rate": 0.0,
+      "expected_recovery": 2151161.2816761923,
+      "expected_loss": 1638636.2783238078,
+      "expected_contest_cost": 135000.0,
+      "expected_net_value": 2016161.2816761923,
+      "synthetic_false_positive_count": 392
+    },
+    {
+      "strategy": "ALWAYS-ACCEPT",
+      "auto_contest_count": 0,
+      "auto_contest_precision": 0.0,
+      "auto_contest_recall": 0.0,
+      "auto_contest_f1": 0.0,
+      "human_review_rate": 0.0,
+      "expected_recovery": 0.0,
+      "expected_loss": 3789797.56,
+      "expected_contest_cost": 0.0,
+      "expected_net_value": 0.0,
+      "synthetic_false_positive_count": 0
+    },
+    {
+      "strategy": "RULES-ONLY",
+      "auto_contest_count": 372,
+      "auto_contest_precision": 0.7043010752688172,
+      "auto_contest_recall": 0.515748031496063,
+      "auto_contest_f1": 0.5954545454545455,
+      "human_review_rate": 0.39555555555555555,
+      "expected_recovery": 1304925.2195425488,
+      "expected_loss": 2484872.3404574515,
+      "expected_contest_cost": 55800.0,
+      "expected_net_value": 1249125.2195425488,
+      "synthetic_false_positive_count": 110
+    },
+    {
+      "strategy": "LOGISTIC-ONLY",
+      "auto_contest_count": 345,
+      "auto_contest_precision": 0.7188405797101449,
+      "auto_contest_recall": 0.4881889763779528,
+      "auto_contest_f1": 0.5814771395076203,
+      "human_review_rate": 0.5388888888888889,
+      "expected_recovery": 1094109.791333144,
+      "expected_loss": 2695687.768666856,
+      "expected_contest_cost": 51750.0,
+      "expected_net_value": 1042359.7913331441,
+      "synthetic_false_positive_count": 97
+    },
+    {
+      "strategy": "BASELINE-CURRENT-ENGINE",
+      "auto_contest_count": 310,
+      "auto_contest_precision": 0.7290322580645161,
+      "auto_contest_recall": 0.4448818897637795,
+      "auto_contest_f1": 0.5525672371638142,
+      "human_review_rate": 0.4988888888888889,
+      "expected_recovery": 1058933.256769999,
+      "expected_contest_cost": 46500.0,
+      "expected_net_value": 1012433.2567699989,
+      "synthetic_false_positive_count": 84,
+      "expected_loss": 2730864.303230001
+    },
+    {
+      "strategy": "CHARGEBACK-SENTINEL",
+      "auto_contest_count": 345,
+      "auto_contest_precision": 0.7188405797101449,
+      "auto_contest_recall": 0.4881889763779528,
+      "auto_contest_f1": 0.5814771395076203,
+      "human_review_rate": 0.5388888888888889,
+      "expected_recovery": 1094109.791333144,
+      "expected_loss": 2695687.768666856,
+      "expected_contest_cost": 51750.0,
+      "expected_net_value": 1042359.7913331441,
+      "synthetic_false_positive_count": 97
+    }
+  ],
+  "notes": {
+    "expected_recovery": "modeled using each strategy's probability signal; ALWAYS strategies use the train-set outcome prior only as a neutral reference",
+    "realized_financial_recovery": "not measured; would_win is synthetic benchmark ground truth",
+    "baseline_current_engine": "frozen measurement captured before candidate changes"
+  }
+}

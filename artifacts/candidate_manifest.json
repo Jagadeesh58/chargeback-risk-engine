@@ -1,0 +1,56 @@
+{
+  "source_snapshot_sha256": "6f479a949ca40c2df36669f034331f4f11b9a9766f6c58cd01f6774076acda96",
+  "baseline_source_archive_sha256": "f19bf0ef249b74b2e861a15fef3a258536e1c70369581701946a65235ffdc09a",
+  "baseline_source_commit": "086572fdd5549a8ba07f9a885d39e0e65b68ca28",
+  "runtime": {
+    "python": "3.13.5",
+    "fastapi": "0.128.2",
+    "pydantic": "2.13.4",
+    "numpy": "2.3.5",
+    "pandas": "2.2.3",
+    "scikit-learn": "1.8.0",
+    "pytest": "9.0.2",
+    "httpx": "0.28.1",
+    "joblib": "1.5.3"
+  },
+  "datasets": {
+    "train.csv": "b36698213ddeece529575e0c9908a2525524f6320db3d50285a6f8bfc189e2da",
+    "dev.csv": "b2abd56a741e675939cf06db4e551321c1643eeaa72bcf2b18890693a7fae57c",
+    "test.csv": "b4d67a05381e6cc7c3d6532c99c6fee984de1c276a79db49e969bd8ab1bceedc"
+  },
+  "models": {
+    "ml_scorer_model.pkl": "eb5e4604768405e52940cf0626059219c9eac595b3d6929365696b4b9ebc570b",
+    "hgb_model.pkl": "cdc739db0063c937c6aaa2a4643a2e67ce9ecde0c8218848f1e2618ad6a55c19"
+  },
+  "versions": {
+    "live_model": "logreg-v1",
+    "hgb_challenger": "hgb-v1",
+    "features": "features-v3",
+    "sklearn": "1.8.0"
+  },
+  "policy": {
+    "monetary_ceiling": 50000.0,
+    "auto_contest_threshold": 0.65,
+    "accept_loss_threshold": 0.3,
+    "contest_cost": 150.0,
+    "max_contest_count": 1
+  },
+  "evaluation": {
+    "selection_split": "dev",
+    "final_test_split": "test is used only for final evaluation after model selection is frozen",
+    "benchmark_artifact": "920ba30c03fbaaf3eec9e720e622d398fd8e88dd1b066dac8f552cec8acd83c8",
+    "latency_artifact": "179dd2d161f198cb6c041e67eb4cb436492aa73272fb9140059c5dc429ca90d5",
+    "latency": {
+      "label": "LOCAL END-TO-END DECISION LATENCY",
+      "runs": 300,
+      "p50_ms": 1.802171,
+      "p95_ms": 2.184858,
+      "p99_ms": 2.325221,
+      "max_ms": 3.547466,
+      "method": "warm model artifacts; unique dispute_id per timed request; local process and filesystem"
+    },
+    "test_count": 144,
+    "benchmark_test_rows": 900
+  },
+  "demo_cases": 5
+}
