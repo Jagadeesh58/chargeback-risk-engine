@@ -1,97 +1,149 @@
 # Architecture
 
-Two separate paths through this codebase: an **offline** path that builds
-and evaluates the system against a held-out set, and an **online** path
-that scores one real dispute and returns one decision. Nothing in the
-online path ever calls back into the offline path — evaluation never
-influences a live decision.
-
-Colors below aren't decorative: they mirror the trust-boundary table in
-`README.md`. Orange = safety-critical and unconditional. Red dashed = can
-never cross into a real action on its own. Grey = advisory only, never
-acts. Blue = durable record.
+Chargeback Sentinel keeps one decision path for the API, Streamlit UI, CLI demo, benchmark, and counterfactual analysis.
 
 ```mermaid
 flowchart TD
-    subgraph OFFLINE[" Offline -- data generation and evaluation, never touched by a live request "]
-        direction TB
-        HT["hidden_truth.py<br/>hidden ground truth, never exposed to the scorer"] --> GD["generate_data.py"]
-        GD --> CSV[("train.csv / dev.csv / test.csv")]
-        CSV --> VNL["verify_no_leakage.py"]
-        CSV --> EVAL["metrics.py / baseline.py / sensitivity.py<br/>test.csv read once, for final reporting only"]
+    CASE[Chargeback case + evidence]
+      --> EVID[Canonical evidence engine\nPASS / WARN / FAIL]
+    CASE --> ML[Reason-aware Logistic Regression\nlive advisory risk estimate]
+    CASE --> GRAPH[Lightweight relationship graph\nadvisory escalation signal]
+    EVID --> ECON[Canonical economics\nexpected recovery - costs]
+    ML --> ECON
+    ECON --> POLICY[Deterministic policy authority]
+    EVID --> POLICY
+    GRAPH --> POLICY
+    POLICY --> DEC{Final action}
+    DEC --> AC[AUTO-CONTEST]
+    DEC --> HR[HUMAN-REVIEW]
+    DEC --> AL[ACCEPT-LOSS]
+    AC --> DRAFT[Razorpay-compatible contest draft\nno external submission]
+    DEC --> EXP[Structured explanation]
+    EXP --> CF[Bounded read-only counterfactual\nreruns the same decision path]
+    DEC --> AUDIT[SQLite audit/idempotency]
+    AUDIT -. duplicate dispute_id .-> DEC
+
+    subgraph OFFLINE[Offline evaluation only]
+      DATA[train / dev / test synthetic data] --> TRAIN[Training + model evaluation]
+      DATA --> BENCH[Fair six-strategy benchmark]
+      DATA --> LEAK[Leakage check]
+      DATA --> CHRON[Chronological ordering check]
     end
-
-    subgraph ONLINE[" Online -- one dispute in, one decision out "]
-        direction TB
-        REQ(["dispute + evidence"]) --> SCORER["scorer.py<br/>P(win) estimate"]
-        SCORER --> EVID["evidence.py<br/>PASS / WARN / FAIL"]
-        EVID --> POLICY{"policy.py"}
-        POLICY -->|"amount over ceiling"| HR(["HUMAN REVIEW"])
-        POLICY -->|"evidence too thin"| HR
-        POLICY -->|"P(win) low"| AL(["ACCEPT LOSS"])
-        POLICY -->|"P(win) high, evidence confirmed, under ceiling"| AC(["AUTO-CONTEST"])
-        AC --> ADAPTER["razorpay_adapter.py<br/>generate_contest_draft"]
-        ADAPTER --> DRAFT(["contest_draft -- action is always draft"])
-    end
-
-    POLICY --> AUDIT[("audit_log.py<br/>SQLite, dispute_id is the PRIMARY KEY")]
-    AUDIT -. "same dispute_id again, replay, never recompute" .-> POLICY
-
-    CSV -. "fit isotonic curve on dev.csv" .-> CALIB["calibration.py"]
-    SCORER -. "apply curve to the raw score" .-> CALIB
-    CALIB --> CALOUT(["calibrated_win_probability -- shown alongside the decision, never decides it"])
-
-    CSV -. "train one LogisticRegression per reason on train.csv" .-> MLSCORE["ml_scorer.py"]
-    EVID -. "reconstruct evidence, apply live model" .-> MLSCORE
-    MLSCORE --> MLOUT(["ml_win_probability -- shown alongside the decision, never decides it"])
-
-    APIL["api.py (FastAPI)"] --> ONLINE
-    STL1["app.py -- Streamlit over real HTTP"] --> APIL
-    STL2["app_deployed.py -- Streamlit, direct call via local_pipeline.py"] --> ONLINE
-
-    classDef advisory fill:#eeeeee,stroke:#888888,color:#333333
-    classDef safety fill:#ffe0b3,stroke:#cc7a00,color:#663d00
-    classDef neverAuto fill:#ffcccc,stroke:#cc0000,color:#660000,stroke-dasharray:5,5
-    classDef storage fill:#cce5ff,stroke:#004080,color:#00264d
-
-    class SCORER,EVID,CALIB,CALOUT,MLSCORE,MLOUT advisory
-    class POLICY safety
-    class ADAPTER,DRAFT neverAuto
-    class AUDIT storage
 ```
 
-## Reading this diagram
+## Decision flow
 
-- **Offline never feeds a live decision.** `test.csv` is read by the
-  evaluation modules to report honest numbers after the fact; it isn't
-  read by `scorer.py`/`policy.py` at request time.
-- **`scorer.py`, `evidence.py`, `calibration.py`, and `ml_scorer.py` are
-  all advisory (grey).** They only ever produce a number or a packet —
-  none of them can take an action. `calibration.py` and `ml_scorer.py`
-  both straddle the diagram on purpose: each *fits* something offline
-  (a curve against `dev.csv`; a Logistic Regression per reason code
-  against `train.csv`) but *applies* it online, to the live request --
-  and neither one's output ever flows back into `policy.py`. The
-  decision is made from the raw rule-based score alone; the calibrated
-  number and the trained model's own probability both exist only to be
-  shown alongside it, in every response.
-- **`policy.py` is the only place a routing decision is made (orange),**
-  and the two safety checks inside it (monetary ceiling, evidence
-  completeness) are unconditional — they run before `win_probability` is
-  even read, not as an extra condition that a confident score could talk
-  its way past.
-- **`razorpay_adapter.py`'s draft output is structurally blocked from
-  becoming a real submission (red, dashed).** The function the pipeline
-  calls, `generate_contest_draft()`, has no parameter that could ever ask
-  for `action="submit"`.
-- **`audit_log.py` is the one durable record (blue).** Every decision is
-  written once; the same `dispute_id` coming in again returns the
-  original decision instead of a fresh computation.
-- **The two Streamlit apps reach the same online path two different
-  ways** — `app.py` over real HTTP through `api.py`, `app_deployed.py` by
-  calling the pipeline functions directly — and are tested against each
-  other to make sure they never silently diverge (see
-  `test_local_pipeline.py::test_matches_api_pipeline_exactly`).
+1. The request is validated at the API boundary.
+2. The evidence engine evaluates reason-relevant fields as `PASS`, `WARN`, or `FAIL`.
+3. The live model estimates contest-win likelihood. This estimate is advisory.
+4. The relationship graph supplies supporting risk context. It is advisory.
+5. The economics module computes expected recovery and expected net value from the case amount and live risk estimate.
+6. The policy module applies safety and business gates in fixed order.
+7. The engine returns one of `AUTO-CONTEST`, `HUMAN-REVIEW`, or `ACCEPT-LOSS`.
+8. A contest draft is generated only for `AUTO-CONTEST`.
+9. The explanation records why the decision occurred and what the bounded counterfactual search found.
+10. The result is persisted by `dispute_id`; duplicate requests replay the original decision.
 
-If the diagram above doesn't render in your viewer, the same flow is
-described in the ASCII version in `README.md`'s Architecture section.
+## Single canonical path
+
+The authoritative entry point is:
+
+```python
+from chargeback_risk_engine.engine.hybrid_pipeline import decide_case
+result = decide_case(dispute)
+```
+
+The module retains its historical filename to avoid an unnecessary repository-wide rename. It is no longer a live hybrid model service.
+
+The following all call `decide_case(...)`:
+
+- FastAPI `/decision`
+- Streamlit `apps/app_deployed.py`
+- `scripts/demo.py`
+- `scripts/benchmark.py`
+- `chargeback_risk_engine.metrics.run_pipeline`
+- `engine/counterfactual.py`
+
+There is no second policy function for demos or UI rendering.
+
+## Live model selection
+
+The live risk estimator is the reason-aware Logistic Regression scorer in `ml_scorer.py`.
+
+Held-out model evidence:
+
+| Model | PR-AUC | Brier | Calibration error |
+|---|---:|---:|---:|
+| Rules | 0.7093 | 0.2365 | 0.1246 |
+| Logistic | **0.7316** | **0.2206** | **0.0337** |
+| HGB challenger | 0.7118 | 0.2288 | 0.0911 |
+| Offline hybrid challenger | 0.7300 | 0.2222 | 0.0475 |
+
+The Logistic model wins on the most useful held-out quality/calibration measures while keeping a small live dependency surface. HGB and the hybrid remain for offline comparison only.
+
+## Evidence
+
+`evidence.py` is the canonical status engine. `engine/evidence_score.py` consumes its packet and adds evaluation metadata rather than maintaining another PASS/WARN/FAIL implementation.
+
+`UNKNOWN` is represented as `WARN`. Missing evidence is uncertainty, not positive evidence. Invalid or contradictory evidence can block automatic contesting.
+
+## Economics
+
+`engine/economic_decision.py` contains the only expected-value calculation:
+
+```text
+expected_recovery = probability_estimate × recoverable_amount
+expected_net_value = expected_recovery - contest_cost - operational_cost
+```
+
+The field is named `probability_of_success` in the economic object but is derived from the model estimate. The repository does not present modeled expected recovery as realized financial recovery.
+
+The economics module exposes `economically_viable`; it does not return an action.
+
+## Policy authority
+
+`policy.py` is the only action authority. The meaningful safety order is:
+
+1. input validity
+2. monetary ceiling
+3. evidence validity, contradiction and completeness
+4. graph escalation
+5. contest/retry limit
+6. external-service availability
+7. model confidence and risk thresholds
+8. expected net value
+9. human-review fallback
+
+A high model estimate or caller-supplied economic value cannot override a safety gate. The policy recomputes the canonical economic value from the amount and model estimate.
+
+A true majority is required for automatic contesting: exactly 50% confirmed evidence is not enough.
+
+## Counterfactual
+
+The counterfactual engine evaluates at most ten relevant fields, flipping one valid input at a time and rerunning `decide_case(...)`.
+
+It is read-only with respect to production audit state. It uses a temporary SQLite database and never changes the model or policy configuration.
+
+Possible outcomes are:
+
+- `DECISION_CHANGED`
+- `RISK_CHANGED_DECISION_UNCHANGED`
+- `NO_CHANGE_FOUND`
+
+A risk-score change without an action change is explicitly reported as **“Risk changed, decision unchanged.”**
+
+## Audit and idempotency
+
+The SQLite audit record is keyed by `dispute_id`. A repeated request returns the original stored decision rather than recomputing a different outcome from mutated input.
+
+The audit record also stores model, feature, and policy versions.
+
+## Offline evaluation boundaries
+
+Offline data never participates in a live request. Training, leakage checks, benchmark calculations, and the chronological ordering check operate on the synthetic train/dev/test files and produce artifacts for reporting.
+
+The chronological check is intentionally not advertised as temporal robustness because the dataset dates are synthetic.
+
+## External integration boundary
+
+`razorpay_adapter.py` creates a contest draft only. There is no production submission path in the demo or benchmark.
