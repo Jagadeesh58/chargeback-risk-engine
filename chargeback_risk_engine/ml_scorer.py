@@ -1,10 +1,5 @@
-"""
-ml_scorer.py — an OPTIONAL trained Logistic Regression scorer, one
-submodel per reason code (same structure that proved useful in the
-earlier leakage check). Only worth keeping if it measurably beats
-scorer.py's rule-based AUC on the SAME held-out test set -- not dev,
-since dev already informed rule design.
-"""
+"""Reason-aware Logistic Regression used as the single live risk model."""
+from __future__ import annotations
 
 import os
 import pickle
@@ -14,18 +9,19 @@ import sklearn
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 
-from chargeback_risk_engine.config import RELEVANT_EVIDENCE_BY_REASON, REASON_CODES
-
-from chargeback_risk_engine.paths import DATA_DIR, ARTIFACTS_DIR
+from chargeback_risk_engine.config import (
+    FEATURE_VERSION,
+    LIVE_MODEL_VERSION,
+    REASON_CODES,
+    RELEVANT_EVIDENCE_BY_REASON,
+)
+from chargeback_risk_engine.paths import ARTIFACTS_DIR, DATA_DIR
 
 MODEL_PATH = str(ARTIFACTS_DIR / "ml_scorer_model.pkl")
-
 _cached_scorer = None
 
 
 def _encode_evidence(df: pd.DataFrame, fields: list[str]) -> pd.DataFrame:
-    """True->1.0, False->0.0, missing/None->0.5 (neutral), matching the
-    same encoding scheme used in verify_no_leakage.py."""
     X = df[fields].copy()
     for col in fields:
         X[col] = X[col].map({True: 1.0, False: 0.0}).fillna(0.5)
@@ -33,10 +29,6 @@ def _encode_evidence(df: pd.DataFrame, fields: list[str]) -> pd.DataFrame:
 
 
 class MLScorer:
-    """Trains one LogisticRegression per reason code on train.csv,
-    exposes predict_win_probability(dispute) with the SAME interface as
-    scorer.predict_win_probability, so it's a drop-in comparison."""
-
     def __init__(self):
         self.models = {}
 
@@ -46,31 +38,21 @@ class MLScorer:
             subset = train_df[train_df["reason_code"] == reason]
             X = _encode_evidence(subset, fields)
             y = subset["would_win"].astype(int)
-            model = LogisticRegression(max_iter=1000)
-            model.fit(X, y)
-            self.models[reason] = model
+            self.models[reason] = LogisticRegression(max_iter=1000, random_state=42).fit(X, y)
         return self
 
     def predict_win_probability(self, dispute: dict) -> float:
         reason = dispute["reason_code"]
         fields = RELEVANT_EVIDENCE_BY_REASON[reason]
         model = self.models[reason]
-
-        row = {}
-        for f in fields:
-            v = dispute.get(f)
-            row[f] = 1.0 if v is True else (0.0 if v is False else 0.5)
-        X = pd.DataFrame([row])[fields]
-        return float(model.predict_proba(X)[0, 1])
+        row = {
+            field: 1.0 if dispute.get(field) is True else 0.0 if dispute.get(field) is False else 0.5
+            for field in fields
+        }
+        return float(model.predict_proba(pd.DataFrame([row])[fields])[0, 1])
 
 
 def dispute_from_evidence_items(reason_code: str, evidence_items: list[dict]) -> dict:
-    """Reconstructs a dispute-shaped dict from an already-assembled
-    evidence packet's PASS/WARN/FAIL items (the shape audit_log.py
-    stores), so predict_win_probability() can be called against a
-    durably-logged decision rather than a live, possibly-mutated
-    request -- the same reasoning razorpay_adapter.py's draft
-    generation already relies on for idempotent replay."""
     status_to_value = {"PASS": True, "FAIL": False, "WARN": None}
     dispute = {"reason_code": reason_code}
     for item in evidence_items:
@@ -78,11 +60,26 @@ def dispute_from_evidence_items(reason_code: str, evidence_items: list[dict]) ->
     return dispute
 
 
+def save_ml_scorer(path: str = MODEL_PATH, train_csv: str | None = None) -> MLScorer:
+    if train_csv is None:
+        train_csv = str(DATA_DIR / "train.csv")
+
+    scorer = MLScorer().fit(pd.read_csv(train_csv))
+    ARTIFACTS_DIR.mkdir(exist_ok=True)
+    with open(path, "wb") as f:
+        pickle.dump(
+            {
+                "scorer": scorer,
+                "model_version": LIVE_MODEL_VERSION,
+                "feature_version": FEATURE_VERSION,
+                "sklearn_version": sklearn.__version__,
+            },
+            f,
+        )
+    return scorer
+
+
 def load_or_fit_ml_scorer(path: str = MODEL_PATH, train_csv: str | None = None) -> MLScorer:
-    """Loads a previously-fitted, pickled scorer if one exists; otherwise
-    trains fresh on train.csv and saves it, so a clean clone with no
-    prior run still works with zero setup. Cached in-process so a live
-    server doesn't refit on every request."""
     global _cached_scorer
     if train_csv is None:
         train_csv = str(DATA_DIR / "train.csv")
@@ -93,29 +90,30 @@ def load_or_fit_ml_scorer(path: str = MODEL_PATH, train_csv: str | None = None) 
         with open(path, "rb") as f:
             bundle = pickle.load(f)
         if isinstance(bundle, dict) and "scorer" in bundle:
+            if bundle.get("model_version") not in (None, LIVE_MODEL_VERSION):
+                raise RuntimeError(f"Incompatible live model artifact: {bundle.get('model_version')}")
+            if bundle.get("feature_version") not in (None, FEATURE_VERSION):
+                raise RuntimeError(f"Incompatible feature artifact: {bundle.get('feature_version')}")
+            if bundle.get("sklearn_version") not in (None, sklearn.__version__):
+                raise RuntimeError(
+                    f"Live model was trained with scikit-learn {bundle.get('sklearn_version')}, "
+                    f"runtime has {sklearn.__version__}"
+                )
             _cached_scorer = bundle["scorer"]
         else:
-            # Backward compatibility with the pre-versioned artifact format.
             _cached_scorer = bundle
     else:
-        train_df = pd.read_csv(train_csv)
-        _cached_scorer = MLScorer().fit(train_df)
-        with open(path, "wb") as f:
-            pickle.dump(
-                {"scorer": _cached_scorer, "sklearn_version": sklearn.__version__},
-                f,
-            )
+        _cached_scorer = save_ml_scorer(path, train_csv)
     return _cached_scorer
 
 
 def evaluate_on(df: pd.DataFrame, ml_scorer: MLScorer) -> float:
-    """Returns AUC of the ML scorer on the given dataframe."""
     probs = []
     for _, row in df.iterrows():
         dispute = row.to_dict()
-        for k, v in dispute.items():
-            if isinstance(v, float) and pd.isna(v):
-                dispute[k] = None
+        for key, value in dispute.items():
+            if isinstance(value, float) and pd.isna(value):
+                dispute[key] = None
         probs.append(ml_scorer.predict_win_probability(dispute))
     return roc_auc_score(df["would_win"], probs)
 
@@ -123,5 +121,4 @@ def evaluate_on(df: pd.DataFrame, ml_scorer: MLScorer) -> float:
 if __name__ == "__main__":
     scorer = load_or_fit_ml_scorer()
     test = pd.read_csv(DATA_DIR / "test.csv")
-    print(f"Trained on train.csv, saved to {MODEL_PATH}")
-    print(f"AUC on held-out test.csv: {evaluate_on(test, scorer):.4f}")
+    print(f"Live model AUC on held-out test.csv: {evaluate_on(test, scorer):.4f}")

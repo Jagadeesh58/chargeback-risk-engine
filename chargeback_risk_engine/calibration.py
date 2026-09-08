@@ -9,12 +9,12 @@ scorer.py's threshold was NOT tuned against test.csv on, so this stays
 consistent with keeping test.csv held out for final reporting only.
 
 Deliberately NOT wired into policy.py. The routing decision
-(AUTO-CONTEST / HUMAN REVIEW / ACCEPT LOSS) keeps using the raw score
+(AUTO-CONTEST / HUMAN-REVIEW / ACCEPT-LOSS) keeps using the raw model estimate
 it was already fuzz-tested and threshold-tuned against -- changing what
 number the ceiling/threshold checks see would require re-validating
 everything in test_policy.py under new semantics. Calibration is
 exposed as a second, separate number instead: more useful than the raw
-score specifically for a human looking at a HUMAN REVIEW case and
+score specifically for a human looking at a HUMAN-REVIEW case and
 wanting an accurate probability, not a ranking.
 
 Implemented as isotonic regression via the Pool Adjacent Violators

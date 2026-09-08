@@ -1,4 +1,4 @@
-"""Business-value decision support for chargeback intervention."""
+"""Canonical expected-value calculation for chargeback intervention."""
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
@@ -15,7 +15,7 @@ class EconomicDecision:
     expected_recovery: float
     expected_cost: float
     expected_net_value: float
-    recommended_action: str  # informational only — policy.py never reads this
+    economically_viable: bool
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -31,6 +31,7 @@ def calculate_economic_value(
     human_review_cost: float = 50.0,
     min_positive_net_value: float = 0.0,
 ) -> EconomicDecision:
+    """Compute expected recovery and net value without selecting an action."""
     amount = max(0.0, float(amount))
     probability_of_success = min(1.0, max(0.0, float(probability_of_success)))
     recoverable_fraction = min(1.0, max(0.0, float(recoverable_fraction)))
@@ -38,7 +39,6 @@ def calculate_economic_value(
     expected_recovery = probability_of_success * recoverable_amount
     expected_cost = float(contest_cost) + float(operational_cost)
     net = expected_recovery - expected_cost
-    action = "AUTO_CONTEST" if net > min_positive_net_value else "NO_ACTION"
     return EconomicDecision(
         disputed_amount=amount,
         probability_of_success=probability_of_success,
@@ -49,5 +49,5 @@ def calculate_economic_value(
         expected_recovery=expected_recovery,
         expected_cost=expected_cost,
         expected_net_value=net,
-        recommended_action=action,
+        economically_viable=net > float(min_positive_net_value),
     )

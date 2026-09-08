@@ -88,7 +88,7 @@ def feedback_metrics(db_path: str) -> dict:
         actual_win = str(outcome).upper() in {"WON", "RECOVERED", "SUCCESS", "TRUE", "1"}
         predicted_win = float(probability) >= 0.5
         correct += int(predicted_win == actual_win)
-        reviewed += int(action == "HUMAN REVIEW")
+        reviewed += int(action == "HUMAN-REVIEW")
         recovered += float(recovered_amount or 0.0)
     return {
         "total_records": len(rows),

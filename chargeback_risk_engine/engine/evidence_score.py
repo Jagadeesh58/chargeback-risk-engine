@@ -1,15 +1,11 @@
-"""Evidence intelligence: quality, completeness, validity and provenance-aware scoring.
-
-The existing evidence.py remains the canonical PASS/WARN/FAIL gate. This module
-adds richer metadata without changing that gate's semantics.
-"""
+"""Deterministic evidence quality metadata built from the canonical evidence packet."""
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
 from typing import Any
 
 from chargeback_risk_engine.config import RELEVANT_EVIDENCE_BY_REASON
+from chargeback_risk_engine.evidence import assemble
 
 
 @dataclass(frozen=True)
@@ -43,16 +39,17 @@ class EvidenceScore:
 
 
 def score_evidence(dispute: dict, evidence_packet=None) -> EvidenceScore:
+    """Add quality metadata to the canonical PASS/WARN/FAIL packet."""
     reason = dispute["reason_code"]
-    fields = RELEVANT_EVIDENCE_BY_REASON[reason]
-    packet_by_field = {i.field: i for i in evidence_packet.items} if evidence_packet else {}
+    packet = evidence_packet or assemble(dispute)
+    packet_by_field = {item.field: item for item in packet.items}
     items: list[EvidenceIntelligenceItem] = []
-    for field in fields:
+
+    for field in RELEVANT_EVIDENCE_BY_REASON[reason]:
         value = dispute.get(field)
-        available = value is not None
+        item = packet_by_field[field]
+        available = isinstance(value, bool)
         valid = isinstance(value, bool) or value is None
-        status = packet_by_field.get(field).status if field in packet_by_field else ("PASS" if value is True else "FAIL" if value is False else "WARN")
-        # Missing evidence is deliberately low-confidence, never positive evidence.
         confidence = 0.95 if value is True and valid else 0.80 if value is False and valid else 0.25
         items.append(
             EvidenceIntelligenceItem(
@@ -63,11 +60,18 @@ def score_evidence(dispute: dict, evidence_packet=None) -> EvidenceScore:
                 timestamp=dispute.get(f"{field}_timestamp") or dispute.get("evidence_timestamp"),
                 source=str(dispute.get(f"{field}_source") or "merchant_record"),
                 consistent=dispute.get(f"{field}_consistent", True) is not False,
-                status=status,
+                status=item.status,
             )
         )
+
     n = len(items) or 1
-    completeness = sum(i.available for i in items) / n
-    validity = sum(i.valid and i.consistent for i in items) / n
-    confidence = sum(i.confidence for i in items) / n
-    return EvidenceScore(reason_code=reason, completeness=completeness, validity=validity, confidence=confidence, items=tuple(items))
+    completeness = sum(item.available for item in items) / n
+    validity = sum(item.valid and item.consistent for item in items) / n
+    confidence = sum(item.confidence for item in items) / n
+    return EvidenceScore(
+        reason_code=reason,
+        completeness=completeness,
+        validity=validity,
+        confidence=confidence,
+        items=tuple(items),
+    )

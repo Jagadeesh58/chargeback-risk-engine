@@ -34,7 +34,7 @@ def test_health_check():
 
 
 def test_score_strong_evidence_auto_contests():
-    response = client.post("/score", json={
+    response = client.post("/decision", json={
         "dispute_id": "D0001",
         "payment_id": "pay_ABC",
         "reason_code": "item_not_received",
@@ -48,7 +48,6 @@ def test_score_strong_evidence_auto_contests():
     assert data["action"] == "AUTO-CONTEST"
     assert 0.0 <= data["win_probability"] <= 1.0
     assert 0.0 <= data["calibrated_win_probability"] <= 1.0
-    assert 0.0 <= data["ml_win_probability"] <= 1.0
     assert len(data["evidence"]) == 3
     assert all(item["status"] == "PASS" for item in data["evidence"])
     assert data["replayed"] is False
@@ -97,14 +96,13 @@ def test_duplicate_submission_is_replayed_via_api():
     assert first["action"] == second["action"]
     assert first["win_probability"] == second["win_probability"]
     assert first["calibrated_win_probability"] == second["calibrated_win_probability"]
-    assert first["ml_win_probability"] == second["ml_win_probability"]
     assert first["expected_value"] == second["expected_value"]
     assert first["contest_draft"] == second["contest_draft"]
 
 
 def test_score_over_ceiling_amount_forces_human_review_via_api():
     """The exact end-to-end safety check: an over-ceiling dispute must
-    route to HUMAN REVIEW even through the real HTTP layer, proving
+    route to HUMAN-REVIEW even through the real HTTP layer, proving
     api.py did not accidentally re-implement (and potentially break)
     the ceiling logic."""
     response = client.post("/score", json={
@@ -118,7 +116,7 @@ def test_score_over_ceiling_amount_forces_human_review_via_api():
     })
     assert response.status_code == 200
     data = response.json()
-    assert data["action"] == "HUMAN REVIEW"
+    assert data["action"] == "HUMAN-REVIEW"
     assert "ceiling" in data["reason"].lower()
 
 
@@ -212,13 +210,10 @@ def test_calibrated_win_probability_matches_calibration_module_directly():
     assert data["calibrated_win_probability"] == expected
 
 
-def test_ml_win_probability_matches_ml_scorer_module_directly():
-    """Cross-check: the API's ml_win_probability should exactly match
-    calling ml_scorer's trained model directly on the same evidence --
-    proving api.py isn't reimplementing the ML scorer itself."""
-    from chargeback_risk_engine.ml_scorer import dispute_from_evidence_items, load_or_fit_ml_scorer
+def test_live_win_probability_matches_ml_scorer_module_directly():
+    from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer
 
-    response = client.post("/score", json={
+    response = client.post("/decision", json={
         "dispute_id": "D0009",
         "payment_id": "pay_VWX",
         "reason_code": "item_not_received",
@@ -228,10 +223,15 @@ def test_ml_win_probability_matches_ml_scorer_module_directly():
         "has_signature_confirmation": True,
     })
     data = response.json()
-    ml_scorer_instance = load_or_fit_ml_scorer()
-    ml_dispute = dispute_from_evidence_items("item_not_received", data["evidence"])
-    expected = ml_scorer_instance.predict_win_probability(ml_dispute)
-    assert data["ml_win_probability"] == expected
+    scorer = load_or_fit_ml_scorer()
+    dispute = {
+        "reason_code": "item_not_received",
+        "has_tracking_number": True,
+        "has_delivery_confirmation": True,
+        "has_signature_confirmation": True,
+    }
+    expected = scorer.predict_win_probability(dispute)
+    assert data["win_probability"] == expected
 
 def test_mutated_replay_uses_only_original_request_context():
     """A retry with changed evidence/amount must be a true replay of the
