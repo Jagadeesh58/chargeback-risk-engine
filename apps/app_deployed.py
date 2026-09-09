@@ -9,6 +9,8 @@ import streamlit as st
 from chargeback_risk_engine.audit_log import verify_audit_integrity
 from chargeback_risk_engine.config import REASON_CODES, RELEVANT_EVIDENCE_BY_REASON
 from chargeback_risk_engine.local_pipeline import score_dispute_locally
+from chargeback_risk_engine.engine.hybrid_pipeline import decide_case
+from chargeback_risk_engine.engine.risk_graph import RiskGraph
 from chargeback_risk_engine.metrics import run_pipeline, confusion_matrix_for_auto_contest, precision_recall_f1, false_positive_cost
 from chargeback_risk_engine.paths import DATA_DIR, ARTIFACTS_DIR
 from chargeback_risk_engine.review_budget import optimize_review_budget
@@ -16,7 +18,7 @@ from chargeback_risk_engine.review_budget import optimize_review_budget
 st.set_page_config(page_title="Chargeback Risk Engine", page_icon="🛡️", layout="wide")
 st.title("Chargeback Risk Engine")
 st.caption("Track 02 — AI Risk Manager")
-st.write("Risk + evidence + graph + economics + bounded AI + deterministic policy")
+st.write("AI-assisted chargeback decisions with deterministic financial safety controls")
 
 @st.cache_data
 
@@ -63,6 +65,14 @@ with score_tab:
             b.metric("Evidence", f"{result['evidence_score']['completeness']:.0%}")
             c.metric("Expected net value", f"₹{result['economic_decision']['expected_net_value']:,.0f}")
             d.metric("Decision", result["action"])
+            st.markdown("### Decision waterfall")
+            st.write({
+                "1 · model": f"{result[\"win_probability\"]:.1%} win probability",
+                "2 · evidence": f"{result[\"evidence_score\"][\"completeness\"]:.0%} complete / {result[\"evidence_score\"][\"validity\"]:.0%} valid",
+                "3 · graph": result["graph_analysis"]["risk_type"],
+                "4 · economics": f"₹{result[\"economic_decision\"][\"expected_net_value\"]:,.0f} expected net",
+                "5 · policy": result["action"],
+            })
             st.markdown("### Why?")
             st.write(result["explanation"]["policy_reason"])
             st.write(result["explanation"]["economic_reason"])
@@ -85,33 +95,27 @@ with proof_tab:
     st.caption("Bundled synthetic evaluation data; not a production-performance claim.")
     report_path = ARTIFACTS_DIR / "verification_report.json"
     if report_path.exists():
-        report = pd.read_json(report_path, typ="series")
         raw = __import__("json").loads(report_path.read_text())
-        candidate = next((x for x in raw["baselines"] if x["strategy"] == "CHARGEBACK-RISK-ENGINE"), raw["baselines"][-1])
+        h = raw["headline"]
+        rb10 = next(x for x in raw["review_budget"] if float(x["review_budget"]) == 0.10)
         a,b,c,d,e,f = st.columns(6)
-        a.metric("Expected net value", f"₹{candidate.get('expected_net_value',0):,.0f}")
-        b.metric("PR-AUC", f"{raw['risk_metrics']['pr_auc']:.3f}")
-        rb10 = next(x for x in raw["review_budget"] if x["review_budget"] == 0.10)
-        base_recall = candidate.get("recall", 0.0)
-        incremental_recall = rb10["recall_at_budget"]
-        c.metric("+Recall from 10% review budget", f"{incremental_recall:.1%}")
-        d.metric("Total recall @ 10% review budget", f"{base_recall + incremental_recall:.1%}")
-        e.metric("False-positive cost", f"₹{candidate.get('synthetic_false_positive_count',0)*150:,.0f}")
-        f.metric("P95 latency", f"{raw['latency']['p95_ms']:.2f} ms")
-        st.caption(
-            "Review-budget recall is additive on top of auto-contest recall, not a "
-            "replacement for it — allocating review capacity recovers additional true "
-            "chargebacks beyond what auto-contest already resolves."
-        )
-        st.markdown("### Baselines")
-        st.dataframe(pd.DataFrame(raw["baselines"]), use_container_width=True, hide_index=True)
-        st.markdown("### Ablation")
-        st.dataframe(pd.DataFrame(raw["ablation"]), use_container_width=True, hide_index=True)
+        a.metric("PR-AUC", f"{h['pr_auc']:.3f}")
+        b.metric("Precision", f"{h['auto_contest_precision']:.1%}")
+        c.metric("Recall", f"{h['auto_contest_recall']:.1%}")
+        d.metric("Realized net value", f"₹{h['realized_net_value']:,.0f}")
+        e.metric("10% review capacity", f"+{rb10['recall_at_budget']:.1%} recall")
+        f.metric("Hard cases", f"{h['hard_cases_passed']}/{h['hard_cases_total']}")
+        st.markdown("### Strategy comparison")
+        st.dataframe(pd.DataFrame(raw["baselines"])[["strategy","auto_contest_count","auto_contest_precision","auto_contest_recall","realized_net_value"]], use_container_width=True, hide_index=True)
+        st.markdown("### True ablation")
+        st.caption("Each row removes a specific capability; the report does not relabel one pipeline as several.")
+        st.dataframe(pd.DataFrame(raw["ablation"])[["component","auto_contest_count","precision","recall","realized_net_value"]], use_container_width=True, hide_index=True)
         st.markdown("### Review-budget optimization")
         st.dataframe(pd.DataFrame(raw["review_budget"]), use_container_width=True, hide_index=True)
-        st.markdown("### Audit integrity")
-        with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
-            st.write({"live_audit_verifier": "available", "generated_report": raw["audit"]})
+        with st.expander("Per-reason evaluation"):
+            st.dataframe(pd.DataFrame(raw["per_reason"]), use_container_width=True, hide_index=True)
+        with st.expander("Security and reproducibility"):
+            st.json({"security": raw["security"], "reproducibility": raw["reproducibility"], "confidence_intervals": raw["confidence_intervals"]})
     else:
         st.warning("Run `make verify` to generate the proof artifacts.")
 
@@ -174,7 +178,15 @@ with demo_tab:
     for title, case in demo_cases:
         with st.expander(title, expanded=(title == "CASE 1 — strong evidence")):
             if st.button(f"Run {title}", key=case["dispute_id"]):
-                st.session_state.demo_result = score_dispute_locally(case)
+                if title.startswith("CASE 3"):
+                    seed = [
+                        {"dispute_id":"RING_SEED_A","reason_code":"item_not_received","amount":2200.0,"customer_id":"ring_a","device_id":"shared-device","ip_address":"10.0.0.9","merchant_id":"merchant_demo","has_tracking_number":True,"has_delivery_confirmation":True,"has_signature_confirmation":True},
+                        {"dispute_id":"RING_SEED_B","reason_code":"item_not_received","amount":1800.0,"customer_id":"ring_b","device_id":"shared-device","ip_address":"10.0.0.9","merchant_id":"merchant_demo","has_tracking_number":True,"has_delivery_confirmation":True,"has_signature_confirmation":True},
+                    ]
+                    graph = RiskGraph(seed)
+                    st.session_state.demo_result = decide_case(case, risk_graph=graph, include_counterfactual=False)
+                else:
+                    st.session_state.demo_result = score_dispute_locally(case)
                 st.session_state.demo_case = case["dispute_id"]
             result = st.session_state.get("demo_result") if st.session_state.get("demo_case") == case["dispute_id"] else None
             if result:

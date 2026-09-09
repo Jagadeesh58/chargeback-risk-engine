@@ -9,3 +9,6 @@ venv/
 *.db
 .DS_Store
 
+
+# local proof/run outputs
+artifacts/release_verification.json

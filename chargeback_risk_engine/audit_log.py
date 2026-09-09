@@ -37,6 +37,7 @@ def _get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
             graph_data_json TEXT NOT NULL DEFAULT '{}',
             ai_metadata_json TEXT NOT NULL DEFAULT '{}',
             request_id TEXT NOT NULL DEFAULT '',
+            routing_score REAL,
             prev_hash TEXT NOT NULL DEFAULT '',
             record_hash TEXT NOT NULL DEFAULT ''
         )
@@ -53,6 +54,7 @@ def _get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
         "request_id": "TEXT NOT NULL DEFAULT ''",
         "prev_hash": "TEXT NOT NULL DEFAULT ''",
         "record_hash": "TEXT NOT NULL DEFAULT ''",
+        "routing_score": "REAL",
     }
     for name, definition in migrations.items():
         if name not in existing_columns:
@@ -78,6 +80,7 @@ class LoggedDecision:
     graph_data: dict | None = None
     ai_metadata: dict | None = None
     request_id: str = ""
+    routing_score: float | None = None
     prev_hash: str = ""
     record_hash: str = ""
     replayed: bool = False
@@ -105,6 +108,7 @@ def _row_to_logged_decision(record: dict, *, replayed: bool) -> LoggedDecision:
         graph_data=graph_data,
         ai_metadata=json.loads(record.get("ai_metadata_json") or "{}"),
         request_id=record.get("request_id", ""),
+        routing_score=float(record.get("routing_score")) if record.get("routing_score") is not None else None,
         prev_hash=record.get("prev_hash", ""),
         record_hash=record.get("record_hash", ""),
         replayed=replayed,
@@ -160,6 +164,7 @@ def log_new_decision(
     graph_data: dict | None = None,
     ai_metadata: dict | None = None,
     request_id: str = "",
+    routing_score: float | None = None,
 ) -> LoggedDecision:
     """Persist a new decision without replacing an existing dispute_id."""
     created_at = datetime.now(timezone.utc).isoformat()
@@ -173,17 +178,17 @@ def log_new_decision(
                    "action": action, "reason": reason, "expected_value": float(expected_value), "evidence": evidence,
                    "created_at": created_at, "model_version": model_version, "feature_version": feature_version,
                    "policy_version": policy_version, "graph_data": graph_data, "ai_metadata": ai_metadata,
-                   "request_id": request_id, "prev_hash": prev_hash}
+                   "request_id": request_id, "routing_score": routing_score, "prev_hash": prev_hash}
         record_hash = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         conn.execute(
             """INSERT INTO decisions
                (dispute_id, reason_code, amount, win_probability, action,
                 reason, expected_value, evidence_json, created_at,
-                model_version, feature_version, policy_version, graph_data_json, ai_metadata_json, request_id, prev_hash, record_hash)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                model_version, feature_version, policy_version, graph_data_json, ai_metadata_json, request_id, routing_score, prev_hash, record_hash)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (dispute_id, reason_code, amount, win_probability, action, reason, expected_value,
              json.dumps(evidence, sort_keys=True), created_at, model_version, feature_version, policy_version,
-             json.dumps(graph_data, sort_keys=True), json.dumps(ai_metadata, sort_keys=True), request_id, prev_hash, record_hash),
+             json.dumps(graph_data, sort_keys=True), json.dumps(ai_metadata, sort_keys=True), request_id, routing_score, prev_hash, record_hash),
         )
         conn.commit()
     except sqlite3.IntegrityError:
@@ -211,6 +216,7 @@ def log_new_decision(
         graph_data=graph_data,
         ai_metadata=ai_metadata,
         request_id=request_id,
+        routing_score=routing_score,
         prev_hash=prev_hash,
         record_hash=record_hash,
         replayed=False,
@@ -231,7 +237,7 @@ def verify_audit_integrity(db_path: str = DB_PATH) -> dict:
                 "action": rec["action"], "reason": rec["reason"], "expected_value": float(rec["expected_value"]), "evidence": json.loads(rec["evidence_json"]),
                 "created_at": rec["created_at"], "model_version": rec["model_version"], "feature_version": rec["feature_version"],
                 "policy_version": rec["policy_version"], "graph_data": json.loads(rec["graph_data_json"] or "{}"), "ai_metadata": json.loads(rec.get("ai_metadata_json") or "{}"),
-                "request_id": rec.get("request_id", ""), "prev_hash": rec.get("prev_hash", "") }
+                "request_id": rec.get("request_id", ""), "routing_score": rec.get("routing_score"), "prev_hash": rec.get("prev_hash", "") }
             expected = hashlib.sha256(json.dumps(expected_payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
             if rec.get("prev_hash", "") != prev_hash or rec.get("record_hash", "") != expected:
                 return {"valid": False, "checked": checked, "failed_dispute_id": rec["dispute_id"]}
@@ -252,12 +258,13 @@ def get_or_create_decision(
     policy_version: str = "policy-v1",
     ai_metadata: dict | None = None,
     request_id: str = "",
+    routing_score: float | None = None,
 ) -> LoggedDecision:
     """Return an existing decision or compute and persist a new one.
 
     For backward compatibility, compute_decision_fn may return either:
       (probability, evidence, action, reason, expected_value)
-    or the same five values plus graph_data and AI metadata.
+    or the same values plus graph_data, AI metadata, and optional routing_score.
     """
     existing = get_existing_decision(dispute_id, db_path)
     if existing is not None:
@@ -268,13 +275,16 @@ def get_or_create_decision(
         win_probability, evidence, action, reason, expected_value = computed
         graph_data = {}
         ai_metadata = ai_metadata or None
+        routing_score = routing_score
     elif len(computed) == 6:
         win_probability, evidence, action, reason, expected_value, graph_data = computed
         ai_metadata = None
-    elif len(computed) == 7:
-        win_probability, evidence, action, reason, expected_value, graph_data, ai_metadata = computed
+        routing_score = routing_score
+    elif len(computed) >= 7:
+        win_probability, evidence, action, reason, expected_value, graph_data, ai_metadata, *extra = computed
+        routing_score = extra[0] if extra else None
     else:
-        raise ValueError("compute_decision_fn must return 5, 6, or 7 values")
+        raise ValueError("compute_decision_fn must return at least 5 values")
 
     return log_new_decision(
         dispute_id=dispute_id,
@@ -292,4 +302,5 @@ def get_or_create_decision(
         graph_data=graph_data,
         ai_metadata=ai_metadata,
         request_id=request_id,
+        routing_score=routing_score,
     )

@@ -69,3 +69,7 @@ reproducibility, not stored per-row in the CSV:
 - Reason-code-blind logistic regression AUC on dev: 0.586
 - Best single evidence field AUC alone: 0.549 (well below the full-model AUC — no single field leaks the label)
 - Reason-code-aware (per-reason submodel) AUC on dev: 0.691
+
+## Release-only metadata
+
+`evidence_source_reliability` is a synthetic provenance-confidence proxy used only by the deterministic evidence layer. It is not included in the Logistic Regression model features and is never generated from `would_win` directly. It exists to test whether an independent evidence-quality signal can improve routing without giving the model hidden label access.

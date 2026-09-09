@@ -38,6 +38,8 @@ IRRELEVANT_FIELD_RATE = 0.50           # P(irrelevant evidence True), no depende
 
 CONTRADICTION_RATE = 0.08              # chance a relevant field is flipped anyway
 MISSINGNESS_RATE = 0.15                # chance any evidence field is None
+SOURCE_RELIABILITY_IF_LEGIT = (0.88, 0.99)
+SOURCE_RELIABILITY_IF_NOT_LEGIT = (0.45, 0.78)
 
 
 def _sample_bool(rng: random.Random, p: float) -> bool:
@@ -61,6 +63,7 @@ def generate_one(rng: random.Random, reason_code: str) -> HiddenTruthResult:
     )
 
     evidence: dict[str, bool | None] = {}
+    source_reliability = rng.uniform(*(SOURCE_RELIABILITY_IF_LEGIT if hidden_legit else SOURCE_RELIABILITY_IF_NOT_LEGIT))
     for field_name in ALL_EVIDENCE_FIELDS:
         if field_name in relevant_fields:
             base_rate = (
@@ -86,5 +89,5 @@ def generate_one(rng: random.Random, reason_code: str) -> HiddenTruthResult:
         reason_code=reason_code,
         hidden_seller_legitimate=hidden_legit,
         would_win=would_win,
-        evidence=evidence,
+        evidence=evidence | {"evidence_source_reliability": round(source_reliability, 3)},
     )
