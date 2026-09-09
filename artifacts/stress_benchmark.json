@@ -1,0 +1,48 @@
+{
+  "protocol": "stress_transformations_of_frozen_test_only",
+  "sample_rows_per_stress_case": 1000,
+  "not_external_data": true,
+  "baseline": {
+    "rows": 1000,
+    "auto_contest": 386,
+    "precision": 0.7616580310880829,
+    "recall": 0.5268817204301075,
+    "auto_rate": 0.386
+  },
+  "missingness_25pct": {
+    "rows": 1000,
+    "auto_contest": 246,
+    "precision": 0.7601626016260162,
+    "recall": 0.33512544802867383,
+    "auto_rate": 0.246
+  },
+  "contradiction_20pct": {
+    "rows": 1000,
+    "auto_contest": 300,
+    "precision": 0.7766666666666666,
+    "recall": 0.4175627240143369,
+    "auto_rate": 0.3
+  },
+  "amount_shift": {
+    "rows": 1000,
+    "auto_contest": 386,
+    "precision": 0.7616580310880829,
+    "recall": 0.5268817204301075,
+    "auto_rate": 0.386
+  },
+  "drift_report": {
+    "status": "NORMAL",
+    "signals": [
+      {
+        "feature": "amount",
+        "baseline_mean": 4125.99406,
+        "current_mean": 6044.316022456292,
+        "standardized_shift": 0.8706439311660024,
+        "status": "NORMAL"
+      }
+    ],
+    "adaptation_action": "CONTINUE_MONITORING",
+    "reason": "No material mean shift detected."
+  },
+  "honesty": "These are robustness stress tests, not independent external-data claims."
+}

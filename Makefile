@@ -13,6 +13,9 @@ policy-optimize:
 hard-cases:
 	python scripts/evaluate_hard_cases.py
 
+stress:
+	python scripts/stress_benchmark.py
+
 verify:
 	python -m pytest -q
 	python -m chargeback_risk_engine.policy_optimizer
