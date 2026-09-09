@@ -14,6 +14,7 @@ from chargeback_risk_engine.ml_scorer import dispute_from_evidence_items, load_o
 from chargeback_risk_engine.policy import decide
 from chargeback_risk_engine.razorpay_adapter import generate_contest_draft
 from chargeback_risk_engine.engine.economic_decision import calculate_economic_value
+from chargeback_risk_engine.ai_analyst import analyze_evidence
 from chargeback_risk_engine.engine.evidence_score import score_evidence
 from chargeback_risk_engine.engine.decision_result import CanonicalDecision
 from chargeback_risk_engine.engine.explainability import build_explanation, logistic_feature_contributions
@@ -76,9 +77,8 @@ def _score_case(
             evidence_quality=evidence_quality,
             graph_risk_score=graph_result.risk_score,
         )
-        evidence_list = [
-            {"field": item.field, "status": item.status} for item in packet.items
-        ]
+        evidence_list = [{"field": item.field, "status": item.status} for item in packet.items]
+        ai_analysis = analyze_evidence({"reason_code": packet.reason_code, "items": evidence_list}, reason_code=packet.reason_code, context_text=str(dispute.get("evidence_text", "")))
         return (
             risk_probability,
             evidence_list,
@@ -86,6 +86,7 @@ def _score_case(
             decision.reason,
             decision.expected_value,
             _graph_data_for(dispute),
+            ai_analysis.to_dict(),
         )
 
     if existing is None:
@@ -99,6 +100,8 @@ def _score_case(
             model_version=MODEL_VERSION,
             feature_version=FEATURE_VERSION,
             policy_version=POLICY_VERSION,
+            ai_metadata=None,
+            request_id=str(dispute.get("request_id", dispute["dispute_id"])),
         )
     else:
         logged = existing
@@ -129,6 +132,7 @@ def _score_case(
         graph_analysis=graph_result.to_dict(),
         feature_importance=contributions,
     )
+    ai_analysis = logged.ai_metadata or analyze_evidence({"reason_code": logged.reason_code, "items": logged.evidence}, reason_code=logged.reason_code).to_dict()
     draft = None
     if logged.action == "AUTO-CONTEST":
         draft = generate_contest_draft(
@@ -150,9 +154,10 @@ def _score_case(
         "expected_value": logged.expected_value,
         "replayed": logged.replayed,
         "contest_draft": draft,
-        "explanation": explanation,
+        "explanation": {**explanation, "ai_analyst": ai_analysis},
         "counterfactual": {"status": "PENDING"},
         "audit_id": f"decision:{logged.dispute_id}",
+        "request_id": logged.request_id,
         "model_version": MODEL_VERSION,
         "policy_version": POLICY_VERSION,
         "feature_version": FEATURE_VERSION,

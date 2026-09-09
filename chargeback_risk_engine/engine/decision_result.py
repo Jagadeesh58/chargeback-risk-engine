@@ -29,6 +29,7 @@ class CanonicalDecision:
     feature_version: str
     live_model: str
     challenger_models: dict[str, str] = field(default_factory=dict)
+    request_id: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

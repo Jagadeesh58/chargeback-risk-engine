@@ -1,5 +1,7 @@
 """
-hidden_truth.py — THE ONLY place `would_win` gets decided.
+Internal label used ONLY to generate/evaluate the synthetic dataset. Never available to the scorer or policy engine — see tests/test_hybrid_safety.py for the leakage check that enforces this.
+
+synthetic_ground_truth.py — THE ONLY place `would_win` gets decided.
 
 Design:
 - would_win is generated from a HIDDEN variable (hidden_seller_legitimate)

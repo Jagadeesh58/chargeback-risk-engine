@@ -109,11 +109,25 @@ def evaluate() -> dict:
         for row in rows:
             candidate_results.append(decide_case(row, db_path=str(Path(tmp) / "audit.db"), include_counterfactual=False))
     candidate_actions = [r["action"] for r in candidate_results]
-    strategies.append(_strategy_metrics("CHARGEBACK-SENTINEL", test, candidate_actions, logistic_probs, outcome_prior))
+    strategies.append(_strategy_metrics("CHARGEBACK-RISK-ENGINE", test, candidate_actions, logistic_probs, outcome_prior))
+    case_results = [
+        {
+            "dispute_id": row["dispute_id"],
+            "amount": float(row["amount"]),
+            "would_win": bool(row["would_win"]),
+            "p_win": float(logistic_probs[i]),
+            "action": candidate_results[i]["action"],
+            "expected_net_value": float(candidate_results[i]["economic_decision"]["expected_net_value"]),
+            "pass_count": int(sum(item["status"] == "PASS" for item in candidate_results[i]["evidence"])),
+            "evidence_total": int(len(candidate_results[i]["evidence"])),
+        }
+        for i, row in enumerate(rows)
+    ]
 
     return {
         "dataset": {"test_rows": len(test), "synthetic": True, "outcome_prior_from_train": outcome_prior},
         "strategies": strategies,
+        "case_results": case_results,
         "notes": {
             "expected_recovery": "modeled using each strategy's probability signal; ALWAYS strategies use the train-set outcome prior only as a neutral reference",
             "realized_financial_recovery": "not measured; would_win is synthetic benchmark ground truth",

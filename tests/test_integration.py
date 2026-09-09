@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from chargeback_risk_engine.api import app
 from chargeback_risk_engine.audit_log import DB_PATH, get_existing_decision
-from chargeback_risk_engine.hidden_truth import generate_one
+from chargeback_risk_engine.synthetic_ground_truth import generate_one
 from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer
 from chargeback_risk_engine.evidence import assemble
 from chargeback_risk_engine.engine.evidence_score import score_evidence

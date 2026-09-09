@@ -1,5 +1,5 @@
 """
-test_generator.py — real, runnable tests for hidden_truth.py and
+test_generator.py — real, runnable tests for synthetic_ground_truth.py and
 generate_data.py. Asserts, in code, the properties the generator is
 supposed to guarantee -- not just prose in a design note.
 """
@@ -10,7 +10,7 @@ import pytest
 
 from chargeback_risk_engine.config import ALL_EVIDENCE_FIELDS, RELEVANT_EVIDENCE_BY_REASON, REASON_CODES
 from scripts.generate_data import generate_dataset, CSV_COLUMNS
-from chargeback_risk_engine.hidden_truth import generate_one, MISSINGNESS_RATE
+from chargeback_risk_engine.synthetic_ground_truth import generate_one, MISSINGNESS_RATE
 
 
 def test_would_win_rate_is_sane():

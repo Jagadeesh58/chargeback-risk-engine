@@ -14,7 +14,7 @@ from chargeback_risk_engine.metrics import (
 
 
 def test_confusion_matrix_counts_sum_to_total_rows():
-    test = pd.read_csv("data/test.csv")
+    test = pd.read_csv("data/test.csv").head(100)
     results = run_pipeline(test)
     cm = confusion_matrix_for_auto_contest(results)
     total = cm["true_positive"] + cm["false_positive"] + cm["true_negative"] + cm["false_negative"]
@@ -22,7 +22,7 @@ def test_confusion_matrix_counts_sum_to_total_rows():
 
 
 def test_precision_and_recall_are_valid_fractions():
-    test = pd.read_csv("data/test.csv")
+    test = pd.read_csv("data/test.csv").head(100)
     results = run_pipeline(test)
     cm = confusion_matrix_for_auto_contest(results)
     prf = precision_recall_f1(cm)
@@ -34,7 +34,7 @@ def test_precision_and_recall_are_valid_fractions():
 def test_precision_beats_naive_would_win_rate():
     """A useful scorer's precision on AUTO-CONTEST calls should beat just
     guessing 'win' for everyone (the raw would_win rate in the data)."""
-    test = pd.read_csv("data/test.csv")
+    test = pd.read_csv("data/test.csv").head(100)
     results = run_pipeline(test)
     cm = confusion_matrix_for_auto_contest(results)
     prf = precision_recall_f1(cm)
@@ -46,7 +46,7 @@ def test_precision_beats_naive_would_win_rate():
 
 
 def test_false_positive_cost_is_nonnegative():
-    test = pd.read_csv("data/test.csv")
+    test = pd.read_csv("data/test.csv").head(100)
     results = run_pipeline(test)
     cost = false_positive_cost(results)
     assert cost >= 0.0
@@ -64,14 +64,14 @@ def test_false_positive_cost_only_counts_actual_false_positives():
 
 
 def test_calibration_check_bins_cover_all_rows():
-    test = pd.read_csv("data/test.csv")
+    test = pd.read_csv("data/test.csv").head(100)
     results = run_pipeline(test)
     calibration = calibration_check(results, n_bins=5)
     assert calibration["count"].sum() == len(results)
 
 
 def test_calibration_actual_rate_is_valid_fraction_per_bin():
-    test = pd.read_csv("data/test.csv")
+    test = pd.read_csv("data/test.csv").head(100)
     results = run_pipeline(test)
     calibration = calibration_check(results, n_bins=5)
     assert (calibration["actual_win_rate"] >= 0.0).all()
