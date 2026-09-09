@@ -1,9 +1,0 @@
-{
-  "label": "LOCAL END-TO-END DECISION LATENCY",
-  "runs": 300,
-  "p50_ms": 1.802171,
-  "p95_ms": 2.184858,
-  "p99_ms": 2.325221,
-  "max_ms": 3.547466,
-  "method": "warm model artifacts; unique dispute_id per timed request; local process and filesystem"
-}
