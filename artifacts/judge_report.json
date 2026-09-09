@@ -1,0 +1,178 @@
+{
+  "dataset": {
+    "name": "bundled synthetic transaction/chargeback dataset",
+    "synthetic": true,
+    "train_rows": 20000,
+    "dev_rows": 5000,
+    "test_rows": 5000,
+    "split": "seeded 2/3 train, 1/6 dev, 1/6 held-out test; final reporting only on test.csv",
+    "leakage_controls": [
+      "synthetic label is excluded from scorer inputs",
+      "calibration fit from dev.csv",
+      "test outcomes are not used for threshold fitting"
+    ]
+  },
+  "baselines": [
+    {
+      "strategy": "ALWAYS-CONTEST",
+      "precision": 0.5648,
+      "recall": 1.0,
+      "f1": 0.721881390593047,
+      "false_positive_cost": 326400.0,
+      "false_positive_count": 2176,
+      "net_money_recovered": 10894729.799999999,
+      "total_disputes": 5000
+    },
+    {
+      "strategy": "ALWAYS-ACCEPT",
+      "auto_contest_count": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "expected_net_value": 0.0
+    },
+    {
+      "strategy": "CHARGEBACK-RISK-ENGINE",
+      "auto_contest_count": 1492,
+      "precision": 0.7593833780160858,
+      "recall": 0.4012039660056657,
+      "expected_net_value": 4607324.763838681,
+      "synthetic_false_positive_count": 359,
+      "comparison_note": "Frozen baseline values are historical 900-row measurements; the scaled test is reported separately because the original pre-change source snapshot is not bundled."
+    }
+  ],
+  "risk_metrics": {
+    "pr_auc": 0.7234116688966661,
+    "brier_score": 0.21650102515928074,
+    "calibrated_brier_score": 0.22414670748238058
+  },
+  "ablation": [
+    {
+      "component": "Rules only",
+      "auto_contest_count": 197,
+      "precision": 0.6852791878172588,
+      "recall": 0.5056179775280899,
+      "f1": 0.581896551724138,
+      "false_positive_cost": 9300.0
+    },
+    {
+      "component": "Model only",
+      "auto_contest_count": 148,
+      "precision": 0.7364864864864865,
+      "recall": 0.40823970037453183,
+      "f1": 0.5253012048192771,
+      "false_positive_cost": 5850.0
+    },
+    {
+      "component": "Model + Evidence",
+      "auto_contest_count": 148,
+      "precision": 0.7364864864864865,
+      "recall": 0.40823970037453183,
+      "f1": 0.5253012048192771,
+      "false_positive_cost": 5850.0
+    },
+    {
+      "component": "Model + Economics",
+      "auto_contest_count": 148,
+      "precision": 0.7364864864864865,
+      "recall": 0.40823970037453183,
+      "f1": 0.5253012048192771,
+      "false_positive_cost": 5850.0
+    },
+    {
+      "component": "Model + Graph",
+      "auto_contest_count": 148,
+      "precision": 0.7364864864864865,
+      "recall": 0.40823970037453183,
+      "f1": 0.5253012048192771,
+      "false_positive_cost": 5850.0
+    },
+    {
+      "component": "Full system",
+      "auto_contest_count": 148,
+      "precision": 0.7364864864864865,
+      "recall": 0.40823970037453183,
+      "f1": 0.5253012048192771,
+      "false_positive_cost": 5850.0
+    }
+  ],
+  "ablation_test_rows": 500,
+  "review_budget": [
+    {
+      "review_budget": 0.01,
+      "capacity": 50,
+      "selected_reviews": 50,
+      "precision_at_budget": 0.62,
+      "recall_at_budget": 0.010977337110481586,
+      "recovered_value": 241742.87,
+      "false_positive_cost": 2850.0
+    },
+    {
+      "review_budget": 0.05,
+      "capacity": 250,
+      "selected_reviews": 250,
+      "precision_at_budget": 0.58,
+      "recall_at_budget": 0.051345609065155805,
+      "recovered_value": 1080907.86,
+      "false_positive_cost": 15750.0
+    },
+    {
+      "review_budget": 0.1,
+      "capacity": 500,
+      "selected_reviews": 500,
+      "precision_at_budget": 0.582,
+      "recall_at_budget": 0.10304532577903683,
+      "recovered_value": 2029957.33,
+      "false_positive_cost": 31350.0
+    },
+    {
+      "review_budget": 0.2,
+      "capacity": 1000,
+      "selected_reviews": 1000,
+      "precision_at_budget": 0.534,
+      "recall_at_budget": 0.18909348441926346,
+      "recovered_value": 3427259.46,
+      "false_positive_cost": 69900.0
+    }
+  ],
+  "adversarial_tests": {
+    "prompt_injection": "covered by deterministic evidence analyst boundary",
+    "contradictory_evidence": "policy -> HUMAN-REVIEW",
+    "missing_evidence": "WARN -> HUMAN-REVIEW",
+    "malformed_input": "API validation -> 422",
+    "duplicate_requests": "SQLite idempotency",
+    "replay_requests": "original decision replayed",
+    "future_timestamp_manipulation": "timestamp fields are not trusted as outcome features",
+    "amount_manipulation": "API amount bounds + monetary ceiling",
+    "graph_manipulation": "relationship identifiers treated as data",
+    "llm_schema_failure": "deterministic fallback",
+    "llm_timeout": "deterministic fallback",
+    "llm_unavailable": "offline operation",
+    "policy_boundary": "deterministic policy tests",
+    "retry_abuse": "contest-count policy gate",
+    "money_limit_bypass": "monetary ceiling gate"
+  },
+  "latency": {
+    "runs": 100,
+    "p50_ms": 2.008016,
+    "p95_ms": 2.514071,
+    "p99_ms": 3.07584,
+    "max_ms": 3.425539,
+    "method": "warm local process; unique dispute IDs"
+  },
+  "audit": {
+    "durable": "SQLite",
+    "fields": [
+      "case ID",
+      "decision",
+      "policy version",
+      "model version",
+      "evidence status",
+      "economic values",
+      "graph signal",
+      "AI metadata",
+      "timestamp",
+      "request ID"
+    ],
+    "integrity": "idempotency and immutable insert; no external submission performed"
+  }
+}
