@@ -1,13 +1,14 @@
 """FastAPI boundary for the canonical chargeback decision service."""
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel, Field
 
 from chargeback_risk_engine.config import REASON_CODES
+from chargeback_risk_engine.audit_log import verify_audit_integrity, DB_PATH
 from chargeback_risk_engine.engine.hybrid_pipeline import decide_case
 
-app = FastAPI(title="Chargeback Sentinel API", version="1.0")
+app = FastAPI(title="Chargeback Risk Engine API", version="1.0")
 
 
 class DisputeRequest(BaseModel):
@@ -58,6 +59,7 @@ class DecisionResponse(BaseModel):
     replayed: bool
     contest_draft: dict | None = None
     audit_id: str | None = None
+    request_id: str = ""
     model_version: str
     policy_version: str
     feature_version: str
@@ -70,23 +72,30 @@ def health():
     return {"status": "ok"}
 
 
-def _score(request: DisputeRequest) -> DecisionResponse:
+def _score(request: DisputeRequest, request_id: str | None = None) -> DecisionResponse:
     if request.reason_code not in REASON_CODES:
         raise HTTPException(
             status_code=422,
             detail=f"Unknown reason_code '{request.reason_code}'. Must be one of {REASON_CODES}.",
         )
     dispute = request.model_dump() if hasattr(request, "model_dump") else request.dict()
+    dispute["request_id"] = request_id or dispute["dispute_id"]
     return DecisionResponse(**decide_case(dispute))
 
 
 @app.post("/decision", response_model=DecisionResponse)
-def decision(request: DisputeRequest) -> DecisionResponse:
+def decision(request: DisputeRequest, x_request_id: str | None = Header(default=None)) -> DecisionResponse:
     """Primary decision endpoint."""
-    return _score(request)
+    return _score(request, x_request_id)
 
 
 @app.post("/score", response_model=DecisionResponse, include_in_schema=False)
-def score_compatibility(request: DisputeRequest) -> DecisionResponse:
+def score_compatibility(request: DisputeRequest, x_request_id: str | None = Header(default=None)) -> DecisionResponse:
     """Compatibility alias for older callers; it uses the same service."""
-    return _score(request)
+    return _score(request, x_request_id)
+
+
+@app.get("/audit/verify")
+def audit_verify():
+    """Verify the durable SQLite audit hash chain."""
+    return verify_audit_integrity(DB_PATH)

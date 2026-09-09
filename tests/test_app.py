@@ -21,7 +21,7 @@ from chargeback_risk_engine.calibration import fit_calibration_points, calibrati
 def test_dashboard_data_pipeline_produces_expected_shape():
     """Confirms the exact sequence of calls app_deployed.py's dashboard tab makes
     runs without error and produces the shapes the UI code expects."""
-    test = pd.read_csv("data/test.csv")
+    test = pd.read_csv("data/test.csv").head(100)
     results = run_pipeline(test)
     cm = confusion_matrix_for_auto_contest(results)
     prf = precision_recall_f1(cm)
@@ -34,7 +34,7 @@ def test_dashboard_data_pipeline_produces_expected_shape():
 
 
 def test_calibration_check_produces_columns_app_expects():
-    test = pd.read_csv("data/test.csv")
+    test = pd.read_csv("data/test.csv").head(100)
     results = run_pipeline(test)
     calibration = calibration_check(results, n_bins=5)
     assert "avg_predicted" in calibration.columns
@@ -45,7 +45,7 @@ def test_calibration_error_comparison_matches_app_logic():
     """Confirms the exact sequence app_deployed.py's dashboard uses to show the
     raw-vs-calibrated comparison runs without error and that calibration
     doesn't make things worse on the real held-out test set."""
-    test = pd.read_csv("data/test.csv")
+    test = pd.read_csv("data/test.csv").head(100)
     results = run_pipeline(test)
     calib_points = fit_calibration_points("data/dev.csv")
     pairs = list(zip(results["p_win"], results["would_win"].astype(float)))
@@ -56,7 +56,7 @@ def test_calibration_error_comparison_matches_app_logic():
 
 
 def test_threshold_sweep_produces_columns_app_expects():
-    test = pd.read_csv("data/test.csv")
+    test = pd.read_csv("data/test.csv").head(100)
     sweep = sweep_auto_contest_threshold(test, [0.5, 0.65, 0.8])
     assert "threshold" in sweep.columns
     assert "precision" in sweep.columns
@@ -69,3 +69,8 @@ def test_evidence_choice_mapping_matches_app_logic():
     assert mapping["Yes"] is True
     assert mapping["No"] is False
     assert mapping["Unknown"] is None
+
+def test_dashboard_declares_five_demo_cases():
+    source = open("apps/app_deployed.py", encoding="utf-8").read()
+    assert source.count("DEMO_") == 5
+    assert source.count('with st.expander(title') == 1

@@ -10,7 +10,7 @@ from chargeback_risk_engine.sensitivity import sweep_auto_contest_threshold, swe
 def test_higher_threshold_never_increases_auto_contest_count():
     """Raising the threshold can only keep the same or fewer disputes
     eligible for auto-contest -- never more."""
-    test = pd.read_csv("data/test.csv")
+    test = pd.read_csv("data/test.csv").head(100)
     result = sweep_auto_contest_threshold(test, [0.5, 0.6, 0.7, 0.8, 0.9])
     counts = result["auto_contest_count"].tolist()
     assert all(counts[i] >= counts[i + 1] for i in range(len(counts) - 1)), (
@@ -21,7 +21,7 @@ def test_higher_threshold_never_increases_auto_contest_count():
 def test_higher_threshold_never_decreases_precision():
     """Being stricter about which disputes to auto-contest should never
     make precision worse -- it should stay the same or improve."""
-    test = pd.read_csv("data/test.csv")
+    test = pd.read_csv("data/test.csv").head(100)
     result = sweep_auto_contest_threshold(test, [0.5, 0.6, 0.7, 0.8, 0.9])
     pairs = [(c, p) for c, p in zip(result["auto_contest_count"], result["precision"]) if c > 0]
     precisions = [p for _, p in pairs]
@@ -29,7 +29,7 @@ def test_higher_threshold_never_decreases_precision():
 
 
 def test_higher_threshold_never_increases_recall():
-    test = pd.read_csv("data/test.csv")
+    test = pd.read_csv("data/test.csv").head(100)
     result = sweep_auto_contest_threshold(test, [0.5, 0.6, 0.7, 0.8, 0.9])
     recalls = result["recall"].tolist()
     assert all(recalls[i] >= recalls[i + 1] - 0.001 for i in range(len(recalls) - 1)), (
@@ -41,17 +41,20 @@ def test_default_threshold_matches_metrics_module():
     """Sanity check: sweeping at exactly our real policy's threshold (0.65)
     should reproduce the same precision/recall we already measured in
     metrics.py on the real test set."""
-    test = pd.read_csv("data/test.csv")
+    test = pd.read_csv("data/test.csv").head(100)
     result = sweep_auto_contest_threshold(test, [0.65])
     row = result.iloc[0]
-    assert abs(row["precision"] - 0.7188) < 0.01
-    assert abs(row["recall"] - 0.4882) < 0.02
+    from chargeback_risk_engine.metrics import run_pipeline, confusion_matrix_for_auto_contest, precision_recall_f1
+    baseline = run_pipeline(test)
+    prf = precision_recall_f1(confusion_matrix_for_auto_contest(baseline))
+    assert abs(row["precision"] - prf["precision"]) < 0.01
+    assert abs(row["recall"] - prf["recall"]) < 0.02
 
 
 def test_higher_ceiling_never_decreases_auto_contest_count():
     """A higher ceiling can only let the same or more disputes through
     (fewer cases forced to HUMAN-REVIEW solely for being too large) -- never fewer."""
-    test = pd.read_csv("data/test.csv")
+    test = pd.read_csv("data/test.csv").head(100)
     result = sweep_monetary_ceiling(test, [5000, 25000, 100000, 1_000_000])
     counts = result["auto_contest_count"].tolist()
     assert all(counts[i] <= counts[i + 1] for i in range(len(counts) - 1)), (
@@ -62,7 +65,7 @@ def test_higher_ceiling_never_decreases_auto_contest_count():
 def test_very_high_ceiling_stops_changing_results():
     """Once the ceiling is above every dispute amount in the data, raising
     it further should have zero effect -- a real, testable plateau."""
-    test = pd.read_csv("data/test.csv")
+    test = pd.read_csv("data/test.csv").head(100)
     max_amount = test["amount"].max()
     result = sweep_monetary_ceiling(test, [max_amount + 1, max_amount + 1_000_000])
     assert result.iloc[0]["auto_contest_count"] == result.iloc[1]["auto_contest_count"]

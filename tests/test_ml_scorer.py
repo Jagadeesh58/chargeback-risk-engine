@@ -66,7 +66,7 @@ def test_ml_scorer_does_not_dramatically_beat_rule_based_scorer():
     The trained ML scorer's AUC on test.csv should be very close to the
     rule-based scorer's AUC -- NOT dramatically
     better -- because the synthetic generator gives every relevant field
-    equal correlation strength by design (see hidden_truth.py), so there
+    equal correlation strength by design (see synthetic_ground_truth.py), so there
     is no hidden per-field weighting pattern for ML to discover.
     If this test ever fails because ML suddenly does dramatically better,
     that's worth investigating -- it could mean the generator changed.

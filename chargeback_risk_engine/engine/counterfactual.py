@@ -40,6 +40,7 @@ def find_minimal_decision_reversal(
         db_path = str(Path(tmp) / "counterfactual.db")
         for field, old_value, new_value in _candidate_inputs(dispute, limit=limit):
             candidate = dict(dispute)
+            candidate["dispute_id"] = f"CF_{dispute.get("dispute_id", "CASE")}_{field}_{repr(new_value)}"[:120]
             candidate[field] = new_value
             result = decision_fn(
                 candidate,
@@ -80,5 +81,5 @@ def find_minimal_decision_reversal(
         "from_value": best_risk_change["from_value"],
         "to_value": best_risk_change["to_value"],
         "risk_delta_abs": best_risk_change["risk_delta_abs"],
-        "statement": "Risk changed, decision unchanged.",
+        "statement": f"Changing {best_risk_change["field"]} from {best_risk_change["from_value"]!r} to {best_risk_change["to_value"]!r} changes the modeled risk, but the deterministic policy still returns {original_action}.",
     }

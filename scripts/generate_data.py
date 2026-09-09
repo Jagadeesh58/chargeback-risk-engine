@@ -1,6 +1,6 @@
 """
 generate_data.py — builds the synthetic dataset the rest of the project
-uses. Calls hidden_truth.generate_one() but DOES NOT store or expose
+uses. Calls synthetic_ground_truth.generate_one() but DOES NOT store or expose
 hidden_seller_legitimate anywhere in the output -- only reason_code,
 amount, evidence fields, and would_win are written out, matching what a
 real scorer would actually have access to.
@@ -21,7 +21,7 @@ import random
 from datetime import date, timedelta
 
 from chargeback_risk_engine.config import ALL_EVIDENCE_FIELDS, REASON_CODES
-from chargeback_risk_engine.hidden_truth import generate_one
+from chargeback_risk_engine.synthetic_ground_truth import generate_one
 
 CSV_COLUMNS = (
     ["dispute_id", "payment_id", "reason_code", "amount", "respond_by"]
@@ -62,7 +62,7 @@ def write_csv(rows: list[dict], path: str) -> None:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--n", type=int, default=6000)
+    parser.add_argument("--n", type=int, default=30000)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--out-dir", type=str, default=".")
     args = parser.parse_args()
@@ -70,7 +70,7 @@ def main():
     Path(args.out_dir).mkdir(parents=True, exist_ok=True)
     all_rows = generate_dataset(args.n, args.seed)
 
-    # Simple 70/15/15 split, done by slicing a pre-shuffled list -- since
+    # Deterministic 70/15/15 split, done by slicing a pre-shuffled list -- since
     # the whole list was already generated from one seeded rng in a fixed
     # order, we shuffle with a SEPARATE seeded rng for the split so the
     # split itself is reproducible too but independent of generation order.
@@ -79,8 +79,8 @@ def main():
     split_rng.shuffle(shuffled)
 
     n = len(shuffled)
-    train_end = int(n * 0.70)
-    dev_end = int(n * 0.85)
+    train_end = int(n * (2 / 3))
+    dev_end = int(n * (5 / 6))
     train, dev, test = shuffled[:train_end], shuffled[train_end:dev_end], shuffled[dev_end:]
 
     write_csv(train, f"{args.out_dir}/train.csv")
