@@ -111,7 +111,7 @@ def decide(
         if evidence_packet is None or evidence_quality is None:
             return PolicyDecision(
                 HUMAN_REVIEW,
-                "Risk estimate is high, but the canonical evidence evaluation was not supplied; automatic contest is not allowed.",
+                "Win probability is high, but the canonical evidence evaluation was not supplied; automatic contest is not allowed.",
                 ev,
             )
         if model_confidence is not None and float(model_confidence) < MIN_MODEL_CONFIDENCE:
@@ -125,30 +125,30 @@ def decide(
             if pass_fraction <= MIN_PASS_FRACTION_FOR_AUTO_CONTEST:
                 return PolicyDecision(
                     HUMAN_REVIEW,
-                    f"Risk estimate clears the threshold, but only {evidence_packet.pass_count}/{evidence_packet.total} relevant fields are confirmed; the {MIN_PASS_FRACTION_FOR_AUTO_CONTEST:.0%} confirmation bar is not met.",
+                    f"Win probability clears the threshold, but only {evidence_packet.pass_count}/{evidence_packet.total} relevant fields are confirmed; the {MIN_PASS_FRACTION_FOR_AUTO_CONTEST:.0%} confirmation bar is not met.",
                     ev,
                 )
         if ev <= 0:
             return PolicyDecision(
                 HUMAN_REVIEW,
-                f"Risk estimate clears the threshold, but expected net value {ev:.2f} is not positive.",
+                f"Win probability clears the threshold, but expected net value {ev:.2f} is not positive.",
                 ev,
             )
         return PolicyDecision(
             AUTO_CONTEST,
-            f"Risk estimate {win_probability:.2f} >= {float(auto_contest_threshold):.2f}, evidence is sufficiently confirmed, and expected net value is {ev:.2f}.",
+            f"Win probability {win_probability:.2f} >= {float(auto_contest_threshold):.2f}, evidence is sufficiently confirmed, and expected net value is {ev:.2f}.",
             ev,
         )
 
     if win_probability <= float(accept_loss_threshold):
         return PolicyDecision(
             ACCEPT_LOSS,
-            f"Risk estimate {win_probability:.2f} <= {float(accept_loss_threshold):.2f}; contesting is not worthwhile at the configured threshold.",
+            f"Win probability {win_probability:.2f} <= {float(accept_loss_threshold):.2f}; contesting is not worthwhile at the configured threshold.",
             ev,
         )
 
     return PolicyDecision(
         HUMAN_REVIEW,
-        f"Risk estimate {win_probability:.2f} is ambiguous between {float(accept_loss_threshold):.2f} and {float(auto_contest_threshold):.2f}.",
+        f"Win probability {win_probability:.2f} is ambiguous between {float(accept_loss_threshold):.2f} and {float(auto_contest_threshold):.2f}.",
         ev,
     )
