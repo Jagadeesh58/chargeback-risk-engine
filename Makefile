@@ -4,14 +4,22 @@ data:
 test:
 	python -m pytest -q
 
+benchmark:
+	python scripts/benchmark.py
+
+judge:
+	python -m pytest -q
+	python scripts/benchmark.py
+	python scripts/judge_report.py
+
+latency:
+	python scripts/latency.py
+
 demo:
 	python scripts/demo.py
 
 train:
 	python training/train_models.py
-
-benchmark:
-	python scripts/benchmark.py
 
 api:
 	uvicorn apps.api:app --reload
