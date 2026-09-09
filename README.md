@@ -107,3 +107,7 @@ The policy engine remains the final authority. In particular:
 The bundled data is synthetic. The graph layer therefore cannot honestly claim a performance lift from the tabular test set because that dataset contains no historical relationship identifiers. Graph behavior is instead exercised in the frozen hard-case suite.
 
 The current operating point deliberately trades recall for precision and safety. Human review is a feature, not a failure: the system is designed to abstain whenever evidence or economics is insufficient.
+
+### Robustness and release proof
+
+`make stress` runs a 1,000-row-per-case stress suite over the frozen held-out test set: extra evidence missingness, contradiction injection, shifted transaction amounts, and a deterministic drift report. These are explicitly robustness transformations, not external-data claims. See `docs/COMPETITION_UPGRADE.md` and `docs/FIVE_MINUTE_PITCH.md`.

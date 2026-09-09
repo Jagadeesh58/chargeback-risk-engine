@@ -15,7 +15,7 @@
     "realized_net_value": 6083459.54,
     "realized_net_value_lift_vs_model_only": 747693.1800000006,
     "expected_net_value_lift_vs_model_only": 684444.7555783838,
-    "p95_latency_ms": 1.213341
+    "p95_latency_ms": 1.160662
   },
   "baselines": [
     {
@@ -162,10 +162,10 @@
   },
   "latency": {
     "runs": 30,
-    "p50_ms": 0.714747,
-    "p95_ms": 1.213341,
-    "p99_ms": 1.655461,
-    "max_ms": 1.655461,
+    "p50_ms": 0.728908,
+    "p95_ms": 1.160662,
+    "p99_ms": 1.882538,
+    "max_ms": 1.882538,
     "method": "warm local pure policy path; 3 repetitions per case"
   },
   "hard_cases": {
