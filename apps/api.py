@@ -3,3 +3,8 @@ chargeback_risk_engine/api.py — this file only re-exports it so there is
 exactly one implementation, not two copies that can silently drift apart.
 """
 from chargeback_risk_engine.api import app
+
+@app.get("/audit/verify")
+def audit_verify():
+    """Verify the durable SQLite audit hash chain."""
+    return verify_audit_integrity(DB_PATH)
