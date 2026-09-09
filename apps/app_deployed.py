@@ -59,7 +59,7 @@ with score_tab:
             st.info("Enter a case and run the decision path.")
         else:
             a,b,c,d = st.columns(4)
-            a.metric("Risk", f"{result['win_probability']:.1%}")
+            a.metric("Win probability", f"{result['win_probability']:.1%}")
             b.metric("Evidence", f"{result['evidence_score']['completeness']:.0%}")
             c.metric("Expected net value", f"₹{result['economic_decision']['expected_net_value']:,.0f}")
             d.metric("Decision", result["action"])
@@ -83,7 +83,7 @@ with score_tab:
 with proof_tab:
     st.subheader("Measured system proof")
     st.caption("Bundled synthetic evaluation data; not a production-performance claim.")
-    report_path = ARTIFACTS_DIR / "judge_report.json"
+    report_path = ARTIFACTS_DIR / "verification_report.json"
     if report_path.exists():
         report = pd.read_json(report_path, typ="series")
         raw = __import__("json").loads(report_path.read_text())
@@ -105,7 +105,7 @@ with proof_tab:
         with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
             st.write({"live_audit_verifier": "available", "generated_report": raw["audit"]})
     else:
-        st.warning("Run `make judge` to generate the proof artifacts.")
+        st.warning("Run `make verify` to generate the proof artifacts.")
 
 with demo_tab:
     st.subheader("Deterministic demo cases")

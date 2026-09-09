@@ -7,10 +7,10 @@ test:
 benchmark:
 	python scripts/benchmark.py
 
-judge:
+verify:
 	python -m pytest -q
 	python scripts/benchmark.py
-	python scripts/judge_report.py
+	python scripts/generate_report.py
 
 latency:
 	python scripts/latency.py
