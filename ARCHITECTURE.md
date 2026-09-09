@@ -1,6 +1,6 @@
 # Architecture
 
-Chargeback Sentinel keeps one decision path for the API, Streamlit UI, CLI demo, benchmark, and counterfactual analysis.
+Chargeback Risk Engine keeps one decision path for the API, Streamlit UI, CLI demo, benchmark, and counterfactual analysis.
 
 ```mermaid
 flowchart TD
@@ -53,7 +53,7 @@ from chargeback_risk_engine.engine.hybrid_pipeline import decide_case
 result = decide_case(dispute)
 ```
 
-The module retains its historical filename to avoid an unnecessary repository-wide rename. It is no longer a live hybrid model service.
+The module name is retained because it is the canonical public entry point; the live risk estimate is the Logistic Regression model.
 
 The following all call `decide_case(...)`:
 
@@ -70,14 +70,14 @@ There is no second policy function for demos or UI rendering.
 
 The live risk estimator is the reason-aware Logistic Regression scorer in `ml_scorer.py`.
 
-Held-out model evidence:
+Current held-out model evidence:
 
 | Model | PR-AUC | Brier | Calibration error |
 |---|---:|---:|---:|
 | Rules | 0.7093 | 0.2365 | 0.1246 |
-| Logistic | **0.7316** | **0.2206** | **0.0337** |
-| HGB challenger | 0.7118 | 0.2288 | 0.0911 |
-| Offline hybrid challenger | 0.7300 | 0.2222 | 0.0475 |
+| Logistic | **0.7234** | **0.2165** | **0.0075** |
+| HGB challenger | 0.7038 | 0.2246 | 0.0741 |
+| Offline hybrid challenger | 0.7210 | 0.2181 | 0.0209 |
 
 The Logistic model wins on the most useful held-out quality/calibration measures while keeping a small live dependency surface. HGB and the hybrid remain for offline comparison only.
 
@@ -147,3 +147,9 @@ The chronological check is intentionally not advertised as temporal robustness b
 ## External integration boundary
 
 `razorpay_adapter.py` creates a contest draft only. There is no production submission path in the demo or benchmark.
+
+## Submission notes
+
+The live application presents five deterministic demo cases: strong evidence, mixed evidence, graph escalation, weak evidence, and an economic boundary case. The evaluation dataset contains 20,000 training rows, 5,000 development rows, and 5,000 held-out test rows.
+
+The main differentiator is the combination of `engine/risk_graph.py` for temporal connected-cluster context, `engine/economic_decision.py` for expected-value economics, and the bounded evidence analyst. One deterministic policy remains authoritative, and `tests/test_safety_regression.py` proves that the monetary ceiling cannot be bypassed by model confidence or a caller-supplied expected value.

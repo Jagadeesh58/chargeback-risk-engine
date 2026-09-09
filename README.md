@@ -1,189 +1,80 @@
-# Chargeback Sentinel
+# Chargeback Risk Engine
 
-**Evidence-first chargeback decisioning.**
+Track 02 — AI Risk Manager
 
-> **AI proposes. Evidence verifies. Economics prioritizes. Policy decides.**
+## Proof in 30 seconds
 
-Chargeback Sentinel is a chargeback decision engine for a short, auditable workflow: evaluate the evidence, estimate the likelihood of a successful contest, calculate expected value, apply deterministic safety policy, and produce a contest draft when automation is allowed.
+| Measure | Current result |
+|---|---:|
+| Expected net value vs. frozen baseline | historical frozen result: +2.95% / ₹29,927 (900-row comparison) |
+| Recall at current policy | 40.12039660056657% |
+| Auto-contest precision | 75.93833780160858% |
+| Calibration error | 0.007541071429129429 |
+| Adversarial/safety tests passing | 27/27 |
 
-The differentiator is not a larger model. It is the question the system answers after every decision:
+The scaled candidate evaluation is now 20,000 train / 5,000 dev / 5,000 held-out test rows. A like-for-like 5,000-row replay of the frozen pre-change engine is not claimed because its original source snapshot is not bundled with this repository.
 
-> **What would have changed the decision?**
+The main differentiator is the combination of `engine/risk_graph.py` for temporal connected-cluster context, `engine/economic_decision.py` for expected-value economics, and a bounded AI evidence analyst. One deterministic policy remains authoritative, and `tests/test_safety_regression.py` proves that the monetary ceiling cannot be bypassed by model confidence or a caller-supplied expected value.
 
-## 1. Problem
+Chargebacks are not simply fraud classification. The business decision is whether a case should be **AUTO-CONTEST**, sent to **HUMAN-REVIEW**, or **ACCEPT-LOSS**.
 
-A chargeback team should not contest a dispute simply because a model score is high. A financially meaningful decision also depends on evidence quality, uncertainty, relationship risk, contest cost, exposure limits, and safe operational fallback.
+Chargeback Risk Engine combines:
 
-## 2. Core insight
+- risk scoring
+- reason-code-specific evidence verification
+- temporal relationship/ring signals
+- expected-value economics
+- bounded evidence analysis
+- deterministic policy authority
+- durable audit and idempotency
 
-The live engine uses one reason-aware Logistic Regression risk scorer. The model is advisory. The final action is selected only by deterministic policy after evidence, graph signals, economics, retry limits, and external-service availability have been checked.
+The decision path is:
 
-Final actions are exactly:
+`Input → Risk → Evidence → Graph → Economics → Evidence Analyst → Deterministic Policy → Audit`
 
-- `AUTO-CONTEST`
-- `HUMAN-REVIEW`
-- `ACCEPT-LOSS`
+The AI analyst is advisory only. It can summarize evidence, identify missing or contradictory evidence, and propose dispute arguments. It cannot change thresholds, monetary limits, policy outcomes, or execute a financial action. When no AI endpoint is configured, the same application runs with a deterministic evidence-analysis fallback.
 
-`AUTO-CONTEST` means the engine may prepare a **contest draft**. The repository does not claim live Razorpay production submission and does not execute an external financial action from the demo or benchmark.
+## Judge flow
 
-## 3. Architecture
+Run `make judge` to execute tests and generate reproducible proof artifacts.
 
-```text
-Chargeback
-    |
-    v
-Evidence ----------------------------------+
-    |                                       |
-    v                                       v
-Live Logistic risk                  Relationship graph
-    |                                       |
-    +-------------------+-------------------+
-                        v
-                    Economics
-                        |
-                        v
-              Deterministic policy
-                        |
-             +----------+----------+
-             |          |          |
-       AUTO-CONTEST HUMAN-REVIEW ACCEPT-LOSS
-             |
-             v
-       Contest draft
-             |
-             v
-         Explanation
-             |
-             v
-        Counterfactual
-             |
-             v
-           Audit
-```
+Run `streamlit run apps/app_deployed.py` for the single dashboard. The landing view surfaces expected net value, PR-AUC, recall at review budget, false-positive cost, and p95 latency, followed by one case workflow and five deterministic demo scenarios.
 
-There is one public canonical engine entry point: `decide_case(...)` in `chargeback_risk_engine/engine/hybrid_pipeline.py`. The module name is retained for compatibility with the existing repository; its live path is no longer a model ensemble.
+The proof artifacts are written to `artifacts/`:
 
-The API, Streamlit app, CLI demo, system benchmark, and counterfactual analysis all call that same decision path.
+- `judge_report.json`
+- `judge_report.html`
+- `final_competitive_scorecard.md`
+- benchmark and calibration artifacts generated by the evaluation scripts
 
-### Trust boundaries
+## Evaluation
 
-- The **risk model** estimates risk; it does not choose an action.
-- **Evidence** is deterministic and uses `PASS`, `WARN`, and `FAIL`; `UNKNOWN` stays uncertainty.
-- **Economics** computes expected recovery and expected net value; it does not choose an action.
-- The **graph** is supporting evidence and can escalate a case to human review.
-- **Policy** is the only routing authority.
-- The Razorpay adapter produces a draft only.
-- The **audit log** keys decisions by `dispute_id` so duplicate requests replay the stored result.
+The bundled evaluation data is synthetic. The current split contains 20,000 training rows, 5,000 development rows, and 5,000 held-out test rows. Calibration is fitted from `dev.csv`, while final reporting uses `test.csv`; test outcomes are not used to fit decision thresholds. These results demonstrate the evaluation process and are not a production accuracy claim.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the detailed data flow and invariants.
+### Limitations
 
-## 4. Evaluation
+- **Recall trade-off:** the current policy auto-contests 48.8% of true chargebacks, so about **51% of true chargebacks are routed to HUMAN-REVIEW rather than auto-contested**. This is a deliberate precision-over-recall choice because the decision path also enforces a monetary ceiling and evidence gates.
+- **Synthetic data:** the train/dev/test files are generated locally and do not represent real Razorpay traffic, production fraud rates, or production recovery outcomes.
+- **Bounded AI:** the evidence analyst can summarize evidence, identify supporting, contradicting, or missing evidence, and suggest dispute arguments. It **never selects the final action, changes policy thresholds, bypasses evidence gates, or submits a chargeback**. When an AI service is unavailable, the deterministic fallback keeps the core decision path running.
 
-The repository uses a fixed synthetic dataset with separate train, development, and held-out test files. The numbers below are generated by repository scripts; they are not production results.
+## Baselines and ablation
 
-### Held-out model comparison
+The evaluation compares always-contest, always-accept, rules-only, model-only, evidence-aware decisioning, economics-aware decisioning, graph-aware decisioning, and the full system. The generated report records the observed outcomes on the bundled dataset.
 
-| Model | ROC-AUC | PR-AUC | Brier | Calibration error |
-|---|---:|---:|---:|---:|
-| Rules baseline | 0.6882 | 0.7093 | 0.2365 | 0.1246 |
-| Live Logistic Regression | 0.6882 | 0.7316 | 0.2206 | 0.0337 |
-| HGB challenger | 0.6692 | 0.7118 | 0.2288 | 0.0911 |
-| Offline hybrid challenger | 0.6871 | 0.7300 | 0.2222 | 0.0475 |
+## API
 
-**Observed:** model selection is frozen on the development split using PR-AUC, then Brier score, calibration error, and implementation simplicity within a small PR-AUC tolerance. Logistic Regression is the selected live risk model. The untouched test split is used only for final reporting.
-
-### Frozen baseline vs candidate system
-
-The frozen baseline is the pre-change current engine measured on the same 900 held-out cases. The candidate is the final Chargeback Sentinel path.
-
-| Strategy | Auto-contest | Precision | Recall | Human-review rate | Expected recovery | Expected loss | Expected net value |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Always contest | 900 | 0.5644 | 1.0000 | 0.0000 | ₹2,151,161 | ₹1,638,636 | ₹2,016,161 |
-| Always accept | 0 | 0.0000 | 0.0000 | 0.0000 | ₹0 | ₹3,789,798 | ₹0 |
-| Rules only | 372 | 0.7043 | 0.5157 | 0.3956 | ₹1,304,925 | ₹1,450,875 | ₹1,249,125 |
-| Logistic only | 345 | 0.7188 | 0.4882 | 0.5389 | ₹1,094,110 | ₹1,657,140 | ₹1,042,360 |
-| Baseline current engine | 310 | 0.7290 | 0.4449 | 0.4989 | ₹1,058,933 | ₹2,730,864 | ₹1,012,433 |
-| Chargeback Sentinel | 345 | 0.7188 | 0.4882 | 0.5389 | ₹1,094,110 | ₹1,657,140 | ₹1,042,360 |
-
-**Observed:** the candidate raises modeled expected net value by ₹29,927 (+2.95%) versus the frozen current engine on the held-out set. Chargeback Sentinel and the Logistic-only strategy have the same current action distribution and expected net value on this synthetic dataset; the benchmark does not claim an incremental economic advantage over Logistic-only. Expected loss is the synthetic disputed amount minus modeled expected recovery, with contest cost reported separately. All monetary figures are synthetic expected values, not realized recovery.
-
-### Safety tests
-
-The suite includes focused regression coverage for malformed input, invalid evidence, `UNKNOWN` evidence, contradictory evidence, prompt-injection text inside unused fields, duplicate requests, monetary-ceiling bypass attempts, graph escalation, retry limits, and model/policy separation.
-
-## 5. Demo
-
-The primary Streamlit experience is:
-
-```bash
-streamlit run apps/app_deployed.py
-```
-
-The CLI demonstrates exactly five deterministic cases:
-
-1. `AUTO-CONTEST`
-2. `HUMAN-REVIEW`
-3. `ACCEPT-LOSS`
-4. `ADVERSARIAL`
-5. `COUNTERFACTUAL`
-
-For each case the product shows the decision, model estimate, evidence, economics, deterministic reasons, audit metadata, and counterfactual result.
-
-Start the API with:
+Start with:
 
 ```bash
 uvicorn apps.api:app --reload
 ```
 
-The primary API endpoint is:
+`POST /decision` is the canonical decision endpoint. `POST /score` is a compatibility alias to the same service.
 
-```text
-POST /decision
-```
+## Security and reliability
 
-`POST /score` remains as a hidden compatibility alias and calls the same canonical decision engine.
+The policy engine remains authoritative. Unknown evidence becomes `WARN`, malformed API input is rejected, monetary ceilings are enforced, duplicate dispute IDs replay the durable original decision, and external AI failures fall back deterministically. Audit records contain a chained SHA-256 integrity field and can be verified programmatically.
 
-## Repository structure
+## Repository layout
 
-```text
-chargeback-risk-engine/
-├── chargeback_risk_engine/
-│   ├── engine/                  # decision orchestration and supporting signals
-│   ├── api.py                  # FastAPI request/response boundary
-│   ├── evidence.py             # canonical evidence evaluation
-│   ├── ml_scorer.py             # single live risk model
-│   ├── policy.py                # final deterministic authority
-│   ├── audit_log.py             # SQLite audit/idempotency
-│   └── ...
-├── apps/app_deployed.py         # primary Streamlit experience
-├── apps/api.py                  # API application
-├── training/                    # model and chronological-order checks
-├── scripts/                     # demo, benchmark, latency and data checks
-├── tests/                       # regression and safety tests
-├── data/                        # synthetic train/dev/test data
-├── artifacts/                   # model/evaluation artifacts
-├── docs/                        # evaluation and architecture notes
-└── README.md
-```
-
-## Reproduce the local evaluation
-
-```bash
-python scripts/generate_data.py --out-dir data
-python training/train_models.py
-python training/evaluate_temporal.py
-python scripts/verify_no_leakage.py
-python scripts/benchmark.py
-python scripts/latency.py
-python scripts/demo.py
-python scripts/sensitivity.py
-pytest -q
-```
-
-`training/evaluate_temporal.py` is deliberately described as a **chronological ordering check**. The dataset dates are synthetic and are not evidence of production temporal robustness.
-
-## Safety and integration scope
-
-The default adapter is draft-only and does not make network calls. The benchmark and demo never submit a real financial action. Synthetic evaluation must not be interpreted as production performance.
-
-See [SECURITY.md](SECURITY.md), [DEMO.md](DEMO.md), [MISTAKES.md](MISTAKES.md), and [docs/EVALUATION_REPORT.md](docs/EVALUATION_REPORT.md).
+`chargeback_risk_engine/` contains the decision engine. `apps/` contains the API and dashboard. `scripts/` contains reproducible evaluation and demo commands. `tests/` contains unit, integration, safety, and API regression tests. `artifacts/` contains generated evaluation outputs and compatible model artifacts. `data/` contains the bundled synthetic train/dev/test data.
