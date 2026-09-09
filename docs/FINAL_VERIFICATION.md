@@ -35,4 +35,6 @@ The CLI demo runs five deterministic cases successfully: AUTO-CONTEST, HUMAN-REV
 
 ## Deployment
 
-The Streamlit app is ready for Streamlit Community Cloud, but a live public URL could not be created from this environment because no authenticated Streamlit Cloud/GitHub deployment connection is available. No placeholder or unverified URL is included in the project.
+Live demo: https://chargebackriskengine.streamlit.app/
+
+The project includes the live demo URL supplied for the deployed Streamlit application. Automated access from this environment redirected to Streamlit authentication, so browser-level execution could not be independently verified here.
