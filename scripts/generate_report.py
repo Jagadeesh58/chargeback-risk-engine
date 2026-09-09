@@ -117,17 +117,18 @@ def main():
     test = pd.read_csv(DATA_DIR/"test.csv")
     benchmark = json.loads((ARTIFACTS_DIR / "candidate_benchmark.json").read_text())
     if int(benchmark["dataset"]["test_rows"]) != len(test) or "case_results" not in benchmark:
-        raise RuntimeError("Run scripts/benchmark.py before scripts/judge_report.py")
+        raise RuntimeError("Run scripts/benchmark.py before scripts/generate_report.py")
     result_df = pd.DataFrame(benchmark["case_results"])
     y=test["would_win"].astype(int).tolist(); p=result_df["p_win"].astype(float).tolist()
     auto=result_df["action"].tolist()
     auto_idx=[i for i,a in enumerate(auto) if a=="AUTO-CONTEST"]
     tp=sum(y[i] for i in auto_idx); fp=len(auto_idx)-tp; fn=sum(y)-tp
+    candidate_benchmark = next(x for x in benchmark["strategies"] if x["strategy"] == "CHARGEBACK-RISK-ENGINE")
     baselines=[
         {"strategy":"ALWAYS-CONTEST", **run_naive_baseline(test)},
         {"strategy":"ALWAYS-ACCEPT","auto_contest_count":0,"precision":0.0,"recall":0.0,"expected_net_value":0.0},
         {"strategy":"CHARGEBACK-RISK-ENGINE","auto_contest_count":len(auto_idx),"precision":tp/len(auto_idx) if auto_idx else 0.0,
-         "recall":tp/sum(y) if sum(y) else 0.0,"expected_net_value":float(result_df.loc[result_df["action"]=="AUTO-CONTEST", "expected_net_value"].sum()),
+         "recall":tp/sum(y) if sum(y) else 0.0,"expected_net_value":float(candidate_benchmark["expected_net_value"]),
          "synthetic_false_positive_count":fp,"comparison_note":"Frozen baseline values are historical 900-row measurements; the scaled test is reported separately because the original pre-change source snapshot is not bundled."}
     ]
     ablation_test = test.head(min(500, len(test))).copy()
@@ -136,34 +137,8 @@ def main():
             "review_budget":optimize_review_budget(result_df).to_dict(orient="records"),
             "adversarial_tests":{"prompt_injection":"covered by deterministic evidence analyst boundary","contradictory_evidence":"policy -> HUMAN-REVIEW","missing_evidence":"WARN -> HUMAN-REVIEW","malformed_input":"API validation -> 422","duplicate_requests":"SQLite idempotency","replay_requests":"original decision replayed","future_timestamp_manipulation":"timestamp fields are not trusted as outcome features","amount_manipulation":"API amount bounds + monetary ceiling","graph_manipulation":"relationship identifiers treated as data","llm_schema_failure":"deterministic fallback","llm_timeout":"deterministic fallback","llm_unavailable":"offline operation","policy_boundary":"deterministic policy tests","retry_abuse":"contest-count policy gate","money_limit_bypass":"monetary ceiling gate"},
             "latency":_latency(),"audit":{"durable":"SQLite","fields":["case ID","decision","policy version","model version","evidence status","economic values","graph signal","AI metadata","timestamp","request ID"],"integrity":"idempotency and immutable insert; no external submission performed"}}
-    (ARTIFACTS_DIR/"judge_report.json").write_text(json.dumps(report,indent=2))
-    (ARTIFACTS_DIR/"judge_report.html").write_text(_html(report))
+    (ARTIFACTS_DIR/"verification_report.json").write_text(json.dumps(report,indent=2))
+    (ARTIFACTS_DIR/"verification_report.html").write_text(_html(report))
     candidate = next(x for x in report["baselines"] if x["strategy"] == "CHARGEBACK-RISK-ENGINE")
-    evidence_map = {
-        "Problem clarity": (5, "Single routing decision: AUTO-CONTEST / HUMAN-REVIEW / ACCEPT-LOSS."),
-        "Technical depth": (4, "Risk, reason-aware evidence, relationship graph, economics, AI analyst, policy and audit are wired into one path."),
-        "Chargeback specificity": (5, "Evidence fields and policy gates are selected by chargeback reason code."),
-        "Risk modeling": (4, f"Live Logistic Regression; held-out PR-AUC {report['risk_metrics']['pr_auc']:.3f}."),
-        "Evidence": (5, "PASS/WARN/FAIL evidence scoring and missing/contradictory evidence safety gates are tested."),
-        "Graph intelligence": (4, "Temporal relationship graph exposes shared identifiers and cluster/ring risk without a separate graph service."),
-        "Economics": (5, f"Expected recovery, costs and net value are computed explicitly; candidate held-out expected net value ₹{candidate['expected_net_value']:,.0f}."),
-        "AI usefulness": (4, "Structured evidence analyst returns supporting, contradicting, missing evidence and dispute-argument suggestions."),
-        "AI safety": (5, "AI is advisory; deterministic policy remains authoritative and offline fallback is implemented and tested."),
-        "False-positive management": (4, f"Candidate auto-contest precision {candidate['precision']:.1%}; false-positive count {candidate['synthetic_false_positive_count']}."),
-        "Review optimization": (4, "1%, 5%, 10%, and 20% review-budget outputs are generated from ranked HUMAN-REVIEW cases."),
-        "Security": (5, "API validation, monetary limits, prompt-injection boundary, replay/idempotency and retry safety are covered by tests."),
-        "Auditability": (5, "SQLite audit records carry versions, economic/evidence/graph/AI metadata, request ID and a SHA-256 hash chain."),
-        "Evaluation credibility": (3, "Bundled data is explicitly synthetic; train/dev/test separation is documented and test metrics are generated automatically."),
-        "Latency": (4, f"Local p95 decision latency {report['latency']['p95_ms']:.2f} ms in the generated benchmark."),
-        "Demo quality": (4, "One Streamlit dashboard and five deterministic case inputs."),
-        "Reproducibility": (5, "make judge runs tests, benchmark and report generation; artifacts are generated from repository data/code."),
-        "Documentation": (4, "README, architecture, security, data dictionary, evaluation and generated proof artifacts describe the same decision path."),
-    }
-    rows=[f"| {area} | {score}/5 | {evidence} |" for area,(score,evidence) in evidence_map.items()]
-    total=sum(score for score,_ in evidence_map.values())
-    limitations="The bundled evaluation is synthetic, the AI endpoint is optional, and the local latency benchmark is not a production SLO. The scorecard is an engineering self-assessment, not a ranking claim."
-    text="# Chargeback Risk Engine — Competitive Scorecard\n\n| Dimension | Score | Evidence |\n|---|---:|---|\n"+"\n".join(rows)+f"\n\n**Total:** {total}/90\n\n**Limitations:** {limitations}\n"
-    (ARTIFACTS_DIR/"final_competitive_scorecard.md").write_text(text)
-    print(json.dumps({"files":["artifacts/judge_report.json","artifacts/judge_report.html","artifacts/final_competitive_scorecard.md"],"test_rows":len(test),"auto_contest_count":len(auto_idx)},indent=2))
-
+    print(json.dumps({"files":["artifacts/verification_report.json","artifacts/verification_report.html"],"test_rows":len(test),"auto_contest_count":len(auto_idx)},indent=2))
 if __name__ == "__main__": main()
