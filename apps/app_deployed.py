@@ -88,13 +88,21 @@ with proof_tab:
         report = pd.read_json(report_path, typ="series")
         raw = __import__("json").loads(report_path.read_text())
         candidate = next((x for x in raw["baselines"] if x["strategy"] == "CHARGEBACK-RISK-ENGINE"), raw["baselines"][-1])
-        a,b,c,d,e = st.columns(5)
+        a,b,c,d,e,f = st.columns(6)
         a.metric("Expected net value", f"₹{candidate.get('expected_net_value',0):,.0f}")
         b.metric("PR-AUC", f"{raw['risk_metrics']['pr_auc']:.3f}")
         rb10 = next(x for x in raw["review_budget"] if x["review_budget"] == 0.10)
-        c.metric("Recall @ 10% review", f"{rb10['recall_at_budget']:.1%}")
-        d.metric("False-positive cost", f"₹{candidate.get('synthetic_false_positive_count',0)*150:,.0f}")
-        e.metric("P95 latency", f"{raw['latency']['p95_ms']:.2f} ms")
+        base_recall = candidate.get("recall", 0.0)
+        incremental_recall = rb10["recall_at_budget"]
+        c.metric("+Recall from 10% review budget", f"{incremental_recall:.1%}")
+        d.metric("Total recall @ 10% review budget", f"{base_recall + incremental_recall:.1%}")
+        e.metric("False-positive cost", f"₹{candidate.get('synthetic_false_positive_count',0)*150:,.0f}")
+        f.metric("P95 latency", f"{raw['latency']['p95_ms']:.2f} ms")
+        st.caption(
+            "Review-budget recall is additive on top of auto-contest recall, not a "
+            "replacement for it — allocating review capacity recovers additional true "
+            "chargebacks beyond what auto-contest already resolves."
+        )
         st.markdown("### Baselines")
         st.dataframe(pd.DataFrame(raw["baselines"]), use_container_width=True, hide_index=True)
         st.markdown("### Ablation")
