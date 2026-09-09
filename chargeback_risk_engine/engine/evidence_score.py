@@ -67,7 +67,16 @@ def score_evidence(dispute: dict, evidence_packet=None) -> EvidenceScore:
     n = len(items) or 1
     completeness = sum(item.available for item in items) / n
     validity = sum(item.valid and item.consistent for item in items) / n
-    confidence = sum(item.confidence for item in items) / n
+    field_confidence = sum(item.confidence for item in items) / n
+    source_reliability = dispute.get("evidence_source_reliability")
+    try:
+        source_reliability = float(source_reliability)
+    except (TypeError, ValueError):
+        source_reliability = None
+    if source_reliability is not None and 0.0 <= source_reliability <= 1.0:
+        confidence = 0.65 * field_confidence + 0.35 * source_reliability
+    else:
+        confidence = field_confidence
     return EvidenceScore(
         reason_code=reason,
         completeness=completeness,

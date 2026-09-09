@@ -1,145 +1,190 @@
-"""Fair held-out comparison of decision strategies."""
+"""Fast, auditable held-out benchmark for model-only vs full policy routing."""
 from __future__ import annotations
 
 import json
-from pathlib import Path
-import tempfile
 import sys
+from dataclasses import asdict
+from pathlib import Path
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
-
+import numpy as np
 import pandas as pd
 
-from chargeback_risk_engine.engine.economic_decision import calculate_economic_value
-from chargeback_risk_engine.engine.hybrid_pipeline import decide_case
+_ROOT = Path(__file__).resolve().parents[1]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 from chargeback_risk_engine.engine.evidence_score import score_evidence
 from chargeback_risk_engine.evidence import assemble
 from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer
-from chargeback_risk_engine.scorer import predict_win_probability
-from chargeback_risk_engine.baseline import run_naive_baseline
 from chargeback_risk_engine.paths import ARTIFACTS_DIR, DATA_DIR
-from chargeback_risk_engine.policy import decide
+from chargeback_risk_engine.policy import ACCEPT_LOSS, AUTO_CONTEST, HUMAN_REVIEW, decide
+from chargeback_risk_engine.policy_optimizer import optimize_policy
+from chargeback_risk_engine.policy_profile import load_policy_profile, decision_score, PROFILE_PATH
 
-BASELINE_PATH = ARTIFACTS_DIR / "baseline_benchmark.json"
-
-
-def _row_dispute(row):
-    dispute = row.to_dict()
-    for key, value in dispute.items():
-        if isinstance(value, float) and pd.isna(value):
-            dispute[key] = None
-    return dispute
+CONTEST_COST = 150.0
 
 
-def _strategy_metrics(name, test, actions, probabilities, outcome_prior):
-    auto = [i for i, action in enumerate(actions) if action == "AUTO-CONTEST"]
-    actual_wins = sum(bool(test.iloc[i]["would_win"]) for i in auto)
-    false_positives = len(auto) - actual_wins
-    precision = actual_wins / len(auto) if auto else 0.0
-    total_wins = int(test["would_win"].sum())
-    recall = actual_wins / total_wins if total_wins else 0.0
-    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
-    expected_recovery = 0.0
-    for i in auto:
-        amount = float(test.iloc[i]["amount"])
-        probability = float(outcome_prior if probabilities[i] is None else probabilities[i])
-        economic = calculate_economic_value(amount, probability)
-        expected_recovery += economic.expected_recovery
-    total_amount = float(test["amount"].sum())
-    expected_loss = total_amount - expected_recovery
-    contest_cost = len(auto) * 150.0
-    expected_net_value = expected_recovery - contest_cost
-    human = sum(action == "HUMAN-REVIEW" for action in actions)
+def _rows(df: pd.DataFrame):
+    for row in df.to_dict("records"):
+        for key, value in list(row.items()):
+            if isinstance(value, float) and pd.isna(value):
+                row[key] = None
+        yield row
+
+
+def _metrics(name: str, test: pd.DataFrame, actions: list[str], probabilities: list[float]) -> dict:
+    y = test["would_win"].astype(bool).to_numpy()
+    amounts = test["amount"].astype(float).to_numpy()
+    auto = np.asarray([a == AUTO_CONTEST for a in actions], dtype=bool)
+    idx = np.flatnonzero(auto)
+    tp = int(y[idx].sum())
+    count = int(len(idx))
+    precision = tp / count if count else 0.0
+    recall = tp / int(y.sum()) if y.sum() else 0.0
+    expected_recovery = float(np.sum(amounts[idx] * np.asarray(probabilities)[idx]))
+    realized_recovery = float(np.sum(amounts[idx][y[idx]]))
+    net = expected_recovery - count * CONTEST_COST
+    realized_net = realized_recovery - count * CONTEST_COST
     return {
         "strategy": name,
-        "auto_contest_count": len(auto),
+        "auto_contest_count": count,
+        "auto_contest_rate": count / len(test),
         "auto_contest_precision": precision,
         "auto_contest_recall": recall,
-        "auto_contest_f1": f1,
-        "human_review_rate": human / len(actions) if actions else 0.0,
+        "auto_contest_f1": 2 * precision * recall / (precision + recall) if precision + recall else 0.0,
+        "human_review_count": actions.count(HUMAN_REVIEW),
+        "human_review_rate": actions.count(HUMAN_REVIEW) / len(actions),
+        "accept_loss_count": actions.count(ACCEPT_LOSS),
         "expected_recovery": expected_recovery,
-        "expected_loss": expected_loss,
-        "expected_contest_cost": contest_cost,
-        "expected_net_value": expected_net_value,
-        "synthetic_false_positive_count": false_positives,
+        "expected_net_value": net,
+        "realized_recovery": realized_recovery,
+        "realized_net_value": realized_net,
+        "false_positive_count": count - tp,
     }
+
+
+def _optimize_model_only(dev: pd.DataFrame, scorer, min_precision: float = 0.72, max_auto_rate: float = 0.40) -> float:
+    probs = np.asarray([scorer.predict_win_probability(r) for r in _rows(dev)])
+    y = dev["would_win"].astype(bool).to_numpy()
+    amounts = dev["amount"].astype(float).to_numpy()
+    best = None
+    for threshold in np.arange(0.55, 0.851, 0.005):
+        auto = probs >= threshold
+        idx = np.flatnonzero(auto)
+        if len(idx) == 0 or len(idx) / len(dev) > max_auto_rate:
+            continue
+        precision = float(y[idx].sum()) / len(idx)
+        if precision < min_precision:
+            continue
+        net = float(np.sum(amounts[idx] * probs[idx]) - len(idx) * CONTEST_COST)
+        candidate = (net, precision, threshold)
+        if best is None or candidate > best:
+            best = candidate
+    return float(best[2] if best else 0.65)
+
+
+def review_frontier(test: pd.DataFrame, probabilities: np.ndarray) -> list[dict]:
+    """Show capacity-aware top-k automation without changing the production policy."""
+    order = np.argsort(-probabilities)
+    y = test["would_win"].astype(bool).to_numpy()
+    amounts = test["amount"].astype(float).to_numpy()
+    rows = []
+    for rate in (0.01, 0.02, 0.05, 0.10, 0.20):
+        k = max(1, int(len(test) * rate))
+        idx = order[:k]
+        tp = int(y[idx].sum())
+        rows.append({
+            "capacity_rate": rate,
+            "auto_count": k,
+            "precision": tp / k,
+            "recall": tp / int(y.sum()),
+            "realized_net_value": float(np.sum(amounts[idx][y[idx]]) - k * CONTEST_COST),
+        })
+    return rows
 
 
 def evaluate() -> dict:
+    ARTIFACTS_DIR.mkdir(exist_ok=True)
+    train = pd.read_csv(DATA_DIR / "train.csv")
+    dev = pd.read_csv(DATA_DIR / "dev.csv")
     test = pd.read_csv(DATA_DIR / "test.csv")
-    ml = load_or_fit_ml_scorer()
-    baseline_current = json.loads(BASELINE_PATH.read_text())
-    baseline_current["expected_loss"] = float(test["amount"].sum()) - float(baseline_current["expected_recovery"])
-    baseline_current["expected_loss"] = float(test["amount"].sum()) - float(baseline_current["expected_recovery"])
+    scorer = load_or_fit_ml_scorer()
+    if not PROFILE_PATH.exists():
+        optimize_policy(dev)
+    profile = load_policy_profile()
 
-    rows = [_row_dispute(row) for _, row in test.iterrows()]
-    rule_probs = [predict_win_probability(row) for row in rows]
-    logistic_probs = [ml.predict_win_probability(row) for row in rows]
-    outcome_prior = float(pd.read_csv(DATA_DIR / "train.csv")["would_win"].mean())
+    rows = list(_rows(test))
+    probabilities = np.asarray([scorer.predict_win_probability(r) for r in rows])
+    model_threshold = _optimize_model_only(dev, scorer)
 
-    strategies = []
-    strategies.append(_strategy_metrics(
-        "ALWAYS-CONTEST", test, ["AUTO-CONTEST"] * len(test), [None] * len(test), outcome_prior
-    ))
-    strategies.append(_strategy_metrics(
-        "ALWAYS-ACCEPT", test, ["ACCEPT-LOSS"] * len(test), [None] * len(test), outcome_prior
-    ))
-
-    rules_actions = []
-    logistic_actions = []
-    for row, p in zip(rows, rule_probs):
+    model_actions = [AUTO_CONTEST if p >= model_threshold else ACCEPT_LOSS for p in probabilities]
+    full_actions = []
+    routing_scores = []
+    for row, p in zip(rows, probabilities):
         packet = assemble(row)
         quality = score_evidence(row, packet)
-        econ = calculate_economic_value(row["amount"], p)
-        rules_actions.append(decide(p, row["amount"], evidence_packet=packet, evidence_quality=quality, expected_net_value=econ.expected_net_value).action)
-    for row, p in zip(rows, logistic_probs):
-        packet = assemble(row)
-        quality = score_evidence(row, packet)
-        econ = calculate_economic_value(row["amount"], p)
-        logistic_actions.append(decide(p, row["amount"], evidence_packet=packet, evidence_quality=quality, expected_net_value=econ.expected_net_value).action)
+        score = decision_score(p, quality.confidence, evidence_signal_weight=profile.evidence_signal_weight)
+        routing_scores.append(score)
+        d = decide(
+            p, row["amount"], evidence_packet=packet, evidence_quality=quality,
+            expected_net_value=p * float(row["amount"]) - CONTEST_COST,
+            decision_score=score,
+            auto_contest_threshold=profile.auto_contest_threshold,
+            accept_loss_threshold=profile.accept_loss_threshold,
+            monetary_ceiling=profile.monetary_ceiling,
+            min_evidence_completeness=profile.min_evidence_completeness,
+        )
+        full_actions.append(d.action)
 
-    strategies.append(_strategy_metrics("RULES-ONLY", test, rules_actions, rule_probs, outcome_prior))
-    strategies.append(_strategy_metrics("LOGISTIC-ONLY", test, logistic_actions, logistic_probs, outcome_prior))
-    strategies.append(baseline_current)
-
-    with tempfile.TemporaryDirectory(prefix="benchmark_") as tmp:
-        candidate_results = []
-        for row in rows:
-            candidate_results.append(decide_case(row, db_path=str(Path(tmp) / "audit.db"), include_counterfactual=False))
-    candidate_actions = [r["action"] for r in candidate_results]
-    strategies.append(_strategy_metrics("CHARGEBACK-RISK-ENGINE", test, candidate_actions, logistic_probs, outcome_prior))
-    case_results = [
-        {
-            "dispute_id": row["dispute_id"],
-            "amount": float(row["amount"]),
-            "would_win": bool(row["would_win"]),
-            "p_win": float(logistic_probs[i]),
-            "action": candidate_results[i]["action"],
-            "expected_net_value": float(candidate_results[i]["economic_decision"]["expected_net_value"]),
-            "pass_count": int(sum(item["status"] == "PASS" for item in candidate_results[i]["evidence"])),
-            "evidence_total": int(len(candidate_results[i]["evidence"])),
-        }
-        for i, row in enumerate(rows)
+    strategies = [
+        _metrics("LOGISTIC-ONLY-DEV-OPTIMIZED", test, model_actions, probabilities.tolist()),
+        _metrics("CHARGEBACK-RISK-ENGINE-FULL", test, full_actions, probabilities.tolist()),
     ]
-
-    return {
-        "dataset": {"test_rows": len(test), "synthetic": True, "outcome_prior_from_train": outcome_prior},
-        "strategies": strategies,
-        "case_results": case_results,
-        "notes": {
-            "expected_recovery": "modeled using each strategy's probability signal; ALWAYS strategies use the train-set outcome prior only as a neutral reference",
-            "realized_financial_recovery": "not measured; would_win is synthetic benchmark ground truth",
-            "baseline_current_engine": "frozen measurement captured before candidate changes",
-        },
+    base, candidate = strategies
+    candidate["incremental_vs_model_only"] = {
+        "delta_expected_net_value": candidate["expected_net_value"] - base["expected_net_value"],
+        "delta_realized_net_value": candidate["realized_net_value"] - base["realized_net_value"],
+        "delta_precision": candidate["auto_contest_precision"] - base["auto_contest_precision"],
+        "delta_recall": candidate["auto_contest_recall"] - base["auto_contest_recall"],
+        "delta_auto_contest_rate": candidate["auto_contest_rate"] - base["auto_contest_rate"],
     }
 
+    case_results = [
+        {"dispute_id": row["dispute_id"], "reason_code": row["reason_code"], "amount": float(row["amount"]),
+         "would_win": bool(row["would_win"]), "p_win": float(p), "routing_score": float(s), "action": action}
+        for row, p, s, action in zip(rows, probabilities, routing_scores, full_actions)
+    ]
+    result = {
+        "dataset": {
+            "train_rows": len(train), "dev_rows": len(dev), "test_rows": len(test),
+            "synthetic": True,
+            "policy_selection_split": "dev.csv only",
+            "no_test_tuning": True,
+        },
+        "policy_profile": asdict(profile),
+        "model_only_threshold": model_threshold,
+        "strategies": strategies,
+        "case_results": case_results,
+        "review_budget_frontier": review_frontier(test, probabilities),
+        "routing_score_summary": {
+            "min": float(np.min(routing_scores)),
+            "median": float(np.median(routing_scores)),
+            "max": float(np.max(routing_scores)),
+        },
+        "notes": {
+            "model_only": "Pure thresholding of the live model probability; no evidence or policy gates.",
+            "full_system": "Same frozen model plus deterministic evidence eligibility and a transparent evidence-confidence routing adjustment.",
+            "business_metric": "Expected and realized net recovery are reported separately.",
+            "honesty": "This is a synthetic held-out benchmark; no production-performance claim is made.",
+        },
+    }
+    return result
 
-def main():
+
+def main() -> None:
     result = evaluate()
-    print(json.dumps(result, indent=2))
     (ARTIFACTS_DIR / "candidate_benchmark.json").write_text(json.dumps(result, indent=2))
+    print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":
