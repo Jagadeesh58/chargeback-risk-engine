@@ -48,7 +48,7 @@ The original pre-change source archive itself is not included in the current rep
 
 ## Ablation
 
-Ablation is generated automatically by `scripts/judge_report.py` on a fixed 500-row prefix of the held-out test set to keep the report generation fast. The full candidate benchmark and all headline candidate metrics use all 5,000 held-out rows.
+Ablation is generated automatically by `scripts/generate_report.py` on a fixed 500-row prefix of the held-out test set to keep the report generation fast. The full candidate benchmark and all headline candidate metrics use all 5,000 held-out rows.
 
 ## Review budget
 
@@ -102,8 +102,7 @@ The main generated artifacts are:
 
 - `artifacts/model_evaluation.json`
 - `artifacts/candidate_benchmark.json`
-- `artifacts/judge_report.json`
-- `artifacts/judge_report.html`
-- `artifacts/final_competitive_scorecard.md`
+- `artifacts/verification_report.json`
+- `artifacts/verification_report.html`
 
 The benchmark and report are generated from the repository's current synthetic data and code.
