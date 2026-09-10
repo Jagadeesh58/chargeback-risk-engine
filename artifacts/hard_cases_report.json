@@ -24,7 +24,7 @@
     {
       "case": "replay",
       "action": "AUTO-CONTEST",
-      "reason": "Win probability 0.81 >= 0.65, evidence is sufficiently confirmed, and expected net value is 1797.19.",
+      "reason": "Routing score 0.82 >= 0.65; calibrated win probability is 0.81, evidence is sufficiently confirmed, and expected net value is 1797.19.",
       "passed": true
     },
     {
@@ -48,7 +48,7 @@
     {
       "case": "fully-confirmed-positive",
       "action": "AUTO-CONTEST",
-      "reason": "Win probability 0.81 >= 0.65, evidence is sufficiently confirmed, and expected net value is 1797.19.",
+      "reason": "Routing score 0.82 >= 0.65; calibrated win probability is 0.81, evidence is sufficiently confirmed, and expected net value is 1797.19.",
       "passed": true
     }
   ]
