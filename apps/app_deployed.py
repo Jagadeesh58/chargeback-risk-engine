@@ -67,7 +67,7 @@ with score_tab:
             d.metric("Decision", result["action"])
             st.markdown("### Decision waterfall")
             st.write({
-                "1 · model": f"{result[\"win_probability\"]:.1%} win probability",
+                "1 · model": f"{result['win_probability']:.1%} win probability",
                 "2 · evidence": f"{result[\"evidence_score\"][\"completeness\"]:.0%} complete / {result[\"evidence_score\"][\"validity\"]:.0%} valid",
                 "3 · graph": result["graph_analysis"]["risk_type"],
                 "4 · economics": f"₹{result[\"economic_decision\"][\"expected_net_value\"]:,.0f} expected net",
