@@ -26,6 +26,7 @@ from chargeback_risk_engine.synthetic_ground_truth import generate_one
 CSV_COLUMNS = (
     ["dispute_id", "payment_id", "reason_code", "amount", "respond_by"]
     + ALL_EVIDENCE_FIELDS
+    + ["evidence_source_reliability"]
     + ["would_win"]
 )
 
