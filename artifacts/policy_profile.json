@@ -1,0 +1,14 @@
+{
+  "policy_version": "policy-v5-dev-optimized",
+  "auto_contest_threshold": 0.65,
+  "accept_loss_threshold": 0.3,
+  "monetary_ceiling": 50000.0,
+  "min_evidence_completeness": 0.5,
+  "contest_cost": 150.0,
+  "selection_split": "dev.csv only",
+  "objective": "maximize expected net value subject to precision >= 0.72 and auto-contest rate <= 0.40",
+  "constraints": {
+    "min_precision": 0.72,
+    "max_auto_rate": 0.4
+  }
+}

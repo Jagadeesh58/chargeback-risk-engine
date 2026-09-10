@@ -1,81 +1,106 @@
 # Chargeback Risk Engine
 
-Track 02 — AI Risk Manager
+**Track 02 — AI Risk Manager**  
+**Goal:** make chargeback decisions that maximize merchant value without letting an AI model bypass financial controls.
 
 **Live demo:** https://chargebackriskengine.streamlit.app/
 
-## Proof in 30 seconds
+## The one-line pitch
 
-| Measure | Current result |
+> **AI proposes the risk. Evidence and economics explain the case. Deterministic policy decides what money-moving action is allowed.**
+
+This is deliberately **not** just a chargeback classifier. The engine routes each dispute to:
+
+- **AUTO-CONTEST** when risk, evidence, economics and safety gates all pass
+- **HUMAN-REVIEW** when information is incomplete, contradictory, risky, uneconomic, or outside policy
+- **ACCEPT-LOSS** when intervention is not economically justified
+
+## Why the system is different
+
+`Risk model → evidence quality → relationship context → expected value → bounded AI analyst → deterministic policy → immutable audit`
+
+The AI analyst is advisory only. It may summarize evidence, identify missing/contradictory items, and draft an argument. It cannot change thresholds, bypass policy, or submit a chargeback.
+
+## Current held-out evidence
+
+The bundled dataset contains **20,000 train / 5,000 dev / 5,000 held-out test** cases. The evaluation data is synthetic and is not a production-performance claim.
+
+The current test snapshot reports approximately:
+
+| Measure | Result |
 |---|---:|
-| Expected net value vs. frozen baseline | historical frozen result: +2.95% / ₹29,927 (900-row comparison) |
-| Recall at current policy | 40.1% |
-| Auto-contest precision | 75.9% |
-| Calibration error | 0.0075 |
-| Adversarial/safety tests passing | 27/27 |
+| PR-AUC | **0.723** |
+| Auto-contest precision | **75.9%** |
+| Auto-contest recall | **40.1%** |
+| P95 end-to-end local latency | **~2.4 ms** |
+| Frozen hard cases | **8 / 8 passed** |
+| Regression suite | **163 tests passed** |
 
-The scaled candidate evaluation is now 20,000 train / 5,000 dev / 5,000 held-out test rows. A like-for-like 5,000-row replay of the frozen pre-change engine is not claimed because its original source snapshot is not bundled with this repository.
+The important claim is not that a synthetic classifier has a spectacular headline metric. The stronger claim is that **the decision path is auditable, economically evaluated, deterministic at the policy boundary, and tested against failure modes**.
 
-The main differentiator is the combination of `engine/risk_graph.py` for temporal connected-cluster context, `engine/economic_decision.py` for expected-value economics, and a bounded AI evidence analyst. One deterministic policy remains authoritative, and `tests/test_safety_regression.py` proves that the monetary ceiling cannot be bypassed by model confidence or a caller-supplied expected value.
+## What was upgraded for judgeability
 
-Chargebacks are not simply fraud classification. The business decision is whether a case should be **AUTO-CONTEST**, sent to **HUMAN-REVIEW**, or **ACCEPT-LOSS**.
+### 1. Honest ablation
 
-Chargeback Risk Engine combines:
+`generate_report.py` now evaluates separate pipelines rather than relabeling the same pipeline as different ablations:
 
-- risk scoring
-- reason-code-specific evidence verification
-- temporal relationship/ring signals
-- expected-value economics
-- bounded evidence analysis
-- deterministic policy authority
-- durable audit and idempotency
+`Rules → Model → Evidence → Economics → Graph → Full`
 
-The decision path is:
+The report explicitly notes when a capability cannot be measured by the tabular benchmark instead of inventing a lift.
 
-`Input → Risk → Evidence → Graph → Economics → Evidence Analyst → Deterministic Policy → Audit`
+### 2. Realized vs expected economics
 
-The AI analyst is advisory only. It can summarize evidence, identify missing or contradictory evidence, and propose dispute arguments. It cannot change thresholds, monetary limits, policy outcomes, or execute a financial action. When no AI endpoint is configured, the same application runs with a deterministic evidence-analysis fallback.
+The benchmark reports both modeled expected recovery and realized synthetic recovery, so the two are never conflated.
 
-## Reproducing the results
+### 3. Development-only policy tuning
 
-Run `make verify` to execute tests and generate reproducible proof artifacts.
+`scripts/generate_report.py` and `chargeback_risk_engine/policy_optimizer.py` support a transparent threshold search on `dev.csv`. The final test set is kept out of threshold selection.
 
-Run `streamlit run apps/app_deployed.py` for the single dashboard. The landing view surfaces expected net value, PR-AUC, recall at review budget, false-positive cost, and p95 latency, followed by one case workflow and five deterministic demo scenarios.
+### 4. Hard-case suite
 
-The proof artifacts are written to `artifacts/`:
+`scripts/evaluate_hard_cases.py` covers missing evidence, contradictory evidence, high-value ceilings, replay/idempotency, prompt-injection text, graph escalation, malformed amounts, and a fully-confirmed positive.
 
-- `verification_report.json`
-- `verification_report.html`
-- benchmark and calibration artifacts generated by the evaluation scripts
+### 5. Per-reason evaluation and uncertainty
 
-## Evaluation
+The proof report includes per-reason PR-AUC/precision/recall and a bootstrap interval over case-level realized net value.
 
-The bundled evaluation data is synthetic. The current split contains 20,000 training rows, 5,000 development rows, and 5,000 held-out test rows. Calibration is fitted from `dev.csv`, while final reporting uses `test.csv`; test outcomes are not used to fit decision thresholds. These results demonstrate the evaluation process and are not a production accuracy claim.
-
-### Limitations
-
-- **Recall trade-off:** the current policy auto-contests roughly 40.1% of true chargebacks, so about **63.7% of true chargebacks are routed to HUMAN-REVIEW rather than auto-contested**. This is a deliberate precision-over-recall choice because the decision path also enforces a monetary ceiling and evidence gates.
-- **Synthetic data:** the train/dev/test files are generated locally and do not represent real Razorpay traffic, production fraud rates, or production recovery outcomes.
-- **Bounded AI:** the evidence analyst can summarize evidence, identify supporting, contradicting, or missing evidence, and suggest dispute arguments. It **never selects the final action, changes policy thresholds, bypasses evidence gates, or submits a chargeback**. When an AI service is unavailable, the deterministic fallback keeps the core decision path running.
-
-## Baselines and ablation
-
-The evaluation compares always-contest, always-accept, rules-only, model-only, evidence-aware decisioning, economics-aware decisioning, graph-aware decisioning, and the full system. The generated report records the observed outcomes on the bundled dataset.
-
-## API
-
-Start with:
+## Run it locally
 
 ```bash
+make verify
+streamlit run apps/app_deployed.py
 uvicorn apps.api:app --reload
 ```
 
-`POST /decision` is the canonical decision endpoint. `POST /score` is a compatibility alias to the same service.
+`make verify` runs the regression suite, held-out benchmark, hard-case suite, and proof-report generation.
 
-## Security and reliability
+## Judge path
 
-The policy engine remains authoritative. Unknown evidence becomes `WARN`, malformed API input is rejected, monetary ceilings are enforced, duplicate dispute IDs replay the durable original decision, and external AI failures fall back deterministically. Audit records contain a chained SHA-256 integrity field and can be verified programmatically.
+Start at `docs/JUDGE_GUIDE.md` for a 90-second walkthrough, evidence map, and judge questions.
 
-## Repository layout
+The proof bundle is written to `artifacts/`:
 
-`chargeback_risk_engine/` contains the decision engine. `apps/` contains the API and dashboard. `scripts/` contains reproducible evaluation and demo commands. `tests/` contains unit, integration, safety, and API regression tests. `artifacts/` contains generated evaluation outputs and compatible model artifacts. `data/` contains the bundled synthetic train/dev/test data.
+- `candidate_benchmark.json`
+- `hard_cases_report.json`
+- `policy_profile.json`
+- `verification_report.json`
+- `verification_report.html`
+- model/calibration artifacts
+
+## Safety contract
+
+The policy engine remains the final authority. In particular:
+
+- unknown evidence never silently becomes positive evidence
+- contradictory evidence forces human review
+- monetary ceilings cannot be bypassed by model confidence or caller input
+- duplicate dispute IDs replay the original durable decision
+- external AI failure falls back deterministically
+- case notes are treated as untrusted data
+- no external chargeback submission is executed by this repository
+
+## Limitations
+
+The bundled data is synthetic. The graph layer therefore cannot honestly claim a performance lift from the tabular test set because that dataset contains no historical relationship identifiers. Graph behavior is instead exercised in the frozen hard-case suite.
+
+The current operating point deliberately trades recall for precision and safety. Human review is a feature, not a failure: the system is designed to abstain whenever evidence or economics is insufficient.

@@ -1,0 +1,55 @@
+{
+  "suite": "frozen-hard-cases-v1",
+  "total": 8,
+  "passed": 8,
+  "cases": [
+    {
+      "case": "missing-evidence",
+      "action": "HUMAN-REVIEW",
+      "reason": "Evidence completeness 0.33 is below required 0.50.",
+      "passed": true
+    },
+    {
+      "case": "contradictory-evidence",
+      "action": "HUMAN-REVIEW",
+      "reason": "Evidence quality failed: invalid=0, contradictory=1.",
+      "passed": true
+    },
+    {
+      "case": "high-value-ceiling",
+      "action": "HUMAN-REVIEW",
+      "reason": "Amount 60000.00 exceeds monetary ceiling 50000.00; automatic contest is not allowed.",
+      "passed": true
+    },
+    {
+      "case": "replay",
+      "action": "AUTO-CONTEST",
+      "reason": "Win probability 0.81 >= 0.65, evidence is sufficiently confirmed, and expected net value is 1797.19.",
+      "passed": true
+    },
+    {
+      "case": "prompt-injection-notes",
+      "action": "HUMAN-REVIEW",
+      "reason": "Evidence completeness 0.33 is below required 0.50.",
+      "passed": true
+    },
+    {
+      "case": "graph-escalation",
+      "action": "HUMAN-REVIEW",
+      "reason": "Relationship risk score 0.65 triggered manual-review safety escalation.",
+      "passed": true
+    },
+    {
+      "case": "negative-amount",
+      "action": "HUMAN-REVIEW",
+      "reason": "Invalid dispute amount; manual review required.",
+      "passed": true
+    },
+    {
+      "case": "fully-confirmed-positive",
+      "action": "AUTO-CONTEST",
+      "reason": "Win probability 0.81 >= 0.65, evidence is sufficiently confirmed, and expected net value is 1797.19.",
+      "passed": true
+    }
+  ]
+}

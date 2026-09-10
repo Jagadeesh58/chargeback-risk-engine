@@ -1,40 +1,128 @@
-<!doctype html><html><head><meta charset='utf-8'><title>Chargeback Risk Engine Proof Report</title><style>body{font-family:system-ui;max-width:1100px;margin:40px auto;padding:0 20px}table{border-collapse:collapse;width:100%;margin:16px 0}td,th{border:1px solid #ddd;padding:7px;text-align:left}</style></head><body><h1>Chargeback Risk Engine</h1><p>Track 02 — AI Risk Manager</p><h2>Dataset</h2><pre>{
-  "name": "bundled synthetic transaction/chargeback dataset",
-  "synthetic": true,
-  "train_rows": 20000,
-  "dev_rows": 5000,
-  "test_rows": 5000,
-  "split": "seeded 2/3 train, 1/6 dev, 1/6 held-out test; final reporting only on test.csv",
-  "leakage_controls": [
-    "synthetic label is excluded from scorer inputs",
-    "calibration fit from dev.csv",
-    "test outcomes are not used for threshold fitting"
-  ]
-}</pre><h2>Baselines</h2><table><tr><th>Strategy</th><th>Auto</th><th>Precision</th><th>Recall</th><th>Expected net value</th></tr>['<tr><td>ALWAYS-CONTEST</td><td></td><td>0.5648</td><td>1.0</td><td></td></tr>', '<tr><td>ALWAYS-ACCEPT</td><td>0</td><td>0.0</td><td>0.0</td><td>0.0</td></tr>', '<tr><td>CHARGEBACK-RISK-ENGINE</td><td>1492</td><td>0.7593833780160858</td><td>0.4012039660056657</td><td>4607324.763838673</td></tr>']</table><h2>Ablation</h2><table><tr><th>Component</th><th>Auto</th><th>Precision</th><th>Recall</th><th>FP cost</th></tr><tr><td>Rules only</td><td>197</td><td>0.6852791878172588</td><td>0.5056179775280899</td><td>9300.0</td></tr><tr><td>Model only</td><td>148</td><td>0.7364864864864865</td><td>0.40823970037453183</td><td>5850.0</td></tr><tr><td>Model + Evidence</td><td>148</td><td>0.7364864864864865</td><td>0.40823970037453183</td><td>5850.0</td></tr><tr><td>Model + Economics</td><td>148</td><td>0.7364864864864865</td><td>0.40823970037453183</td><td>5850.0</td></tr><tr><td>Model + Graph</td><td>148</td><td>0.7364864864864865</td><td>0.40823970037453183</td><td>5850.0</td></tr><tr><td>Full system</td><td>148</td><td>0.7364864864864865</td><td>0.40823970037453183</td><td>5850.0</td></tr></table><h2>Review budget</h2><table><tr><th>Budget</th><th>Capacity</th><th>Precision</th><th>Recall</th><th>Recovered value</th></tr><tr><td>0.01</td><td>50</td><td>0.62</td><td>0.010977337110481586</td><td>241742.87</td></tr><tr><td>0.05</td><td>250</td><td>0.58</td><td>0.051345609065155805</td><td>1080907.86</td></tr><tr><td>0.1</td><td>500</td><td>0.582</td><td>0.10304532577903683</td><td>2029957.33</td></tr><tr><td>0.2</td><td>1000</td><td>0.534</td><td>0.18909348441926346</td><td>3427259.46</td></tr></table><h2>Risk & calibration</h2><pre>{
+<!doctype html><html><head><meta charset='utf-8'><title>Chargeback Risk Engine — Judge Proof</title><style>body{font-family:system-ui;max-width:1180px;margin:32px auto;padding:0 18px;line-height:1.45}table{border-collapse:collapse;width:100%;margin:12px 0 28px}th,td{border:1px solid #ddd;padding:7px;font-size:14px}th{text-align:left}code,pre{background:#f6f6f6;padding:4px}.hero{padding:18px;border:2px solid #222;border-radius:14px}</style></head><body><div class='hero'><h1>Chargeback Risk Engine</h1><p><b>Track 02 — AI Risk Manager</b></p><p><b>Claim:</b> AI-assisted chargeback decisions where the model proposes evidence-weighted risk, economics quantifies value, and deterministic policy controls the final financial action.</p></div><h2>Held-out headline</h2><pre>{
+  "pr_auc": 0.7234116688966661,
+  "auto_contest_precision": 0.7593833780160858,
+  "auto_contest_recall": 0.4012039660056657,
+  "realized_recovery": 4782541.98,
+  "realized_net_value": 4558741.98,
+  "realized_net_value_lift_vs_frozen": null,
+  "p95_latency_ms": 2.338294,
+  "hard_cases_passed": 8,
+  "hard_cases_total": 8
+}</pre><h2>Strategy comparison</h2><table><tr><th>Strategy</th><th>Auto</th><th>Precision</th><th>Recall</th><th>Realized net value</th></tr><tr><td>ALWAYS-CONTEST</td><td>5000</td><td>0.5648</td><td>1.0</td><td>10894729.80000001</td></tr><tr><td>ALWAYS-ACCEPT</td><td>0</td><td>0.0</td><td>0.0</td><td>0.0</td></tr><tr><td>RULES-ONLY</td><td>2133</td><td>0.7290201593999063</td><td>0.5506373937677054</td><td>6142407.970000008</td></tr><tr><td>LOGISTIC-ONLY</td><td>1492</td><td>0.7593833780160858</td><td>0.4012039660056657</td><td>4558741.98</td></tr><tr><td>FROZEN-PRE-CHANGE</td><td>310</td><td>0.7290322580645161</td><td>0.4448818897637795</td><td></td></tr><tr><td>CHARGEBACK-RISK-ENGINE</td><td>1492</td><td>0.7593833780160858</td><td>0.4012039660056657</td><td>4558741.98</td></tr></table><h2>True ablation</h2><table><tr><th>Variant</th><th>Auto</th><th>Precision</th><th>Recall</th><th>Realized net value</th></tr><tr><td>Rules only</td><td>487</td><td>0.6981519507186859</td><td>0.6204379562043796</td><td>1389692.21</td></tr><tr><td>Model only</td><td>331</td><td>0.7462235649546828</td><td>0.45072992700729925</td><td>1051125.7300000002</td></tr><tr><td>Model + Evidence</td><td>219</td><td>0.7442922374429224</td><td>0.29744525547445255</td><td>723332.55</td></tr><tr><td>Model + Economics</td><td>331</td><td>0.7462235649546828</td><td>0.45072992700729925</td><td>1051125.7300000002</td></tr><tr><td>Model + Graph</td><td>331</td><td>0.7462235649546828</td><td>0.45072992700729925</td><td>1051125.7300000002</td></tr><tr><td>Full system</td><td>219</td><td>0.7442922374429224</td><td>0.29744525547445255</td><td>723332.55</td></tr></table><h2>Analyst capacity</h2><table><tr><th>Budget</th><th>Capacity</th><th>Precision</th><th>Incremental recall</th><th>Incremental net value</th></tr><tr><td>0.01</td><td>50</td><td>0.54</td><td>0.009560906515580737</td><td>207775.30000000002</td></tr><tr><td>0.05</td><td>250</td><td>0.56</td><td>0.049575070821529746</td><td>1031603.1299999999</td></tr><tr><td>0.1</td><td>500</td><td>0.56</td><td>0.09915014164305949</td><td>1957556.45</td></tr><tr><td>0.2</td><td>1000</td><td>0.53</td><td>0.18767705382436262</td><td>3378220.8600000003</td></tr></table><h2>Per reason</h2><pre>[
+  {
+    "reason_code": "duplicate_charge",
+    "count": 1240,
+    "pr_auc": 0.6659119566623464,
+    "precision_at_threshold": 0.7118226600985221,
+    "recall_at_threshold": 0.42128279883381925
+  },
+  {
+    "reason_code": "item_not_as_described",
+    "count": 1241,
+    "pr_auc": 0.7479182944135883,
+    "precision_at_threshold": 0.7723970944309927,
+    "recall_at_threshold": 0.44929577464788734
+  },
+  {
+    "reason_code": "item_not_received",
+    "count": 1207,
+    "pr_auc": 0.7184335202201272,
+    "precision_at_threshold": 0.7636363636363637,
+    "recall_at_threshold": 0.3678832116788321
+  },
+  {
+    "reason_code": "unauthorized_transaction",
+    "count": 1312,
+    "pr_auc": 0.737613010714677,
+    "precision_at_threshold": 0.7572383073496659,
+    "recall_at_threshold": 0.4576043068640646
+  }
+]</pre><h2>Risk/calibration</h2><pre>{
   "pr_auc": 0.7234116688966661,
   "brier_score": 0.21650102515928074,
   "calibrated_brier_score": 0.22414670748238058
+}</pre><h2>Uncertainty</h2><pre>{
+  "case_level_realized_net_value": {
+    "mean": 911.748396,
+    "low": 857.29812335,
+    "high": 968.1960921499998,
+    "n": 5000
+  }
 }</pre><h2>Latency</h2><pre>{
-  "runs": 100,
-  "p50_ms": 4.298243,
-  "p95_ms": 7.409783,
-  "p99_ms": 9.958728,
-  "max_ms": 11.870571,
+  "runs": 120,
+  "p50_ms": 2.050218,
+  "p95_ms": 3.000875,
+  "p99_ms": 3.607661,
+  "max_ms": 3.631417,
   "method": "warm local process; unique dispute IDs"
-}</pre><h2>Security</h2><pre>{
-  "prompt_injection": "covered by deterministic evidence analyst boundary",
-  "contradictory_evidence": "policy -> HUMAN-REVIEW",
-  "missing_evidence": "WARN -> HUMAN-REVIEW",
-  "malformed_input": "API validation -> 422",
-  "duplicate_requests": "SQLite idempotency",
-  "replay_requests": "original decision replayed",
-  "future_timestamp_manipulation": "timestamp fields are not trusted as outcome features",
-  "amount_manipulation": "API amount bounds + monetary ceiling",
-  "graph_manipulation": "relationship identifiers treated as data",
-  "llm_schema_failure": "deterministic fallback",
-  "llm_timeout": "deterministic fallback",
-  "llm_unavailable": "offline operation",
-  "policy_boundary": "deterministic policy tests",
-  "retry_abuse": "contest-count policy gate",
-  "money_limit_bypass": "monetary ceiling gate"
+}</pre><h2>Hard cases</h2><pre>{
+  "suite": "frozen-hard-cases-v1",
+  "total": 8,
+  "passed": 8,
+  "cases": [
+    {
+      "case": "missing-evidence",
+      "action": "HUMAN-REVIEW",
+      "reason": "Evidence completeness 0.33 is below required 0.50.",
+      "passed": true
+    },
+    {
+      "case": "contradictory-evidence",
+      "action": "HUMAN-REVIEW",
+      "reason": "Evidence quality failed: invalid=0, contradictory=1.",
+      "passed": true
+    },
+    {
+      "case": "high-value-ceiling",
+      "action": "HUMAN-REVIEW",
+      "reason": "Amount 60000.00 exceeds monetary ceiling 50000.00; automatic contest is not allowed.",
+      "passed": true
+    },
+    {
+      "case": "replay",
+      "action": "AUTO-CONTEST",
+      "reason": "Win probability 0.81 >= 0.65, evidence is sufficiently confirmed, and expected net value is 1797.19.",
+      "passed": true
+    },
+    {
+      "case": "prompt-injection-notes",
+      "action": "HUMAN-REVIEW",
+      "reason": "Evidence completeness 0.33 is below required 0.50.",
+      "passed": true
+    },
+    {
+      "case": "graph-escalation",
+      "action": "HUMAN-REVIEW",
+      "reason": "Relationship risk score 0.65 triggered manual-review safety escalation.",
+      "passed": true
+    },
+    {
+      "case": "negative-amount",
+      "action": "HUMAN-REVIEW",
+      "reason": "Invalid dispute amount; manual review required.",
+      "passed": true
+    },
+    {
+      "case": "fully-confirmed-positive",
+      "action": "AUTO-CONTEST",
+      "reason": "Win probability 0.81 >= 0.65, evidence is sufficiently confirmed, and expected net value is 1797.19.",
+      "passed": true
+    }
+  ]
+}</pre><h2>Security boundaries</h2><pre>{
+  "policy_authoritative": true,
+  "monetary_ceiling": 50000.0,
+  "idempotency": true,
+  "audit_integrity": "SHA-256 chained audit records",
+  "ai_can_execute_financial_action": false,
+  "prompt_injection_boundary": "notes/evidence are untrusted data",
+  "external_ai_failure": "deterministic fallback"
+}</pre><h2>Reproducibility contract</h2><pre>{
+  "test_outcomes_used_for_threshold_selection": false,
+  "calibration_split": "dev.csv",
+  "policy_threshold": 0.65,
+  "accept_loss_threshold": 0.3,
+  "minimum_evidence_completeness": 0.5,
+  "contest_cost": 150.0,
+  "command": "make verify"
 }</pre></body></html>
