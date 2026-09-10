@@ -7,9 +7,17 @@ test:
 benchmark:
 	python scripts/benchmark.py
 
+policy-optimize:
+	python -m chargeback_risk_engine.policy_optimizer
+
+hard-cases:
+	python scripts/evaluate_hard_cases.py
+
 verify:
 	python -m pytest -q
+	python -m chargeback_risk_engine.policy_optimizer
 	python scripts/benchmark.py
+	python scripts/evaluate_hard_cases.py
 	python scripts/generate_report.py
 
 latency:
