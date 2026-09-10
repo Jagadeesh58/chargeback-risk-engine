@@ -9,3 +9,18 @@ venv/
 *.db
 .DS_Store
 
+
+# local proof/run outputs
+artifacts/release_verification.json
+
+# Private / generated files
+data/
+artifacts/
+*.db
+.env
+.env.*
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/

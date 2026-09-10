@@ -38,11 +38,11 @@ def test_higher_threshold_never_increases_recall():
 
 
 def test_default_threshold_matches_metrics_module():
-    """Sanity check: sweeping at exactly our real policy's threshold (0.65)
-    should reproduce the same precision/recall we already measured in
-    metrics.py on the real test set."""
+    """Sanity check: sweeping at the frozen runtime policy threshold should
+    reproduce the same precision/recall used by the live decision service."""
     test = pd.read_csv("data/test.csv").head(100)
-    result = sweep_auto_contest_threshold(test, [0.65])
+    from chargeback_risk_engine.policy_profile import load_policy_profile
+    result = sweep_auto_contest_threshold(test, [load_policy_profile().auto_contest_threshold])
     row = result.iloc[0]
     from chargeback_risk_engine.metrics import run_pipeline, confusion_matrix_for_auto_contest, precision_recall_f1
     baseline = run_pipeline(test)

@@ -12,6 +12,7 @@ from chargeback_risk_engine.calibration import apply_calibration, load_or_fit_ca
 from chargeback_risk_engine.evidence import assemble
 from chargeback_risk_engine.ml_scorer import dispute_from_evidence_items, load_or_fit_ml_scorer
 from chargeback_risk_engine.policy import decide
+from chargeback_risk_engine.policy_profile import decision_score, load_policy_profile
 from chargeback_risk_engine.razorpay_adapter import generate_contest_draft
 from chargeback_risk_engine.engine.economic_decision import calculate_economic_value
 from chargeback_risk_engine.ai_analyst import analyze_evidence
@@ -69,6 +70,11 @@ def _score_case(
         risk_probability = live_risk_probability(ml, dispute)
         graph_result = graph.analyze(dispute)
         economic = calculate_economic_value(dispute["amount"], risk_probability)
+        profile = load_policy_profile()
+        routing_score = decision_score(
+            risk_probability, evidence_quality.confidence,
+            evidence_signal_weight=profile.evidence_signal_weight,
+        )
         decision = decide(
             risk_probability,
             dispute["amount"],
@@ -76,6 +82,11 @@ def _score_case(
             expected_net_value=economic.expected_net_value,
             evidence_quality=evidence_quality,
             graph_risk_score=graph_result.risk_score,
+            auto_contest_threshold=profile.auto_contest_threshold,
+            accept_loss_threshold=profile.accept_loss_threshold,
+            monetary_ceiling=profile.monetary_ceiling,
+            min_evidence_completeness=profile.min_evidence_completeness,
+            decision_score=routing_score,
         )
         evidence_list = [{"field": item.field, "status": item.status} for item in packet.items]
         ai_analysis = analyze_evidence({"reason_code": packet.reason_code, "items": evidence_list}, reason_code=packet.reason_code, context_text=str(dispute.get("evidence_text", "")))
@@ -87,6 +98,7 @@ def _score_case(
             decision.expected_value,
             _graph_data_for(dispute),
             ai_analysis.to_dict(),
+            routing_score,
         )
 
     if existing is None:
@@ -144,6 +156,7 @@ def _score_case(
         "reason_code": logged.reason_code,
         "amount": logged.amount,
         "win_probability": logged.win_probability,
+        "routing_score": (logged.routing_score if logged.routing_score is not None else logged.win_probability),
         "calibrated_win_probability": calibrated_probability,
         "evidence": logged.evidence,
         "evidence_score": evidence_quality.to_dict(),

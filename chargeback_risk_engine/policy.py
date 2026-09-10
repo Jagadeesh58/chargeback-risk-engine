@@ -53,6 +53,8 @@ def decide(
     auto_contest_threshold: float = AUTO_CONTEST_THRESHOLD,
     accept_loss_threshold: float = ACCEPT_LOSS_THRESHOLD,
     monetary_ceiling: float = MONETARY_CEILING,
+    decision_score: float | None = None,
+    min_evidence_completeness: float = MIN_EVIDENCE_COMPLETENESS,
 ) -> PolicyDecision:
     """Apply safety, evidence, graph, economics and risk gates in fixed order."""
     if not math.isfinite(float(amount)) or float(amount) <= 0:
@@ -71,11 +73,15 @@ def decide(
 
     ev = compute_expected_value(win_probability, amount)
 
+    policy_score = float(win_probability if decision_score is None else decision_score)
+    if not math.isfinite(policy_score) or not 0.0 <= policy_score <= 1.0:
+        return PolicyDecision(HUMAN_REVIEW, "Invalid deterministic routing score; manual review required.", ev)
+
     if evidence_quality is not None:
-        if evidence_quality.completeness < MIN_EVIDENCE_COMPLETENESS:
+        if evidence_quality.completeness < float(min_evidence_completeness):
             return PolicyDecision(
                 HUMAN_REVIEW,
-                f"Evidence completeness {evidence_quality.completeness:.2f} is below required {MIN_EVIDENCE_COMPLETENESS:.2f}.",
+                f"Evidence completeness {evidence_quality.completeness:.2f} is below required {float(min_evidence_completeness):.2f}.",
                 ev,
             )
         invalid = sum(not item.valid for item in evidence_quality.items)
@@ -107,7 +113,7 @@ def decide(
             ev,
         )
 
-    if win_probability >= float(auto_contest_threshold):
+    if policy_score >= float(auto_contest_threshold):
         if evidence_packet is None or evidence_quality is None:
             return PolicyDecision(
                 HUMAN_REVIEW,
@@ -136,19 +142,19 @@ def decide(
             )
         return PolicyDecision(
             AUTO_CONTEST,
-            f"Win probability {win_probability:.2f} >= {float(auto_contest_threshold):.2f}, evidence is sufficiently confirmed, and expected net value is {ev:.2f}.",
+            f"Routing score {policy_score:.2f} >= {float(auto_contest_threshold):.2f}; calibrated win probability is {win_probability:.2f}, evidence is sufficiently confirmed, and expected net value is {ev:.2f}.",
             ev,
         )
 
-    if win_probability <= float(accept_loss_threshold):
+    if policy_score <= float(accept_loss_threshold):
         return PolicyDecision(
             ACCEPT_LOSS,
-            f"Win probability {win_probability:.2f} <= {float(accept_loss_threshold):.2f}; contesting is not worthwhile at the configured threshold.",
+            f"Routing score {policy_score:.2f} <= {float(accept_loss_threshold):.2f}; contesting is not worthwhile at the configured threshold.",
             ev,
         )
 
     return PolicyDecision(
         HUMAN_REVIEW,
-        f"Win probability {win_probability:.2f} is ambiguous between {float(accept_loss_threshold):.2f} and {float(auto_contest_threshold):.2f}.",
+        f"Routing score {policy_score:.2f} is ambiguous between {float(accept_loss_threshold):.2f} and {float(auto_contest_threshold):.2f}.",
         ev,
     )

@@ -12,6 +12,7 @@ class CanonicalDecision:
     amount: float
     action: str
     win_probability: float
+    routing_score: float
     calibrated_win_probability: float
     evidence: list[dict[str, Any]]
     evidence_score: dict[str, Any]

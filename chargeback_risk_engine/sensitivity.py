@@ -8,6 +8,7 @@ from chargeback_risk_engine.engine.evidence_score import score_evidence
 from chargeback_risk_engine.evidence import assemble
 from chargeback_risk_engine.metrics import _row_to_dispute
 from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer
+from chargeback_risk_engine.policy_profile import decision_score, load_policy_profile
 from chargeback_risk_engine.policy import (
     ACCEPT_LOSS_THRESHOLD,
     AUTO_CONTEST_THRESHOLD,
@@ -42,6 +43,7 @@ def sweep_auto_contest_threshold(
     contest_cost: float = 150.0,
 ) -> pd.DataFrame:
     precomputed = _precompute(df)
+    profile = load_policy_profile()
     results = []
     for threshold in thresholds:
         tp = fp = fn = 0
@@ -52,7 +54,9 @@ def sweep_auto_contest_threshold(
                 evidence_packet=row["packet"],
                 evidence_quality=row["quality"],
                 expected_net_value=row["economic"].expected_net_value,
+                decision_score=decision_score(row["probability"], row["quality"].confidence, evidence_signal_weight=profile.evidence_signal_weight),
                 auto_contest_threshold=threshold,
+                min_evidence_completeness=profile.min_evidence_completeness,
             )
             predicted_win = decision.action == "AUTO-CONTEST"
             actual_win = row["would_win"] is True
@@ -78,6 +82,7 @@ def sweep_monetary_ceiling(
     contest_cost: float = 150.0,
 ) -> pd.DataFrame:
     precomputed = _precompute(df)
+    profile = load_policy_profile()
     results = []
     for ceiling in ceilings:
         tp = fp = human_review_count = 0
@@ -91,6 +96,8 @@ def sweep_monetary_ceiling(
                 auto_contest_threshold=AUTO_CONTEST_THRESHOLD,
                 accept_loss_threshold=ACCEPT_LOSS_THRESHOLD,
                 monetary_ceiling=ceiling,
+                decision_score=decision_score(row["probability"], row["quality"].confidence, evidence_signal_weight=profile.evidence_signal_weight),
+                min_evidence_completeness=profile.min_evidence_completeness,
             )
             if decision.action == "HUMAN-REVIEW":
                 human_review_count += 1
