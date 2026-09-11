@@ -8,10 +8,8 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from chargeback_risk_engine.config import (
-    REASON_CODES,
-    RELEVANT_EVIDENCE_BY_REASON,
-)
+from chargeback_risk_engine.audit_log import verify_audit_integrity
+from chargeback_risk_engine.config import REASON_CODES, RELEVANT_EVIDENCE_BY_REASON
 from chargeback_risk_engine.local_pipeline import score_dispute_locally
 from chargeback_risk_engine.engine.hybrid_pipeline import decide_case
 from chargeback_risk_engine.engine.risk_graph import RiskGraph
@@ -30,7 +28,6 @@ st.set_page_config(
     page_icon="🛡️",
     layout="wide",
 )
-
 
 st.title("Chargeback Risk Engine")
 st.caption("Track 02 — AI Risk Manager")
@@ -82,18 +79,11 @@ score_tab, proof_tab, demo_tab = st.tabs(
 )
 
 
-# ============================================================
-# DECISION TAB
-# ============================================================
-
 with score_tab:
     left, right = st.columns([1, 1.3])
 
     with left:
-        reason_code = st.selectbox(
-            "Reason code",
-            REASON_CODES,
-        )
+        reason_code = st.selectbox("Reason code", REASON_CODES)
 
         amount = st.number_input(
             "Disputed amount (₹)",
@@ -129,16 +119,10 @@ with score_tab:
         evidence_text = st.text_area(
             "Optional case notes",
             height=90,
-            help=(
-                "Case notes are treated as untrusted data; "
-                "they cannot change policy."
-            ),
+            help="Case notes are treated as untrusted data; they cannot change policy.",
         )
 
-        if st.button(
-            "Run live case",
-            type="primary",
-        ):
+        if st.button("Run live case", type="primary"):
             dispute = {
                 "dispute_id": dispute_id,
                 "payment_id": "pay_streamlit_demo",
@@ -148,17 +132,13 @@ with score_tab:
                 **evidence_values,
             }
 
-            st.session_state.last_result = score_dispute_locally(
-                dispute
-            )
+            st.session_state.last_result = score_dispute_locally(dispute)
 
     with right:
         result = st.session_state.get("last_result")
 
         if not result:
-            st.info(
-                "Enter a case and run the decision path."
-            )
+            st.info("Enter a case and run the decision path.")
         else:
             a, b, c, d = st.columns(4)
 
@@ -174,10 +154,7 @@ with score_tab:
 
             c.metric(
                 "Expected net value",
-                (
-                    f"₹"
-                    f"{result['economic_decision']['expected_net_value']:,.0f}"
-                ),
+                f"₹{result['economic_decision']['expected_net_value']:,.0f}",
             )
 
             d.metric(
@@ -190,21 +167,15 @@ with score_tab:
             st.write(
                 {
                     "1 · model": (
-                        f"{result['win_probability']:.1%} "
-                        "win probability"
+                        f"{result['win_probability']:.1%} win probability"
                     ),
                     "2 · evidence": (
-                        f"{result['evidence_score']['completeness']:.0%} "
-                        "complete / "
-                        f"{result['evidence_score']['validity']:.0%} "
-                        "valid"
+                        f"{result['evidence_score']['completeness']:.0%} complete / "
+                        f"{result['evidence_score']['validity']:.0%} valid"
                     ),
-                    "3 · graph": (
-                        result["graph_analysis"]["risk_type"]
-                    ),
+                    "3 · graph": result["graph_analysis"]["risk_type"],
                     "4 · economics": (
-                        f"₹"
-                        f"{result['economic_decision']['expected_net_value']:,.0f} "
+                        f"₹{result['economic_decision']['expected_net_value']:,.0f} "
                         "expected net"
                     ),
                     "5 · policy": result["action"],
@@ -213,262 +184,139 @@ with score_tab:
 
             st.markdown("### Why?")
 
-            st.write(
-                result["explanation"]["policy_reason"]
-            )
-
-            st.write(
-                result["explanation"]["economic_reason"]
-            )
-
-            st.write(
-                result["explanation"]["graph_reason"]
-            )
+            st.write(result["explanation"]["policy_reason"])
+            st.write(result["explanation"]["economic_reason"])
+            st.write(result["explanation"]["graph_reason"])
 
             st.markdown("### Evidence analyst")
+            st.json(result["explanation"]["ai_analyst"])
 
-            st.json(
-                result["explanation"]["ai_analyst"]
-            )
-
-            counterfactual = result.get("counterfactual")
-
-            if counterfactual:
+            if result.get("counterfactual"):
                 st.markdown("### What would change this?")
-                st.write(
-                    counterfactual.get(
-                        "statement",
-                        "No counterfactual explanation available.",
-                    )
-                )
+                st.write(result["counterfactual"]["statement"])
 
             with st.expander("Graph"):
-                st.json(
-                    result.get(
-                        "graph_analysis",
-                        {},
-                    )
-                )
+                st.json(result["graph_analysis"])
 
             with st.expander("Audit"):
                 st.write(
                     {
-                        "audit_id": result.get("audit_id"),
-                        "request_id": result.get("request_id"),
-                        "model": result.get("model_version"),
-                        "policy": result.get("policy_version"),
+                        "audit_id": result["audit_id"],
+                        "request_id": result["request_id"],
+                        "model": result["model_version"],
+                        "policy": result["policy_version"],
                     }
                 )
 
-            contest_draft = result.get("contest_draft")
-
-            if contest_draft:
+            if result.get("contest_draft"):
                 with st.expander("Contest draft"):
                     st.caption(
                         "Draft only. No external financial action is executed."
                     )
-                    st.json(contest_draft)
+                    st.json(result["contest_draft"])
 
-
-# ============================================================
-# PROOF TAB
-# ============================================================
 
 with proof_tab:
     st.subheader("Measured system proof")
-
     st.caption(
-        "Bundled synthetic evaluation data; "
-        "not a production-performance claim."
+        "Bundled synthetic evaluation data; not a production-performance claim."
     )
 
     report_path = ARTIFACTS_DIR / "verification_report.json"
 
     if report_path.exists():
         try:
-            raw = json.loads(
-                report_path.read_text(
-                    encoding="utf-8"
-                )
+            raw = json.loads(report_path.read_text(encoding="utf-8"))
+
+            h = raw.get("headline", {})
+
+            review_budget_rows = raw.get("review_budget", [])
+            rb10 = next(
+                (
+                    row
+                    for row in review_budget_rows
+                    if float(row.get("review_budget", 0)) == 0.10
+                ),
+                None,
             )
-
-            headline = raw.get(
-                "headline",
-                {},
-            )
-
-            review_budget_rows = raw.get(
-                "review_budget",
-                [],
-            )
-
-            rb10 = None
-
-            for row in review_budget_rows:
-                try:
-                    if (
-                        float(
-                            row.get(
-                                "review_budget",
-                                0,
-                            )
-                        )
-                        == 0.10
-                    ):
-                        rb10 = row
-                        break
-                except (
-                    TypeError,
-                    ValueError,
-                ):
-                    continue
 
             a, b, c, d, e, f = st.columns(6)
 
             a.metric(
                 "PR-AUC",
-                f"{float(headline.get('pr_auc', 0)):.3f}",
+                f"{h.get('pr_auc', 0):.3f}",
             )
 
             b.metric(
                 "Precision",
-                (
-                    f"{float(headline.get('auto_contest_precision', 0)):.1%}"
-                ),
+                f"{h.get('auto_contest_precision', 0):.1%}",
             )
 
             c.metric(
                 "Recall",
-                (
-                    f"{float(headline.get('auto_contest_recall', 0)):.1%}"
-                ),
+                f"{h.get('auto_contest_recall', 0):.1%}",
             )
 
             d.metric(
                 "Realized net value",
-                (
-                    f"₹"
-                    f"{float(headline.get('realized_net_value', 0)):,.0f}"
-                ),
+                f"₹{h.get('realized_net_value', 0):,.0f}",
             )
 
             e.metric(
                 "10% review capacity",
                 (
-                    f"+{float(rb10.get('recall_at_budget', 0)):.1%} recall"
-                    if rb10 is not None
+                    f"+{rb10.get('recall_at_budget', 0):.1%} recall"
+                    if rb10
                     else "N/A"
                 ),
             )
 
             f.metric(
                 "Hard cases",
-                (
-                    f"{headline.get('hard_cases_passed', 0)}/"
-                    f"{headline.get('hard_cases_total', 0)}"
-                ),
+                f"{h.get('hard_cases_passed', 0)}/{h.get('hard_cases_total', 0)}",
             )
-
-            # ------------------------------------------------
-            # Strategy comparison
-            # ------------------------------------------------
 
             st.markdown("### Strategy comparison")
 
-            baselines = raw.get(
-                "baselines",
-                [],
-            )
+            baselines = raw.get("baselines", [])
 
             if baselines:
-                baseline_df = pd.DataFrame(baselines)
-
-                baseline_columns = [
-                    "strategy",
-                    "auto_contest_count",
-                    "auto_contest_precision",
-                    "auto_contest_recall",
-                    "realized_net_value",
-                ]
-
-                available_columns = [
-                    column
-                    for column in baseline_columns
-                    if column in baseline_df.columns
-                ]
-
-                if available_columns:
-                    st.dataframe(
-                        baseline_df[available_columns],
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-                else:
-                    st.dataframe(
-                        baseline_df,
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-            else:
-                st.info(
-                    "No strategy comparison data is available "
-                    "in the verification report."
+                st.dataframe(
+                    pd.DataFrame(baselines)[
+                        [
+                            "strategy",
+                            "auto_contest_count",
+                            "auto_contest_precision",
+                            "auto_contest_recall",
+                            "realized_net_value",
+                        ]
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
                 )
-
-            # ------------------------------------------------
-            # True ablation
-            # ------------------------------------------------
 
             st.markdown("### True ablation")
-
             st.caption(
-                "Each row removes a specific capability; "
-                "the report does not relabel one pipeline as several."
+                "Each row removes a specific capability; the report does not relabel "
+                "one pipeline as several."
             )
 
-            ablation = raw.get(
-                "ablation",
-                [],
-            )
+            ablation = raw.get("ablation", [])
 
             if ablation:
-                ablation_df = pd.DataFrame(ablation)
-
-                ablation_columns = [
-                    "component",
-                    "auto_contest_count",
-                    "precision",
-                    "recall",
-                    "realized_net_value",
-                ]
-
-                available_columns = [
-                    column
-                    for column in ablation_columns
-                    if column in ablation_df.columns
-                ]
-
-                if available_columns:
-                    st.dataframe(
-                        ablation_df[available_columns],
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-                else:
-                    st.dataframe(
-                        ablation_df,
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-            else:
-                st.info(
-                    "No ablation data is available "
-                    "in the verification report."
+                st.dataframe(
+                    pd.DataFrame(ablation)[
+                        [
+                            "component",
+                            "auto_contest_count",
+                            "precision",
+                            "recall",
+                            "realized_net_value",
+                        ]
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
                 )
-
-            # ------------------------------------------------
-            # Review budget
-            # ------------------------------------------------
 
             st.markdown("### Review-budget optimization")
 
@@ -478,47 +326,22 @@ with proof_tab:
                     use_container_width=True,
                     hide_index=True,
                 )
-            else:
-                st.info(
-                    "No review-budget data is available."
-                )
 
-            # ------------------------------------------------
-            # Per-reason evaluation
-            # ------------------------------------------------
-
-            per_reason = raw.get(
-                "per_reason",
-                [],
-            )
+            per_reason = raw.get("per_reason", [])
 
             if per_reason:
-                with st.expander(
-                    "Per-reason evaluation"
-                ):
+                with st.expander("Per-reason evaluation"):
                     st.dataframe(
                         pd.DataFrame(per_reason),
                         use_container_width=True,
                         hide_index=True,
                     )
 
-            # ------------------------------------------------
-            # Security / reproducibility
-            # ------------------------------------------------
-
-            with st.expander(
-                "Security and reproducibility"
-            ):
+            with st.expander("Security and reproducibility"):
                 st.json(
                     {
-                        "security": raw.get(
-                            "security",
-                            {},
-                        ),
-                        "reproducibility": raw.get(
-                            "reproducibility",
-                            {},
-                        ),
+                        "security": raw.get("security", {}),
+                        "reproducibility": raw.get("reproducibility", {}),
                         "confidence_intervals": raw.get(
                             "confidence_intervals",
                             {},
@@ -533,58 +356,10 @@ with proof_tab:
             TypeError,
             ValueError,
         ) as exc:
-            st.error(
-                "Unable to load verification report."
-            )
-
-            st.caption(
-                f"Report parsing error: {exc}"
-            )
-
-            st.info(
-                "The app will fall back to computing "
-                "lightweight proof metrics directly from "
-                "the public evaluation dataset."
-            )
-
-            metrics = proof_metrics()
-
-            if metrics.get("available"):
-                a, b, c, d = st.columns(4)
-
-                a.metric(
-                    "Precision",
-                    f"{metrics['precision']:.1%}",
-                )
-
-                b.metric(
-                    "Recall",
-                    f"{metrics['recall']:.1%}",
-                )
-
-                c.metric(
-                    "Expected net value",
-                    f"₹{metrics['expected_net_value']:,.0f}",
-                )
-
-                d.metric(
-                    "False-positive cost",
-                    f"₹{metrics['fp_cost']:,.0f}",
-                )
-
-            else:
-                st.warning(
-                    metrics.get(
-                        "reason",
-                        "Evaluation data unavailable.",
-                    )
-                )
+            st.error("Unable to load verification report.")
+            st.caption(f"Report parsing error: {exc}")
 
     else:
-        # ----------------------------------------------------
-        # No verification artifact: calculate proof live.
-        # ----------------------------------------------------
-
         metrics = proof_metrics()
 
         if metrics.get("available"):
@@ -616,11 +391,10 @@ with proof_tab:
             )
 
             st.info(
-                "Detailed verification artifacts are not bundled. "
-                "The proof metrics above are computed directly "
-                "from the public evaluation dataset."
+                "Detailed verification artifacts are not bundled; "
+                "the proof metrics above are computed directly from the "
+                "public evaluation dataset."
             )
-
         else:
             st.warning(
                 metrics.get(
@@ -629,10 +403,6 @@ with proof_tab:
                 )
             )
 
-
-# ============================================================
-# DEMO TAB
-# ============================================================
 
 with demo_tab:
     st.subheader("Deterministic demo cases")
@@ -716,9 +486,7 @@ with demo_tab:
     for title, case in demo_cases:
         with st.expander(
             title,
-            expanded=(
-                title == "CASE 1 — strong evidence"
-            ),
+            expanded=(title == "CASE 1 — strong evidence"),
         ):
             if st.button(
                 f"Run {title}",
@@ -759,15 +527,10 @@ with demo_tab:
                         risk_graph=graph,
                         include_counterfactual=False,
                     )
-
                 else:
-                    st.session_state.demo_result = (
-                        score_dispute_locally(case)
-                    )
+                    st.session_state.demo_result = score_dispute_locally(case)
 
-                st.session_state.demo_case = (
-                    case["dispute_id"]
-                )
+                st.session_state.demo_case = case["dispute_id"]
 
             result = (
                 st.session_state.get("demo_result")
@@ -779,7 +542,5 @@ with demo_tab:
             if result:
                 st.json(result)
             else:
-                st.caption(
-                    "Deterministic demo input"
-                )
-                
+                st.caption("Deterministic demo input")
+

@@ -72,5 +72,19 @@ def test_evidence_choice_mapping_matches_app_logic():
 
 def test_dashboard_declares_five_demo_cases():
     source = open("apps/app_deployed.py", encoding="utf-8").read()
+
+    expected_cases = [
+        "CASE 1 — strong evidence",
+        "CASE 2 — mixed evidence",
+        "CASE 3 — network escalation",
+        "CASE 4 — weak evidence",
+        "CASE 5 — economic boundary",
+    ]
+
+    for case in expected_cases:
+        assert case in source
+
+    assert source.count('"CASE ') == 5
+    source = open("apps/app_deployed.py", encoding="utf-8").read()
     assert source.count("DEMO_") == 5
     assert source.count('with st.expander(title') == 1
