@@ -72,9 +72,13 @@ def _score_case(
         economic = calculate_economic_value(dispute["amount"], risk_probability)
         profile = load_policy_profile()
         routing_score = decision_score(
-            risk_probability, evidence_quality.confidence,
+            risk_probability,
+            evidence_quality.confidence,
             evidence_signal_weight=profile.evidence_signal_weight,
         )
+        # Safety boundary:
+        # ML, evidence, graph, economics, and AI provide decision signals.
+        # Only deterministic policy may select the final financial action.
         decision = decide(
             risk_probability,
             dispute["amount"],
@@ -88,8 +92,18 @@ def _score_case(
             min_evidence_completeness=profile.min_evidence_completeness,
             decision_score=routing_score,
         )
-        evidence_list = [{"field": item.field, "status": item.status} for item in packet.items]
-        ai_analysis = analyze_evidence({"reason_code": packet.reason_code, "items": evidence_list}, reason_code=packet.reason_code, context_text=str(dispute.get("evidence_text", "")))
+        evidence_list = [
+            {"field": item.field, "status": item.status}
+            for item in packet.items
+        ]
+        ai_analysis = analyze_evidence(
+            {
+                "reason_code": packet.reason_code,
+                "items": evidence_list,
+            },
+            reason_code=packet.reason_code,
+            context_text=str(dispute.get("evidence_text", "")),
+        )
         return (
             risk_probability,
             evidence_list,
@@ -144,7 +158,13 @@ def _score_case(
         graph_analysis=graph_result.to_dict(),
         feature_importance=contributions,
     )
-    ai_analysis = logged.ai_metadata or analyze_evidence({"reason_code": logged.reason_code, "items": logged.evidence}, reason_code=logged.reason_code).to_dict()
+    ai_analysis = logged.ai_metadata or analyze_evidence(
+        {
+            "reason_code": logged.reason_code,
+            "items": logged.evidence,
+        },
+        reason_code=logged.reason_code,
+    ).to_dict()
     draft = None
     if logged.action == "AUTO-CONTEST":
         draft = generate_contest_draft(
@@ -156,7 +176,11 @@ def _score_case(
         "reason_code": logged.reason_code,
         "amount": logged.amount,
         "win_probability": logged.win_probability,
-        "routing_score": (logged.routing_score if logged.routing_score is not None else logged.win_probability),
+        "routing_score": (
+            logged.routing_score
+            if logged.routing_score is not None
+            else logged.win_probability
+        ),
         "calibrated_win_probability": calibrated_probability,
         "evidence": logged.evidence,
         "evidence_score": evidence_quality.to_dict(),
@@ -192,7 +216,9 @@ def decide_case(
     """Public canonical entry point used by API, UI, demo and evaluation."""
     result = _score_case(dispute, risk_graph=risk_graph, db_path=db_path)
     if include_counterfactual:
-        from chargeback_risk_engine.engine.counterfactual import find_minimal_decision_reversal
+        from chargeback_risk_engine.engine.counterfactual import (
+            find_minimal_decision_reversal
+        )
         original_record = get_existing_decision(dispute["dispute_id"], db_path)
         counterfactual_input = _logged_dispute(original_record) if original_record is not None else dict(dispute)
         result["counterfactual"] = find_minimal_decision_reversal(

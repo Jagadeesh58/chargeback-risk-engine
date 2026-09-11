@@ -5,7 +5,13 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 from typing import Iterable
 
-ENTITY_FIELDS = ("customer_id", "device_id", "ip_address", "card_fingerprint", "merchant_id")
+ENTITY_FIELDS = (
+    "customer_id",
+    "device_id",
+    "ip_address",
+    "card_fingerprint",
+    "merchant_id",
+)
 
 
 @dataclass(frozen=True)
@@ -78,7 +84,13 @@ class RiskGraph:
                 shared.setdefault(kind, []).append(value)
         other_disputes = max(0, len(connected_nodes) - 1)
         shared_count = sum(len(v) for v in shared.values())
-        risk_score = min(1.0, 0.10 * other_disputes + 0.15 * shared_count)
+
+        # Deterministic relationship-risk heuristic for escalation context.
+        # These weights are hand-defined and are not learned model parameters.
+        risk_score = min(
+            1.0,
+            0.10 * other_disputes + 0.15 * shared_count,
+        )
         connected_customers = set()
         historical_disputed_value = 0.0
         for related_node in connected_nodes:
