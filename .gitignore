@@ -1,26 +1,31 @@
+# Python
 __pycache__/
 *.py[cod]
-.pytest_cache/
 *.egg-info/
-.venv/
-venv/
-.env
-.env.*
-*.db
-.DS_Store
-
-
-# local proof/run outputs
-artifacts/release_verification.json
-
-# Private / generated files
-data/
-artifacts/
-*.db
-.env
-.env.*
-__pycache__/
-*.pyc
 .pytest_cache/
+
+# Virtual environments
 .venv/
 venv/
+env/
+
+# Secrets / local configuration
+.env
+.env.*
+!.env.example
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Generated proof outputs
+artifacts/*
+!artifacts/hard_cases_report.json
+!artifacts/policy_profile.json
