@@ -1,40 +1,53 @@
 # Final Verification
 
-## Required checks
+## Verification contract
 
-`pytest -q` — **159 passed**
+This document records the repository verification contract. The authoritative test count is the result of the current local or CI run; it is intentionally not hard-coded here so the document does not become stale when tests change.
 
-`python scripts/verify_no_leakage.py` — **passed**
+Run the full verification workflow with:
 
-`python scripts/benchmark.py` — **passed on 5,000 held-out rows**
+```bash
+make verify
+```
 
-`python scripts/latency.py` — p50 **2.119985 ms**, p95 **2.438868 ms**, p99 **2.968378 ms**
+`make verify` consumes the tracked `artifacts/policy_profile.json` as the frozen
+release policy. Use `make policy-optimize` separately when deliberately selecting
+a new development policy from `dev.csv`, then review and commit the resulting profile.
 
-Focused adversarial and safety suite — **27/27 passed**
+The workflow covers:
 
-## Current candidate metrics
+1. the complete pytest suite
+2. leakage verification
+3. held-out benchmark generation using the frozen tracked policy profile
+4. deterministic hard-case verification
+5. release safety verification
+6. reproducible evaluation-report generation
 
-- Auto-contest precision: **0.7593833780160858**
-- Auto-contest recall: **0.4012039660056657**
-- Human-review rate: **0.637**
-- Expected net value: **₹4,607,324.763838673**
-- Logistic PR-AUC: **0.7234116688966661**
-- Logistic calibration error: **0.007541071429129429**
+Additional checks are available through:
+
+```bash
+python scripts/verify_no_leakage.py
+python scripts/latency.py
+```
 
 ## Evaluation data
 
-Train: **20,000** rows
+| Split | Rows |
+|---|---:|
+| Train | 20,000 |
+| Development | 5,000 |
+| Held-out test | 5,000 |
 
-Dev: **5,000** rows
+The bundled dataset is synthetic. It is included for reproducible development and evaluation and is not a representation of production Razorpay traffic.
 
-Held-out test: **5,000** rows
+## Safety verification
 
-## Demo
+The verification suite covers policy boundaries, malformed and missing evidence, contradictory evidence, duplicate/replay behavior, monetary ceilings, prompt-injection-style case text, graph escalation, AI fallback behavior, counterfactual isolation, and audit integrity.
 
-The CLI demo runs five deterministic cases successfully: AUTO-CONTEST, HUMAN-REVIEW, graph escalation, weak evidence, and an economic boundary case.
+## Latency
 
-## Deployment
+Run `python scripts/latency.py` to obtain the current local timing snapshot. The benchmark is a warm single-process measurement and is not a production SLA.
 
-Live demo: https://chargebackriskengine.streamlit.app/
+## Release notes
 
-The project includes the live demo URL supplied for the deployed Streamlit application. Automated access from this environment redirected to Streamlit authentication, so browser-level execution could not be independently verified here.
+Generated benchmark and verification artifacts are intentionally treated as reproducible outputs. Only small, reviewable artifacts are kept in Git.

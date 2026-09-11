@@ -24,6 +24,9 @@ def _candidate_inputs(dispute: dict, limit: int = 10):
     return candidates[:limit]
 
 
+# Counterfactual cases are read-only simulations.
+# Candidate disputes must never be persisted or treated as real disputes.
+
 def find_minimal_decision_reversal(
     dispute: dict,
     current_result: dict,
@@ -32,27 +35,15 @@ def find_minimal_decision_reversal(
     risk_graph=None,
     limit: int = 10,
 ) -> dict:
-    """Flip one valid input at a time and rerun the same canonical path.
-
-    Candidate cases are read-only simulations and must never become
-    durable dispute records.
-    """
+    """Flip one valid input at a time and rerun the same canonical path."""
     original_action = current_result["action"]
     best_risk_change: dict | None = None
 
     with TemporaryDirectory(prefix="chargeback_cf_") as tmp:
         db_path = str(Path(tmp) / "counterfactual.db")
-        # Counterfactual cases are read-only simulations.
-        # Candidate disputes must never be persisted or treated as real cases.
-        for field, old_value, new_value in _candidate_inputs(
-            dispute,
-            limit=limit,
-        ):
+        for field, old_value, new_value in _candidate_inputs(dispute, limit=limit):
             candidate = dict(dispute)
-            original_id = dispute.get("dispute_id", "CASE")
-            candidate["dispute_id"] = (
-                f"CF_{original_id}_{field}_{new_value!r}"
-            )[:120]
+            candidate["dispute_id"] = f"CF_{dispute.get('dispute_id', 'CASE')}_{field}_{new_value!r}"[:120]
             candidate[field] = new_value
             result = decision_fn(
                 candidate,
@@ -60,10 +51,7 @@ def find_minimal_decision_reversal(
                 db_path=db_path,
                 include_counterfactual=False,
             )
-            delta = abs(
-                float(result["win_probability"])
-                - float(current_result["win_probability"])
-            )
+            delta = abs(float(result["win_probability"]) - float(current_result["win_probability"]))
             if result["action"] != original_action:
                 return {
                     "status": "DECISION_CHANGED",

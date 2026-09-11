@@ -26,9 +26,14 @@ from chargeback_risk_engine.evidence import assemble
 from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer
 from chargeback_risk_engine.paths import ARTIFACTS_DIR, DATA_DIR
 from chargeback_risk_engine.policy import (
-    ACCEPT_LOSS_THRESHOLD, AUTO_CONTEST_THRESHOLD, CONTEST_COST, GRAPH_HUMAN_REVIEW_THRESHOLD,
-    MIN_EVIDENCE_COMPLETENESS, MONETARY_CEILING,
+    ACCEPT_LOSS_THRESHOLD,
+    AUTO_CONTEST_THRESHOLD,
+    CONTEST_COST,
+    GRAPH_HUMAN_REVIEW_THRESHOLD,
+    MIN_EVIDENCE_COMPLETENESS,
+    MONETARY_CEILING,
 )
+from chargeback_risk_engine.policy_profile import load_policy_profile
 from chargeback_risk_engine.review_budget import optimize_review_budget
 from chargeback_risk_engine.scorer import predict_win_probability
 
@@ -50,7 +55,9 @@ def _risk_metrics(y, p):
     }
 
 
-def _simulate_actions(df: pd.DataFrame, probabilities: np.ndarray, *, evidence=True, economics=True, graph=True, threshold: float = AUTO_CONTEST_THRESHOLD) -> list[str]:
+def _simulate_actions(df: pd.DataFrame, probabilities: np.ndarray, *, evidence=True, economics=True, graph=True, threshold: float | None = None) -> list[str]:
+    profile = load_policy_profile()
+    threshold = profile.auto_contest_threshold if threshold is None else float(threshold)
     actions = []
     for row, p in zip(df.to_dict("records"), probabilities):
         packet = assemble(row)
@@ -89,35 +96,82 @@ def _ablation(df: pd.DataFrame) -> list[dict]:
         ("Model + Graph", model_p, False, False, True),
         ("Full system", model_p, True, True, True),
     ]
-    out=[]
-    positives=int(df["would_win"].sum())
+    out = []
+    positives = int(df["would_win"].sum())
     for name,p,evidence,economics,graph in variants:
         actions=_simulate_actions(df,p,evidence=evidence,economics=economics,graph=graph)
         auto=[i for i,a in enumerate(actions) if a=="AUTO-CONTEST"]
-        tp=sum(bool(df.iloc[i]["would_win"]) for i in auto); fp=len(auto)-tp
-        precision=tp/len(auto) if auto else 0.0; recall=tp/positives if positives else 0.0
-        realized_recovery=float(df.iloc[auto].loc[df.iloc[auto]["would_win"]==True,"amount"].sum()) if auto else 0.0
-        net=realized_recovery-len(auto)*CONTEST_COST
-        out.append({"component":name,"auto_contest_count":len(auto),"precision":precision,"recall":recall,
-                    "f1":2*precision*recall/(precision+recall) if precision+recall else 0.0,
-                    "false_positive_cost":fp*CONTEST_COST,"realized_recovery":realized_recovery,"realized_net_value":net})
+        tp = sum(bool(df.iloc[i]["would_win"]) for i in auto)
+        fp = len(auto) - tp
+        precision = tp / len(auto) if auto else 0.0
+        recall = tp / positives if positives else 0.0
+        realized_recovery = (
+            float(
+                df.iloc[auto]
+                .loc[df.iloc[auto]["would_win"] == True, "amount"]
+                .sum()
+            )
+            if auto
+            else 0.0
+        )
+        net = realized_recovery - len(auto) * CONTEST_COST
+        out.append(
+            {
+                "component": name,
+                "auto_contest_count": len(auto),
+                "precision": precision,
+                "recall": recall,
+                "f1": (
+                    2 * precision * recall / (precision + recall)
+                    if precision + recall
+                    else 0.0
+                ),
+                "false_positive_cost": fp * CONTEST_COST,
+                "realized_recovery": realized_recovery,
+                "realized_net_value": net,
+            }
+        )
     return out
 
 
 def _bootstrap_mean(values: np.ndarray, seed: int = 42, n: int = 1000) -> dict:
-    rng=np.random.default_rng(seed); values=np.asarray(values,dtype=float)
-    if len(values)==0:return {"mean":0.0,"low":0.0,"high":0.0,"n":0}
-    means=np.array([rng.choice(values,size=len(values),replace=True).mean() for _ in range(n)])
-    return {"mean":float(values.mean()),"low":float(np.quantile(means,0.025)),"high":float(np.quantile(means,0.975)),"n":int(len(values))}
+    rng = np.random.default_rng(seed)
+    values = np.asarray(values, dtype=float)
+    if len(values) == 0:
+        return {"mean": 0.0, "low": 0.0, "high": 0.0, "n": 0}
+    means = np.array(
+        [
+            rng.choice(values, size=len(values), replace=True).mean()
+            for _ in range(n)
+        ]
+    )
+    return {
+        "mean": float(values.mean()),
+        "low": float(np.quantile(means, 0.025)),
+        "high": float(np.quantile(means, 0.975)),
+        "n": int(len(values)),
+    }
 
 
 def _reason_breakdown(test: pd.DataFrame, p: np.ndarray) -> list[dict]:
-    rows=[]
-    for reason,g in test.assign(_p=p).groupby("reason_code",sort=True):
-        pred=g["_p"]>=AUTO_CONTEST_THRESHOLD; y=g["would_win"].astype(bool)
-        tp=int((pred&y).sum()); fp=int((pred&~y).sum()); fn=int((~pred&y).sum())
-        rows.append({"reason_code":reason,"count":len(g),"pr_auc":float(average_precision_score(y,g["_p"])),
-                     "precision_at_threshold":tp/(tp+fp) if tp+fp else 0.0,"recall_at_threshold":tp/(tp+fn) if tp+fn else 0.0})
+    profile = load_policy_profile()
+    threshold = profile.auto_contest_threshold
+    rows = []
+    for reason, group in test.assign(_p=p).groupby("reason_code", sort=True):
+        pred = group["_p"] >= threshold
+        y = group["would_win"].astype(bool)
+        tp = int((pred & y).sum())
+        fp = int((pred & ~y).sum())
+        fn = int((~pred & y).sum())
+        rows.append(
+            {
+                "reason_code": reason,
+                "count": len(group),
+                "pr_auc": float(average_precision_score(y, group["_p"])),
+                "precision_at_threshold": tp / (tp + fp) if tp + fp else 0.0,
+                "recall_at_threshold": tp / (tp + fn) if tp + fn else 0.0,
+            }
+        )
     return rows
 
 
@@ -144,34 +198,162 @@ def _html(report):
 
 def main():
     ARTIFACTS_DIR.mkdir(exist_ok=True)
-    test=pd.read_csv(DATA_DIR/"test.csv"); train=pd.read_csv(DATA_DIR/"train.csv")
-    benchmark=json.loads((ARTIFACTS_DIR/"candidate_benchmark.json").read_text())
-    result_df=pd.DataFrame(benchmark["case_results"])
-    y=test["would_win"].astype(int).to_numpy(); p=result_df["p_win"].astype(float).to_numpy()
-    candidate=next(x for x in benchmark["strategies"] if x["strategy"]=="CHARGEBACK-RISK-ENGINE")
-    base=next(x for x in benchmark["strategies"] if x["strategy"]=="FROZEN-PRE-CHANGE")
-    per_case_net=np.where((result_df["action"]=="AUTO-CONTEST") & (result_df["would_win"]==True),result_df["amount"],0.0) - np.where(result_df["action"]=="AUTO-CONTEST",CONTEST_COST,0.0)
-    rb=optimize_review_budget(result_df).to_dict("records")
-    hard=json.loads((ARTIFACTS_DIR/"hard_cases_report.json").read_text()) if (ARTIFACTS_DIR/"hard_cases_report.json").exists() else {"total":0,"passed":0}
-    report={
-      "dataset":{"name":"bundled synthetic dataset","synthetic":True,"train_rows":len(train),"dev_rows":len(pd.read_csv(DATA_DIR/"dev.csv")),"test_rows":len(test),"split":"train/dev/test; final report uses test.csv only","label":"would_win is synthetic ground truth and is never fed to the decision engine"},
-      "headline":{"pr_auc":float(average_precision_score(y,p)),"auto_contest_precision":candidate["auto_contest_precision"],"auto_contest_recall":candidate["auto_contest_recall"],"realized_recovery":candidate["realized_recovery"],"realized_net_value":candidate["realized_net_value"],"realized_net_value_lift_vs_frozen":None,"p95_latency_ms":_latency()["p95_ms"],"hard_cases_passed":hard.get("passed",0),"hard_cases_total":hard.get("total",0)},
-      "baselines":[next(x for x in benchmark["strategies"] if x["strategy"]==s) for s in ["ALWAYS-CONTEST","ALWAYS-ACCEPT","RULES-ONLY","LOGISTIC-ONLY","FROZEN-PRE-CHANGE","CHARGEBACK-RISK-ENGINE"]],
-      "ablation":_ablation(test.head(min(1000,len(test))).copy()),
-      "ablation_test_rows":min(1000,len(test)),
-      "review_budget":rb,
-      "risk_metrics":_risk_metrics(y,p),
-      "per_reason":_reason_breakdown(test,p),
-      "confidence_intervals": {"case_level_realized_net_value":_bootstrap_mean(per_case_net)},
-      "latency":_latency(),
-      "hard_cases":hard,
-      "security":{"policy_authoritative":True,"monetary_ceiling":MONETARY_CEILING,"idempotency":True,"audit_integrity":"SHA-256 chained audit records","ai_can_execute_financial_action":False,"prompt_injection_boundary":"notes/evidence are untrusted data","external_ai_failure":"deterministic fallback"},
-      "reproducibility":{"test_outcomes_used_for_threshold_selection":False,"calibration_split":"dev.csv","policy_threshold":AUTO_CONTEST_THRESHOLD,"accept_loss_threshold":ACCEPT_LOSS_THRESHOLD,"minimum_evidence_completeness":MIN_EVIDENCE_COMPLETENESS,"contest_cost":CONTEST_COST,"command":"make verify"},
-      "comparison_notes":{"frozen_baseline":"historical repository artifact; realized net value is not comparable because the historical snapshot did not store realized outcomes","realized_value":"synthetic ground truth only; not a production recovery claim","graph_ablation":"tabular benchmark has no network identifiers, so graph stress testing is separately reported rather than invented as a lift"},
-    }
-    (ARTIFACTS_DIR/"verification_report.json").write_text(json.dumps(report,indent=2))
-    (ARTIFACTS_DIR/"verification_report.html").write_text(_html(report))
-    print(json.dumps({"headline":report["headline"],"files":["artifacts/verification_report.json","artifacts/verification_report.html"]},indent=2))
 
-if __name__=="__main__":
+    profile = load_policy_profile()
+    test = pd.read_csv(DATA_DIR / "test.csv")
+    train = pd.read_csv(DATA_DIR / "train.csv")
+    dev = pd.read_csv(DATA_DIR / "dev.csv")
+
+    benchmark_path = ARTIFACTS_DIR / "candidate_benchmark.json"
+    if not benchmark_path.exists():
+        raise FileNotFoundError(
+            "candidate_benchmark.json is missing. Run `python scripts/benchmark.py` first."
+        )
+
+    benchmark = json.loads(benchmark_path.read_text(encoding="utf-8"))
+    result_df = pd.DataFrame(benchmark["case_results"])
+    y = test["would_win"].astype(int).to_numpy()
+    p = result_df["p_win"].astype(float).to_numpy()
+
+    candidate = next(
+        item
+        for item in benchmark["strategies"]
+        if item["strategy"] == "CHARGEBACK-RISK-ENGINE"
+    )
+
+    frozen_baseline = next(
+        (
+            item
+            for item in benchmark["strategies"]
+            if item["strategy"] == "FROZEN-PRE-CHANGE"
+        ),
+        None,
+    )
+
+    per_case_net = (
+        np.where(
+            (result_df["action"] == "AUTO-CONTEST")
+            & (result_df["would_win"] == True),
+            result_df["amount"],
+            0.0,
+        )
+        - np.where(
+            result_df["action"] == "AUTO-CONTEST",
+            CONTEST_COST,
+            0.0,
+        )
+    )
+
+    rb = optimize_review_budget(result_df).to_dict("records")
+
+    hard_cases_path = ARTIFACTS_DIR / "hard_cases_report.json"
+    if hard_cases_path.exists():
+        hard = json.loads(hard_cases_path.read_text(encoding="utf-8"))
+    else:
+        hard = {"total": 0, "passed": 0}
+
+    selected_threshold = profile.auto_contest_threshold
+    latency = _latency()
+
+    strategies = []
+    wanted = [
+        "ALWAYS-CONTEST",
+        "ALWAYS-ACCEPT",
+        "RULES-ONLY",
+        "LOGISTIC-ONLY",
+    ]
+    if frozen_baseline is not None:
+        wanted.append("FROZEN-PRE-CHANGE")
+    wanted.append("CHARGEBACK-RISK-ENGINE")
+
+    strategy_map = {
+        item["strategy"]: item
+        for item in benchmark["strategies"]
+    }
+    strategies = [strategy_map[name] for name in wanted]
+
+    report = {
+        "dataset": {
+            "name": "bundled synthetic dataset",
+            "synthetic": True,
+            "train_rows": len(train),
+            "dev_rows": len(dev),
+            "test_rows": len(test),
+            "split": "train/dev/test; final report uses test.csv only",
+            "label": "would_win is synthetic ground truth and is never fed to the decision engine",
+        },
+        "headline": {
+            "pr_auc": float(average_precision_score(y, p)),
+            "auto_contest_precision": candidate["auto_contest_precision"],
+            "auto_contest_recall": candidate["auto_contest_recall"],
+            "realized_recovery": candidate["realized_recovery"],
+            "realized_net_value": candidate["realized_net_value"],
+            "realized_net_value_lift_vs_frozen": None,
+            "p95_latency_ms": latency["p95_ms"],
+            "hard_cases_passed": hard.get("passed", 0),
+            "hard_cases_total": hard.get("total", 0),
+        },
+        "baselines": strategies,
+        "ablation": _ablation(test.head(min(1000, len(test))).copy()),
+        "ablation_test_rows": min(1000, len(test)),
+        "review_budget": rb,
+        "risk_metrics": _risk_metrics(y, p),
+        "per_reason": _reason_breakdown(test, p),
+        "confidence_intervals": {
+            "case_level_realized_net_value": _bootstrap_mean(per_case_net)
+        },
+        "latency": latency,
+        "hard_cases": hard,
+        "security": {
+            "policy_authoritative": True,
+            "monetary_ceiling": profile.monetary_ceiling,
+            "idempotency": True,
+            "audit_integrity": "SHA-256 chained audit records",
+            "ai_can_execute_financial_action": False,
+            "prompt_injection_boundary": "notes/evidence are untrusted data",
+            "external_ai_failure": "deterministic fallback",
+        },
+        "reproducibility": {
+            "test_outcomes_used_for_threshold_selection": False,
+            "calibration_split": "dev.csv",
+            "policy_profile": "artifacts/policy_profile.json",
+            "policy_version": profile.profile_version,
+            "policy_threshold": selected_threshold,
+            "accept_loss_threshold": profile.accept_loss_threshold,
+            "minimum_evidence_completeness": profile.min_evidence_completeness,
+            "contest_cost": profile.contest_cost,
+            "command": "make verify",
+        },
+        "comparison_notes": {
+            "frozen_baseline": (
+                "Historical versioned artifact from the original pre-change evaluation. "
+                "It is not treated as a like-for-like current 5,000-row benchmark."
+                if frozen_baseline is not None
+                else "No historical frozen baseline artifact is present."
+            ),
+            "realized_value": "Synthetic ground truth only; not a production recovery claim.",
+            "graph_ablation": "The tabular benchmark has no network identifiers, so graph stress testing is separately reported rather than invented as a lift.",
+        },
+    }
+
+    json_path = ARTIFACTS_DIR / "verification_report.json"
+    html_path = ARTIFACTS_DIR / "verification_report.html"
+    json_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    html_path.write_text(_html(report), encoding="utf-8")
+
+    print(
+        json.dumps(
+            {
+                "headline": report["headline"],
+                "files": [
+                    str(json_path.relative_to(ROOT)),
+                    str(html_path.relative_to(ROOT)),
+                ],
+            },
+            indent=2,
+        )
+    )
+
+
+if __name__ == "__main__":
     main()

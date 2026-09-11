@@ -172,7 +172,7 @@ def log_new_decision(
     ai_metadata = ai_metadata or {}
     conn = _get_connection(db_path)
     try:
-        prev_row = conn.execute("SELECT record_hash FROM decisions ORDER BY created_at DESC, dispute_id DESC LIMIT 1").fetchone()
+        prev_row = conn.execute("SELECT record_hash FROM decisions ORDER BY rowid DESC LIMIT 1").fetchone()
         prev_hash = prev_row[0] if prev_row and prev_row[0] else ""
         payload = {"dispute_id": dispute_id, "reason_code": reason_code, "amount": float(amount), "win_probability": float(win_probability),
                    "action": action, "reason": reason, "expected_value": float(expected_value), "evidence": evidence,
@@ -227,7 +227,7 @@ def log_new_decision(
 def verify_audit_integrity(db_path: str = DB_PATH) -> dict:
     conn = _get_connection(db_path)
     try:
-        rows = conn.execute("SELECT * FROM decisions ORDER BY created_at ASC, dispute_id ASC").fetchall()
+        rows = conn.execute("SELECT * FROM decisions ORDER BY rowid ASC").fetchall()
         cols = [d[0] for d in conn.execute("SELECT * FROM decisions LIMIT 0").description]
         prev_hash = ""
         checked = 0
