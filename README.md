@@ -1,106 +1,621 @@
 # Chargeback Risk Engine
 
-**Track 02 — AI Risk Manager**  
-**Goal:** make chargeback decisions that maximize merchant value without letting an AI model bypass financial controls.
+**Razorpay AI Buildathon 2026 — Track 02: AI Risk Manager**
+
+> **ML estimates risk. Evidence adds context. Economics measures value. Deterministic policy controls the financial action.**
+
+Chargeback Risk Engine is an auditable decision system for evaluating chargeback disputes and deciding whether a case should be:
+
+- `AUTO-CONTEST`
+- `HUMAN-REVIEW`
+- `ACCEPT-LOSS`
+
+The system combines reason-code-aware risk scoring, evidence validation, relationship context, economic decisioning, bounded AI analysis, deterministic safety controls, and durable auditability.
 
 **Live demo:** https://chargebackriskengine.streamlit.app/
 
-## The one-line pitch
+---
 
-> **AI proposes the risk. Evidence and economics explain the case. Deterministic policy decides what money-moving action is allowed.**
+## Why this design
 
-This is deliberately **not** just a chargeback classifier. The engine routes each dispute to:
+Financial workflows should not allow an AI model or LLM to directly authorize a money-moving action.
 
-- **AUTO-CONTEST** when risk, evidence, economics and safety gates all pass
-- **HUMAN-REVIEW** when information is incomplete, contradictory, risky, uneconomic, or outside policy
-- **ACCEPT-LOSS** when intervention is not economically justified
+This project therefore uses a **bounded-automation architecture**:
 
-## Why the system is different
+```text
+                         ┌──────────────────┐
+                         │  Dispute Input   │
+                         └────────┬─────────┘
+                                  │
+                                  ▼
+                         ┌──────────────────┐
+                         │    Risk Model    │
+                         └────────┬─────────┘
+                                  │
+                                  ▼
+                         ┌──────────────────┐
+                         │ Evidence Scoring │
+                         └────────┬─────────┘
+                                  │
+                                  ▼
+                         ┌──────────────────┐
+                         │ Relationship /   │
+                         │   Graph Context  │
+                         └────────┬─────────┘
+                                  │
+                                  ▼
+                         ┌──────────────────┐
+                         │    Economics     │
+                         └────────┬─────────┘
+                                  │
+                                  ▼
+                         ┌──────────────────┐
+                         │ Bounded AI       │
+                         │ Evidence Analyst │
+                         └────────┬─────────┘
+                                  │
+                                  ▼
+                         ┌──────────────────┐
+                         │ Deterministic    │
+                         │     Policy       │
+                         └────────┬─────────┘
+                                  │
+                    ┌─────────────┼─────────────┐
+                    ▼             ▼             ▼
+             AUTO-CONTEST   HUMAN-REVIEW   ACCEPT-LOSS
+                                  │
+                                  ▼
+                         ┌──────────────────┐
+                         │ Durable Audit &  │
+                         │    Idempotency   │
+                         └──────────────────┘
+```
 
-`Risk model → evidence quality → relationship context → expected value → bounded AI analyst → deterministic policy → immutable audit`
+### Safety boundary
 
-The AI analyst is advisory only. It may summarize evidence, identify missing/contradictory items, and draft an argument. It cannot change thresholds, bypass policy, or submit a chargeback.
+The ML model, graph analysis, economics layer, and AI analyst provide **signals and explanations**.
 
-## Current held-out evidence
+Only the deterministic policy layer can select the final financial action.
 
-The bundled dataset contains **20,000 train / 5,000 dev / 5,000 held-out test** cases. The evaluation data is synthetic and is not a production-performance claim.
+The AI analyst cannot:
 
-The current test snapshot reports approximately:
+- change policy thresholds
+- bypass safety gates
+- authorize an `AUTO-CONTEST`
+- increase monetary limits
+- execute an external chargeback
 
-| Measure | Result |
+---
+
+## Core capabilities
+
+### 1. Reason-code-aware risk scoring
+
+The system supports reason-code-specific decisioning instead of treating every dispute identically.
+
+The risk scorer produces a calibrated estimate of the probability that a dispute would be won if contested.
+
+### 2. Evidence verification
+
+Evidence is evaluated against the requirements for the selected reason code.
+
+Evidence is explicitly represented as:
+
+```text
+True   → supporting evidence
+False  → contradictory / negative evidence
+None   → unknown / unavailable evidence
+```
+
+Unknown evidence is not silently converted into positive evidence.
+
+### 3. Relationship and network context
+
+A deterministic relationship graph tracks contextual relationships such as:
+
+```text
+customer
+device
+IP address
+merchant
+related disputes
+```
+
+This layer can provide additional risk context and escalation signals.
+
+The graph is intentionally treated as a deterministic risk-context component rather than being presented as a separately validated learned model.
+
+### 4. Economic decisioning
+
+The system evaluates whether contesting a dispute is economically worthwhile.
+
+The policy considers factors such as:
+
+```text
+win probability
+dispute amount
+contest cost
+expected recovery
+safety limits
+review constraints
+```
+
+This allows the system to distinguish between:
+
+```text
+"the case may be winnable"
+```
+
+and:
+
+```text
+"contesting the case is actually worthwhile and permitted"
+```
+
+### 5. Bounded AI evidence analyst
+
+The optional AI analyst can:
+
+- summarize evidence
+- identify missing evidence
+- identify contradictions
+- suggest evidence-grounded dispute arguments
+
+AI output is advisory only.
+
+The financial decision remains controlled by deterministic policy.
+
+### 6. Counterfactual explanation
+
+For supported decisions, the system can explain what change in the case would be sufficient to alter the outcome.
+
+Counterfactuals are treated as **read-only simulations** and are never persisted as real disputes.
+
+### 7. Durable audit trail
+
+Each decision records auditable state including:
+
+- request identifier
+- dispute identifier
+- model version
+- policy version
+- decision
+- evidence summary
+- economic result
+- explanation
+- audit metadata
+
+Duplicate requests can replay the original durable decision.
+
+---
+
+## Safety controls
+
+The implementation includes deterministic controls for:
+
+- contradictory evidence
+- unknown evidence
+- monetary ceilings
+- duplicate request handling
+- replay protection
+- untrusted case notes
+- prompt-injection-style text
+- AI-service failure
+- counterfactual isolation
+- graph-based escalation
+- audit integrity
+
+A critical design rule is:
+
+```text
+AI can recommend.
+Policy decides.
+```
+
+See:
+
+- [`SECURITY.md`](SECURITY.md)
+- [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md)
+- [`ARCHITECTURE.md`](ARCHITECTURE.md)
+
+---
+
+## Evaluation
+
+The repository includes a reproducible synthetic evaluation dataset with separate train, development, and held-out test splits.
+
+| Split | Rows |
+|---|---:|
+| Train | 20,000 |
+| Development | 5,000 |
+| Held-out test | 5,000 |
+
+The intended evaluation lifecycle is:
+
+```text
+TRAIN
+  │
+  ▼
+MODEL FIT
+  │
+  ▼
+DEV
+  │
+  ├── calibration
+  ├── policy tuning
+  └── threshold selection
+  │
+  ▼
+FROZEN POLICY
+  │
+  ▼
+HELD-OUT TEST
+  │
+  ├── precision
+  ├── recall
+  ├── PR-AUC
+  ├── expected value
+  ├── false-positive cost
+  └── calibration
+```
+
+### Current evaluation snapshot
+
+The current public evaluation snapshot reports approximately:
+
+| Metric | Result |
 |---|---:|
 | PR-AUC | **0.723** |
 | Auto-contest precision | **75.9%** |
 | Auto-contest recall | **40.1%** |
-| P95 end-to-end local latency | **~2.4 ms** |
-| Frozen hard cases | **8 / 8 passed** |
-| Regression suite | **163 tests passed** |
+| Hard cases | **8 / 8 passed** |
 
-The important claim is not that a synthetic classifier has a spectacular headline metric. The stronger claim is that **the decision path is auditable, economically evaluated, deterministic at the policy boundary, and tested against failure modes**.
+These are **synthetic evaluation results** and are not production-performance guarantees.
 
-## What was upgraded for judgeability
+The operating point intentionally prioritizes safe automation over maximizing automatic contest recall.
 
-### 1. Honest ablation
+---
 
-`generate_report.py` now evaluates separate pipelines rather than relabeling the same pipeline as different ablations:
+## Evaluation methodology
 
-`Rules → Model → Evidence → Economics → Graph → Full`
+The repository includes separate checks for:
 
-The report explicitly notes when a capability cannot be measured by the tabular benchmark instead of inventing a lift.
+- rules-only baseline
+- model-only baseline
+- evidence-aware decisioning
+- economics-aware decisioning
+- graph-aware decisioning
+- full-system decisioning
+- threshold sensitivity
+- calibration
+- review-budget optimization
+- hard-case verification
+- latency
+- adversarial/safety behavior
+- audit integrity
+- leakage checks
+- stress scenarios
 
-### 2. Realized vs expected economics
+### Graph evaluation note
 
-The benchmark reports both modeled expected recovery and realized synthetic recovery, so the two are never conflated.
+The bundled tabular dataset does not contain the historical relationship identifiers required for a clean held-out graph-performance comparison.
 
-### 3. Development-only policy tuning
+Therefore graph behavior is evaluated separately through deterministic graph scenarios and safety tests rather than claiming an unsupported tabular performance lift.
 
-`scripts/generate_report.py` and `chargeback_risk_engine/policy_optimizer.py` support a transparent threshold search on `dev.csv`. The final test set is kept out of threshold selection.
+---
 
-### 4. Hard-case suite
+## Running the project
 
-`scripts/evaluate_hard_cases.py` covers missing evidence, contradictory evidence, high-value ceilings, replay/idempotency, prompt-injection text, graph escalation, malformed amounts, and a fully-confirmed positive.
+### Install dependencies
 
-### 5. Per-reason evaluation and uncertainty
+```bash
+pip install -r requirements.txt
+```
 
-The proof report includes per-reason PR-AUC/precision/recall and a bootstrap interval over case-level realized net value.
+### Run the test suite
 
-## Run it locally
+```bash
+python -m pytest -q
+```
+
+### Run complete verification
 
 ```bash
 make verify
+```
+
+### Generate/rebuild synthetic data
+
+```bash
+make data
+```
+
+### Run benchmark
+
+```bash
+make benchmark
+```
+
+### Run hard cases
+
+```bash
+make hard-cases
+```
+
+### Run latency measurement
+
+```bash
+make latency
+```
+
+---
+
+## Streamlit application
+
+Start the dashboard with:
+
+```bash
 streamlit run apps/app_deployed.py
+```
+
+The dashboard provides:
+
+- live dispute scoring
+- reason-code selection
+- evidence selection
+- decision waterfall
+- expected-value display
+- relationship-risk context
+- bounded AI evidence analysis
+- counterfactual explanation
+- audit information
+- deterministic demonstration cases
+
+### Demo cases
+
+The dashboard includes deterministic scenarios covering:
+
+1. strong supporting evidence
+2. mixed / incomplete evidence
+3. relationship-network escalation
+4. weak evidence
+5. economic boundary behavior
+
+See [`DEMO.md`](DEMO.md).
+
+---
+
+## API
+
+Start the API with:
+
+```bash
 uvicorn apps.api:app --reload
 ```
 
-`make verify` runs the regression suite, held-out benchmark, hard-case suite, and proof-report generation.
+Primary endpoint:
 
-## Judge path
+```text
+POST /decision
+```
 
-Start at `docs/JUDGE_GUIDE.md` for a 90-second walkthrough, evidence map, and judge questions.
+Compatibility endpoint:
 
-The proof bundle is written to `artifacts/`:
+```text
+POST /score
+```
 
-- `candidate_benchmark.json`
-- `hard_cases_report.json`
-- `policy_profile.json`
-- `verification_report.json`
-- `verification_report.html`
-- model/calibration artifacts
+The API and local execution path use the same canonical decision engine.
 
-## Safety contract
+---
 
-The policy engine remains the final authority. In particular:
+## Repository structure
 
-- unknown evidence never silently becomes positive evidence
-- contradictory evidence forces human review
-- monetary ceilings cannot be bypassed by model confidence or caller input
-- duplicate dispute IDs replay the original durable decision
-- external AI failure falls back deterministically
-- case notes are treated as untrusted data
-- no external chargeback submission is executed by this repository
+```text
+chargeback-risk-engine/
+│
+├── apps/
+│   ├── api.py
+│   └── app_deployed.py
+│
+├── chargeback_risk_engine/
+│   ├── engine/
+│   │   ├── hybrid_pipeline.py
+│   │   ├── risk_graph.py
+│   │   ├── counterfactual.py
+│   │   └── decision_result.py
+│   │
+│   ├── monitoring/
+│   │   └── drift_guard.py
+│   │
+│   ├── ai_analyst.py
+│   ├── audit_log.py
+│   ├── calibration.py
+│   ├── evidence.py
+│   ├── metrics.py
+│   ├── ml_scorer.py
+│   ├── policy.py
+│   ├── policy_optimizer.py
+│   ├── policy_profile.py
+│   └── razorpay_adapter.py
+│
+├── data/
+│   ├── train.csv
+│   ├── dev.csv
+│   └── test.csv
+│
+├── docs/
+│   ├── BASELINE.md
+│   ├── EVALUATION_PROTOCOL.md
+│   ├── EVALUATION_REPORT.md
+│   ├── FINAL_VERIFICATION.md
+│   ├── MODEL_CARD.md
+│   └── THREAT_MODEL.md
+│
+├── scripts/
+│   ├── benchmark.py
+│   ├── demo.py
+│   ├── evaluate_hard_cases.py
+│   ├── external_benchmark.py
+│   ├── generate_data.py
+│   ├── generate_report.py
+│   ├── latency.py
+│   ├── sensitivity.py
+│   ├── stress_benchmark.py
+│   ├── verify_no_leakage.py
+│   └── verify_release.py
+│
+├── tests/
+│
+├── artifacts/
+│   ├── hard_cases_report.json
+│   └── policy_profile.json
+│
+├── ARCHITECTURE.md
+├── CONTRIBUTING.md
+├── DATA_DICTIONARY.md
+├── DEMO.md
+├── SECURITY.md
+├── Makefile
+├── pyproject.toml
+└── requirements.txt
+```
+
+---
+
+## Testing
+
+The test suite covers the decision engine and its supporting components, including:
+
+- API behavior
+- local pipeline behavior
+- evidence handling
+- policy rules
+- economic decisioning
+- ML scoring
+- calibration
+- sensitivity analysis
+- graph behavior
+- counterfactuals
+- audit integrity
+- idempotency
+- adversarial safety cases
+- hard cases
+- drift monitoring
+- stress scenarios
+- Razorpay adapter behavior
+- dashboard data dependencies
+
+Run:
+
+```bash
+python -m pytest -q
+```
+
+The exact passing test count is intentionally not treated as a permanent architectural claim; use the current local/CI result as the authoritative count.
+
+---
+
+## Data and leakage
+
+The bundled data is synthetic and is included to make the project reproducible.
+
+The label `would_win` is evaluation/training ground truth and is never supplied to the live decision path.
+
+The repository includes leakage verification tooling:
+
+```bash
+python scripts/verify_no_leakage.py
+```
+
+See:
+
+- [`DATA_DICTIONARY.md`](DATA_DICTIONARY.md)
+- [`docs/EVALUATION_PROTOCOL.md`](docs/EVALUATION_PROTOCOL.md)
+- [`docs/MODEL_CARD.md`](docs/MODEL_CARD.md)
+
+---
+
+## Security model
+
+The project intentionally separates:
+
+```text
+Untrusted input
+      ↓
+Structured evidence
+      ↓
+Risk / graph / economics / AI signals
+      ↓
+Deterministic safety policy
+      ↓
+Allowed action
+```
+
+Case notes and AI-generated content cannot directly select the final financial action.
+
+For the complete security contract, see [`SECURITY.md`](SECURITY.md).
+
+---
 
 ## Limitations
 
-The bundled data is synthetic. The graph layer therefore cannot honestly claim a performance lift from the tabular test set because that dataset contains no historical relationship identifiers. Graph behavior is instead exercised in the frozen hard-case suite.
+### Synthetic benchmark
 
-The current operating point deliberately trades recall for precision and safety. Human review is a feature, not a failure: the system is designed to abstain whenever evidence or economics is insufficient.
+The bundled dataset is synthetic.
+
+It should not be interpreted as a representation of Razorpay's production transaction or chargeback distribution.
+
+### Predictive-performance claims
+
+The published metrics are evaluation-snapshot results.
+
+They are not guarantees of production precision, recall, recovery, or financial savings.
+
+### Graph validation
+
+Relationship context is validated separately from the tabular benchmark because the required historical relationship features are not present in the bundled evaluation data.
+
+### AI dependency
+
+The AI analyst is optional.
+
+When no external AI service is configured, the core decision flow can continue using deterministic fallback behavior.
+
+### Production status
+
+This repository is a buildathon/research prototype.
+
+A production deployment would require additional:
+
+- security review
+- operational monitoring
+- model validation
+- data-governance controls
+- access controls
+- service isolation
+- reliability testing
+- production integration testing
+
+---
+
+## Documentation
+
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — system architecture and decision flow
+- [`DATA_DICTIONARY.md`](DATA_DICTIONARY.md) — dataset and field definitions
+- [`DEMO.md`](DEMO.md) — dashboard and deterministic demo flow
+- [`SECURITY.md`](SECURITY.md) — security and safety contract
+- [`docs/BASELINE.md`](docs/BASELINE.md) — baseline methodology
+- [`docs/EVALUATION_PROTOCOL.md`](docs/EVALUATION_PROTOCOL.md) — evaluation design
+- [`docs/EVALUATION_REPORT.md`](docs/EVALUATION_REPORT.md) — evaluation results
+- [`docs/FINAL_VERIFICATION.md`](docs/FINAL_VERIFICATION.md) — release verification
+- [`docs/MODEL_CARD.md`](docs/MODEL_CARD.md) — model scope and limitations
+- [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) — threat analysis
+
+---
+
+## Project status
+
+Built for the **Razorpay AI Buildathon 2026 — Track 02: AI Risk Manager**.
+
+This repository demonstrates an auditable, safety-bounded chargeback decision workflow in which automated financial actions remain under deterministic control.
