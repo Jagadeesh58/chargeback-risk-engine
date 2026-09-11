@@ -19,13 +19,13 @@ env/
 *.sqlite
 *.sqlite3
 
-# OS/editor
+# OS / IDE
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 
-# Generated proof outputs
+# Generated verification output
 artifacts/*
 !artifacts/hard_cases_report.json
 !artifacts/policy_profile.json

@@ -69,6 +69,8 @@ def _mock_document_id(dispute_id: str, field_name: str) -> str:
 
 def fetch_dispute(dispute_id: str, csv_path: str | None = None) -> dict:
     """
+    # IMPORTANT: this function is intentionally a local adapter/mock.
+    # It never performs a network request or uses Razorpay credentials.
     Stands in for GET /v1/disputes/:id. A real integration would call
     that endpoint on Razorpay's servers and get back a JSON object
     shaped like the one this function returns; this mock looks the

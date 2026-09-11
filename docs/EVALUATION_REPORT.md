@@ -100,9 +100,9 @@ The decision record stores the decision, policy/model versions, evidence, econom
 
 The main generated artifacts are:
 
-- `artifacts/model_evaluation.json`
-- `artifacts/candidate_benchmark.json`
-- `artifacts/verification_report.json`
-- `artifacts/verification_report.html`
+- `artifacts/hard_cases_report.json`
+- `artifacts/policy_profile.json`
+
+The detailed verification report is generated locally by `make verify` and is intentionally not required to be tracked in Git.
 
 The benchmark and report are generated from the repository's current synthetic data and code.

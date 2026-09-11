@@ -20,9 +20,30 @@ from chargeback_risk_engine.policy import decide
 from chargeback_risk_engine.policy_profile import load_policy_profile, decision_score
 
 CASES = [
-    {"dispute_id":"RV_POS","reason_code":"item_not_received","amount":2400.0,"has_tracking_number":True,"has_delivery_confirmation":True,"has_signature_confirmation":True},
-    {"dispute_id":"RV_WARN","reason_code":"item_not_received","amount":2400.0,"has_tracking_number":True,"has_delivery_confirmation":None,"has_signature_confirmation":None},
-    {"dispute_id":"RV_CEIL","reason_code":"item_not_received","amount":75000.0,"has_tracking_number":True,"has_delivery_confirmation":True,"has_signature_confirmation":True},
+    {
+        "dispute_id": "RV_POS",
+        "reason_code": "item_not_received",
+        "amount": 2400.0,
+        "has_tracking_number": True,
+        "has_delivery_confirmation": True,
+        "has_signature_confirmation": True,
+    },
+    {
+        "dispute_id": "RV_WARN",
+        "reason_code": "item_not_received",
+        "amount": 2400.0,
+        "has_tracking_number": True,
+        "has_delivery_confirmation": None,
+        "has_signature_confirmation": None,
+    },
+    {
+        "dispute_id": "RV_CEIL",
+        "reason_code": "item_not_received",
+        "amount": 75000.0,
+        "has_tracking_number": True,
+        "has_delivery_confirmation": True,
+        "has_signature_confirmation": True,
+    },
 ]
 
 
@@ -34,7 +55,9 @@ def main() -> int:
         for case in CASES:
             packet = assemble(case)
             quality = score_evidence(case, packet)
-            p = 0.80 if case["dispute_id"] != "RV_CEIL" else 0.80
+            # Fixed synthetic probability used only to exercise deterministic
+            # release verification. This is not a model-performance claim.
+            p = 0.80
             score = decision_score(p, quality.confidence, evidence_signal_weight=profile.evidence_signal_weight)
             econ = calculate_economic_value(case["amount"], p)
             decision = decide(
@@ -61,7 +84,10 @@ def main() -> int:
         audit = verify_audit_integrity(db)
     report = {"valid": all(r["valid"] for r in results) and audit["valid"], "decisions": results, "audit": audit}
     ARTIFACTS_DIR.mkdir(exist_ok=True)
-    (ARTIFACTS_DIR / "release_verification.json").write_text(json.dumps(report, indent=2))
+    # Generated locally for release checks; intentionally ignored by Git.
+    (ARTIFACTS_DIR / "release_verification.json").write_text(
+        json.dumps(report, indent=2)
+    )
     print(json.dumps(report, indent=2))
     return 0 if report["valid"] else 1
 

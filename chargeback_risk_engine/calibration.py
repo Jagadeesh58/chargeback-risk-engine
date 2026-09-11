@@ -2,7 +2,7 @@
 calibration.py — fixes a real, documented weakness: scorer.py's raw
 probabilities rank disputes reasonably (AUC 0.688) but aren't
 well-calibrated -- underconfident at the low end, overconfident at the
-high end (see MISTAKES.md). This module fits an isotonic regression
+high end (see `docs/EVALUATION_REPORT.md` for the calibration evidence). This module fits an isotonic regression
 (a monotonic, data-driven curve, not hand-picked) mapping the raw score
 to an actual observed win rate, using dev.csv -- the same split
 scorer.py's threshold was NOT tuned against test.csv on, so this stays
