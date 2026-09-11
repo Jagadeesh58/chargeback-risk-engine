@@ -29,3 +29,4 @@ Thumbs.db
 artifacts/*
 !artifacts/hard_cases_report.json
 !artifacts/policy_profile.json
+audit_log.db

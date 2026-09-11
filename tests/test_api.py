@@ -291,3 +291,17 @@ def test_live_api_graph_uses_persisted_relationship_history():
     assert data["graph_analysis"]["connected_accounts"] == 0
     assert "device_id" in data["graph_analysis"]["shared_identifiers"]
     assert data["graph_analysis"]["historical_disputed_value"] >= 6000.0
+
+
+def test_apps_api_audit_verify_endpoint_uses_canonical_audit_checker():
+    """The deployable apps.api wrapper must expose the audit verifier without
+    duplicating or breaking the canonical audit implementation."""
+    from apps.api import app as deployed_app
+
+    deployed_client = TestClient(deployed_app)
+    response = deployed_client.get("/audit/verify")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["valid"] is True
+    assert "checked" in data

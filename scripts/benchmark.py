@@ -20,6 +20,8 @@ from chargeback_risk_engine.evidence import assemble
 from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer
 from chargeback_risk_engine.paths import ARTIFACTS_DIR, DATA_DIR
 from chargeback_risk_engine.policy import decide
+from chargeback_risk_engine.policy_profile import load_policy_profile
+from chargeback_risk_engine.engine.risk_graph import RiskGraph
 from chargeback_risk_engine.scorer import predict_win_probability
 
 BASELINE_PATH = ARTIFACTS_DIR / "baseline_benchmark.json"
@@ -80,7 +82,8 @@ def evaluate() -> dict:
     test = pd.read_csv(DATA_DIR / "test.csv")
     train = pd.read_csv(DATA_DIR / "train.csv")
     ml = load_or_fit_ml_scorer()
-    baseline = json.loads(BASELINE_PATH.read_text())
+    profile = load_policy_profile()
+    baseline = json.loads(BASELINE_PATH.read_text()) if BASELINE_PATH.exists() else None
     rows = [_row_dispute(row) for _, row in test.iterrows()]
     rule_probs = [predict_win_probability(row) for row in rows]
     logistic_probs = [ml.predict_win_probability(row) for row in rows]
@@ -92,14 +95,51 @@ def evaluate() -> dict:
     for row, p in zip(rows, rule_probs):
         packet = assemble(row); quality = score_evidence(row, packet)
         econ = calculate_economic_value(row["amount"], p)
-        rules_actions.append(decide(p, row["amount"], evidence_packet=packet, evidence_quality=quality, expected_net_value=econ.expected_net_value).action)
+        rules_actions.append(
+            decide(
+                p,
+                row["amount"],
+                evidence_packet=packet,
+                evidence_quality=quality,
+                expected_net_value=econ.expected_net_value,
+                auto_contest_threshold=profile.auto_contest_threshold,
+                accept_loss_threshold=profile.accept_loss_threshold,
+                monetary_ceiling=profile.monetary_ceiling,
+                min_evidence_completeness=profile.min_evidence_completeness,
+            ).action
+        )
     for row, p in zip(rows, logistic_probs):
         packet = assemble(row); quality = score_evidence(row, packet)
         econ = calculate_economic_value(row["amount"], p)
-        logistic_actions.append(decide(p, row["amount"], evidence_packet=packet, evidence_quality=quality, expected_net_value=econ.expected_net_value).action)
+        logistic_actions.append(
+            decide(
+                p,
+                row["amount"],
+                evidence_packet=packet,
+                evidence_quality=quality,
+                expected_net_value=econ.expected_net_value,
+                auto_contest_threshold=profile.auto_contest_threshold,
+                accept_loss_threshold=profile.accept_loss_threshold,
+                monetary_ceiling=profile.monetary_ceiling,
+                min_evidence_completeness=profile.min_evidence_completeness,
+            ).action
+        )
 
+    # Reuse one in-memory relationship graph during the benchmark instead of
+    # rereading an ever-growing SQLite graph history for every test row.
+    # The graph is updated incrementally in the same order as the held-out set.
     with tempfile.TemporaryDirectory(prefix="benchmark_") as tmp:
-        candidate_results = [decide_case(row, db_path=str(Path(tmp) / "audit.db"), include_counterfactual=False) for row in rows]
+        db_path = str(Path(tmp) / "audit.db")
+        benchmark_graph = RiskGraph()
+        candidate_results = [
+            decide_case(
+                row,
+                risk_graph=benchmark_graph,
+                db_path=db_path,
+                include_counterfactual=False,
+            )
+            for row in rows
+        ]
     candidate_actions = [r["action"] for r in candidate_results]
 
     strategies = [
@@ -107,7 +147,7 @@ def evaluate() -> dict:
         _strategy_metrics("ALWAYS-ACCEPT", test, always_accept, [None] * len(test), outcome_prior),
         _strategy_metrics("RULES-ONLY", test, rules_actions, rule_probs, outcome_prior),
         _strategy_metrics("LOGISTIC-ONLY", test, logistic_actions, logistic_probs, outcome_prior),
-        {**baseline, "strategy": "FROZEN-PRE-CHANGE"},
+        *([ {**baseline, "strategy": "FROZEN-PRE-CHANGE"} ] if baseline is not None else []),
         _strategy_metrics("CHARGEBACK-RISK-ENGINE", test, candidate_actions, logistic_probs, outcome_prior),
     ]
 
@@ -130,7 +170,18 @@ def evaluate() -> dict:
         "notes": {
             "expected_recovery": "Expected recovery uses the strategy probability signal.",
             "realized_recovery": "Realized recovery is the sum of amount for AUTO-CONTEST cases where would_win=True; this is synthetic ground truth only.",
-            "test_integrity": "No test outcomes are used to fit the model or tune the production threshold.",
+            "test_integrity": "No test outcomes are used to fit the model or tune the selected policy threshold.",
+            "policy_profile": {
+                "policy_version": profile.profile_version,
+                "auto_contest_threshold": profile.auto_contest_threshold,
+                "accept_loss_threshold": profile.accept_loss_threshold,
+                "selection_source": "artifacts/policy_profile.json",
+            },
+            "frozen_baseline": (
+                "Included from the versioned historical artifact."
+                if baseline is not None
+                else "Not included; historical baseline artifact is unavailable."
+            ),
         },
     }
     return result

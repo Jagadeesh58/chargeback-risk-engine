@@ -1,7 +1,7 @@
 """
 test_baseline.py — real, runnable tests for baseline.py.
 Uses a tiny 5-dispute example with independently calculated expected values,
-so these assertions are not derived from the implementation under test.
+so the assertions are not derived from the implementation under test.
 """
 
 import pandas as pd

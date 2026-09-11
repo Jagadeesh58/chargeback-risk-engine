@@ -20,6 +20,7 @@ class RuntimePolicyProfile:
     accept_loss_threshold: float = 0.30
     monetary_ceiling: float = 50_000.0
     min_evidence_completeness: float = 0.50
+    contest_cost: float = 150.0
     evidence_signal_weight: float = 0.05
     model_threshold: float = 0.65
     profile_version: str = "fallback"
@@ -35,6 +36,7 @@ def load_policy_profile(path: str | Path = PROFILE_PATH) -> RuntimePolicyProfile
             accept_loss_threshold=float(raw.get("accept_loss_threshold", 0.30)),
             monetary_ceiling=float(raw.get("monetary_ceiling", 50_000.0)),
             min_evidence_completeness=float(raw.get("min_evidence_completeness", 0.50)),
+            contest_cost=float(raw.get("contest_cost", 150.0)),
             evidence_signal_weight=float(raw.get("evidence_signal_weight", 0.05)),
             model_threshold=float(raw.get("model_threshold", raw.get("auto_contest_threshold", 0.65))),
             profile_version=str(raw.get("policy_version", "loaded")),

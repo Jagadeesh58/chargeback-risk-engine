@@ -265,9 +265,12 @@ The current public evaluation snapshot reports approximately:
 
 | Metric | Result |
 |---|---:|
-| PR-AUC | **0.723** |
-| Auto-contest precision | **75.9%** |
-| Auto-contest recall | **40.1%** |
+| PR-AUC | **0.7234** |
+| Auto-contest precision | **74.0%** |
+| Auto-contest recall | **48.4%** |
+| Realized net value | **₹54.41 lakh** |
+| Selected policy threshold | **0.645** from `dev.csv` |
+| P95 local latency | **5.68 ms** |
 | Hard cases | **8 / 8 passed** |
 
 These are **synthetic evaluation results** and are not production-performance guarantees.
@@ -322,6 +325,13 @@ python -m pytest -q
 
 ```bash
 make verify
+```
+
+The verification workflow uses the tracked frozen policy profile. To deliberately
+reselect a policy from `dev.csv`, run:
+
+```bash
+make policy-optimize
 ```
 
 ### Generate/rebuild synthetic data
