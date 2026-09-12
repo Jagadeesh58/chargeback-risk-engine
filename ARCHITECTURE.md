@@ -4,30 +4,29 @@ Chargeback Risk Engine keeps one decision path for the API, Streamlit UI, CLI de
 
 ```mermaid
 flowchart TD
-    CASE[Chargeback case + evidence]
-      --> EVID[Canonical evidence engine\nPASS / WARN / FAIL]
-    CASE --> ML[Reason-aware Logistic Regression\nlive advisory risk estimate]
-    CASE --> GRAPH[Lightweight relationship graph\nadvisory escalation signal]
-    EVID --> ECON[Canonical economics\nexpected recovery - costs]
+    CASE["Chargeback case + evidence"] --> EVID["Canonical evidence engine<br/>PASS / WARN / FAIL"]
+    CASE --> ML["Reason-aware Logistic Regression<br/>live advisory risk estimate"]
+    CASE --> GRAPH["Lightweight relationship graph<br/>advisory escalation signal"]
+    EVID --> ECON["Canonical economics<br/>expected recovery - costs"]
     ML --> ECON
-    ECON --> POLICY[Deterministic policy authority]
+    ECON --> POLICY["Deterministic policy authority"]
     EVID --> POLICY
     GRAPH --> POLICY
-    POLICY --> DEC{Final action}
-    DEC --> AC[AUTO-CONTEST]
-    DEC --> HR[HUMAN-REVIEW]
-    DEC --> AL[ACCEPT-LOSS]
-    AC --> DRAFT[Razorpay-compatible contest draft\nno external submission]
-    DEC --> EXP[Structured explanation]
-    EXP --> CF[Bounded read-only counterfactual\nreruns the same decision path]
-    DEC --> AUDIT[SQLite audit/idempotency]
-    AUDIT -. duplicate dispute_id .-> DEC
-
-    subgraph OFFLINE[Offline evaluation only]
-      DATA[train / dev / test synthetic data] --> TRAIN[Training + model evaluation]
-      DATA --> BENCH[Fair six-strategy benchmark]
-      DATA --> LEAK[Leakage check]
-      DATA --> CHRON[Chronological ordering check]
+    POLICY --> DEC{"Final action"}
+    DEC --> AC["AUTO-CONTEST"]
+    DEC --> HR["HUMAN-REVIEW"]
+    DEC --> AL["ACCEPT-LOSS"]
+    AC --> DRAFT["Razorpay-compatible contest draft<br/>no external submission"]
+    DEC --> EXP["Structured explanation"]
+    EXP --> CF["Bounded read-only counterfactual<br/>reruns the same decision path"]
+    DEC --> AUDIT["SQLite audit/idempotency"]
+    AUDIT -.->|duplicate dispute_id| DEC
+ 
+    subgraph OFFLINE["Offline evaluation only"]
+      DATA["train / dev / test synthetic data"] --> TRAIN["Training + model evaluation"]
+      DATA --> BENCH["Fair six-strategy benchmark"]
+      DATA --> LEAK["Leakage check"]
+      DATA --> CHRON["Chronological ordering check"]
     end
 ```
 
