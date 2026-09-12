@@ -1,0 +1,42 @@
+{
+  "source_commit": "086572fdd5549a8ba07f9a885d39e0e65b68ca28",
+  "baseline_tests": {
+    "passed": 124,
+    "duration_s": 4.01
+  },
+  "baseline_environment": {
+    "python": "3.13.5",
+    "fastapi": "0.128.2",
+    "pydantic": "2.13.4",
+    "numpy": "2.3.5",
+    "pandas": "2.2.3",
+    "scikit-learn": "1.8.0",
+    "pytest": "9.0.2",
+    "httpx": "0.28.1",
+    "joblib": "1.5.3"
+  },
+  "dataset": {
+    "train.csv": "b36698213ddeece529575e0c9908a2525524f6320db3d50285a6f8bfc189e2da",
+    "dev.csv": "b2abd56a741e675939cf06db4e551321c1643eeaa72bcf2b18890693a7fae57c",
+    "test.csv": "b4d67a05381e6cc7c3d6532c99c6fee984de1c276a79db49e969bd8ab1bceedc"
+  },
+  "model_artifacts": {
+    "ml_scorer_model.pkl": "93a1b3fe6e8c659b1e2f8396a1381586a37830f66ad1b48e06cc8f0db0806c68",
+    "hgb_model.pkl": "7bc6712ced7e3394be896375bb534b0b793ead30d19e6b5a9b7874ff35c9ee85"
+  },
+  "baseline_current_engine_benchmark": {
+    "strategy": "BASELINE-CURRENT-ENGINE",
+    "auto_contest_count": 310,
+    "auto_contest_precision": 0.7290322580645161,
+    "auto_contest_recall": 0.4448818897637795,
+    "auto_contest_f1": 0.5525672371638142,
+    "human_review_rate": 0.4988888888888889,
+    "expected_recovery": 1058933.256769999,
+    "expected_contest_cost": 46500.0,
+    "expected_net_value": 1012433.2567699989,
+    "synthetic_false_positive_count": 84
+  },
+  "baseline_latency_method": "500 repeated calls through the legacy benchmark function; retained only as historical baseline because it was narrower than the candidate end-to-end method.",
+  "source_archive_sha256": "f19bf0ef249b74b2e861a15fef3a258536e1c70369581701946a65235ffdc09a",
+  "source_archive_name": "chargeback-risk-engine (3).zip"
+}
