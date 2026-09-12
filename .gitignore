@@ -30,3 +30,7 @@ artifacts/*
 !artifacts/hard_cases_report.json
 !artifacts/policy_profile.json
 audit_log.db
+!artifacts/baseline_benchmark.json
+!artifacts/baseline_manifest.json
+!artifacts/baseline_model_evaluation.json
+!artifacts/baseline_temporal_evaluation.json
