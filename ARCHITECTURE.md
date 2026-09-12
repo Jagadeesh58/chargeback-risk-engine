@@ -22,7 +22,7 @@ flowchart TD
     DEC --> AUDIT["SQLite audit/idempotency"]
     AUDIT -.->|duplicate dispute_id| DEC
 
-    subgraph OFFLINE["Offline evaluation only"]
+      subgraph "Offline evaluation only"
       DATA["train / dev / test synthetic data"] --> TRAIN["Training + model evaluation"]
       DATA --> BENCH["Fair six-strategy benchmark"]
       DATA --> LEAK["Leakage check"]
