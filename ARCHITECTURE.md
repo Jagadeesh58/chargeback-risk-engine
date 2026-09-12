@@ -2,7 +2,6 @@
 
 Chargeback Risk Engine keeps one decision path for the API, Streamlit UI, CLI demo, benchmark, and counterfactual analysis.
 
-```mermaid
 flowchart TD
     CASE["Chargeback case + evidence"] --> EVID["Canonical evidence engine<br/>PASS / WARN / FAIL"]
     CASE --> ML["Reason-aware Logistic Regression<br/>live advisory risk estimate"]
@@ -21,14 +20,13 @@ flowchart TD
     EXP --> CF["Bounded read-only counterfactual<br/>reruns the same decision path"]
     DEC --> AUDIT["SQLite audit/idempotency"]
     AUDIT -.->|duplicate dispute_id| DEC
- 
+    
     subgraph OFFLINE["Offline evaluation only"]
-      DATA["train / dev / test synthetic data"] --> TRAIN["Training + model evaluation"]
-      DATA --> BENCH["Fair six-strategy benchmark"]
-      DATA --> LEAK["Leakage check"]
-      DATA --> CHRON["Chronological ordering check"]
+        DATA["train / dev / test synthetic data"] --> TRAIN["Training + model evaluation"]
+        DATA --> BENCH["Fair six-strategy benchmark"]
+        DATA --> LEAK["Leakage check"]
+        DATA --> CHRON["Chronological ordering check"]
     end
-```
 
 ## Decision flow
 
