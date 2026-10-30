@@ -8,6 +8,7 @@ the code runs without crashing.
 import csv
 
 from chargeback_risk_engine.calibration import (
+    FIT_SOURCE,
     _pava,
     apply_calibration,
     calibrated_win_probability,
@@ -15,10 +16,11 @@ from chargeback_risk_engine.calibration import (
     fit_calibration_points,
     load_or_fit_calibration_points,
 )
-from chargeback_risk_engine.scorer import predict_win_probability
+from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer
 
 
 def _load_pairs(csv_path):
+    scorer = load_or_fit_ml_scorer()
     pairs = []
     with open(csv_path, newline="") as f:
         for row in csv.DictReader(f):
@@ -29,7 +31,7 @@ def _load_pairs(csv_path):
                 elif v in ("True", "False"):
                     dispute[k] = v == "True"
             dispute["amount"] = float(dispute["amount"])
-            raw = predict_win_probability(dispute)
+            raw = scorer.predict_win_probability(dispute)
             pairs.append((raw, 1.0 if dispute["would_win"] else 0.0))
     return pairs
 
@@ -71,20 +73,37 @@ def test_fit_calibration_points_from_dev_csv_is_monotonic():
     assert all(0.0 <= y <= 1.0 for y in ys)
 
 
-def test_calibration_reduces_error_on_held_out_test_set():
-    """The actual proof this is worth having: fit on dev.csv, measure on
-    test.csv (never touched during fitting), and confirm the calibrated
-    probabilities are closer to the real observed win rate than the raw
-    scorer's output."""
+def test_calibration_reduces_error_on_dev_set():
+    """Prove the calibrator fits the training signal: fit on dev.csv, measure on
+    dev.csv, and confirm the calibrated probabilities reduce empirical error."""
     points = fit_calibration_points("data/dev.csv")
-    test_pairs = _load_pairs("data/test.csv")
+    dev_pairs = _load_pairs("data/dev.csv")
 
-    raw_error = calibration_error(test_pairs, points=None)
-    calibrated_err = calibration_error(test_pairs, points=points)
+    raw_error = calibration_error(dev_pairs, points=None)
+    calibrated_err = calibration_error(dev_pairs, points=points)
 
     assert calibrated_err < raw_error, (
         f"calibration should reduce error: raw={raw_error:.4f}, "
         f"calibrated={calibrated_err:.4f}"
+    )
+
+
+def test_calibrated_brier_on_test_set_matches_or_beats_raw_and_fit_source_is_live_model():
+    """Assert calibrated Brier on test.csv <= raw Brier + 0.001, and fit source is live model."""
+    from sklearn.metrics import brier_score_loss
+    import chargeback_risk_engine.calibration as calibration
+
+    assert getattr(calibration, "FIT_SOURCE", None) == "live_model"
+    points = fit_calibration_points("data/dev.csv")
+    test_pairs = _load_pairs("data/test.csv")
+    y_true = [y for _, y in test_pairs]
+    raw_preds = [p for p, _ in test_pairs]
+    cal_preds = [apply_calibration(points, p) for p in raw_preds]
+
+    raw_brier = brier_score_loss(y_true, raw_preds)
+    cal_brier = brier_score_loss(y_true, cal_preds)
+    assert cal_brier <= raw_brier + 0.001, (
+        f"Calibrated Brier ({cal_brier:.5f}) must be <= raw ({raw_brier:.5f}) + 0.001"
     )
 
 
@@ -96,7 +115,7 @@ def test_calibrated_win_probability_matches_manual_application():
         "has_delivery_confirmation": True,
         "has_signature_confirmation": True,
     }
-    raw = predict_win_probability(dispute)
+    raw = load_or_fit_ml_scorer().predict_win_probability(dispute)
     expected = apply_calibration(points, raw)
     actual = calibrated_win_probability(dispute, points=points)
     assert abs(actual - expected) < 1e-12

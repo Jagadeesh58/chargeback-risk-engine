@@ -50,14 +50,16 @@ class MLScorer:
         return self
 
     def predict_win_probability(self, dispute: dict) -> float:
+        import math
         reason = dispute["reason_code"]
         fields = RELEVANT_EVIDENCE_BY_REASON[reason]
         model = self.models[reason]
-        row = {
-            field: 1.0 if dispute.get(field) is True else 0.0 if dispute.get(field) is False else 0.5
+        x = [
+            1.0 if dispute.get(field) is True else 0.0 if dispute.get(field) is False else 0.5
             for field in fields
-        }
-        return float(model.predict_proba(pd.DataFrame([row])[fields])[0, 1])
+        ]
+        logit = float(model.intercept_[0] + sum(w * val for w, val in zip(model.coef_[0], x)))
+        return float(1.0 / (1.0 + math.exp(-logit)))
 
 
 def dispute_from_evidence_items(reason_code: str, evidence_items: list[dict]) -> dict:

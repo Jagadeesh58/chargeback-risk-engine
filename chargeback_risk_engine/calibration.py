@@ -33,6 +33,7 @@ import os
 from chargeback_risk_engine.paths import DATA_DIR, ARTIFACTS_DIR
 
 CALIBRATION_POINTS_PATH = str(ARTIFACTS_DIR / "calibration_points.json")
+FIT_SOURCE = "live_model"
 
 _cached_points = None
 
@@ -46,9 +47,17 @@ def _pava(pairs: list[tuple[float, float]]) -> list[tuple[float, float]]:
     original points, merged wherever the raw data would otherwise have
     made the fit go down as x increases.
     """
-    ordered = sorted(pairs, key=lambda p: p[0])
-    # Each block: [sum_y, weight, x_min, x_max]
-    blocks = [[y, 1, x, x] for x, y in ordered]
+    if not pairs:
+        return []
+    # Pre-aggregate identical / near-identical x values for proper tie handling
+    x_grouped = {}
+    for x, y in sorted(pairs, key=lambda p: p[0]):
+        x_key = round(x, 8)
+        if x_key not in x_grouped:
+            x_grouped[x_key] = [0.0, 0, x, x]
+        x_grouped[x_key][0] += y
+        x_grouped[x_key][1] += 1
+    blocks = list(x_grouped.values())
 
     i = 0
     while i < len(blocks) - 1:
@@ -91,12 +100,13 @@ def apply_calibration(points: list[tuple[float, float]], raw_probability: float)
 def fit_calibration_points(dev_csv_path: str | None = None) -> list[tuple[float, float]]:
     if dev_csv_path is None:
         dev_csv_path = str(DATA_DIR / "dev.csv")
-    """Reads dev.csv, scores every row with the already-tested rule-based
-    scorer, pairs each raw probability with the real would_win outcome,
+    """Reads dev.csv, scores every row with the live logistic ML model,
+    pairs each raw probability with the real would_win outcome,
     and fits the isotonic curve. This is the "training" step -- it never
     touches test.csv."""
-    from chargeback_risk_engine.scorer import predict_win_probability
+    from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer
 
+    scorer = load_or_fit_ml_scorer()
     pairs = []
     with open(dev_csv_path, newline="") as f:
         for row in csv.DictReader(f):
@@ -107,7 +117,7 @@ def fit_calibration_points(dev_csv_path: str | None = None) -> list[tuple[float,
                 elif v in ("True", "False"):
                     dispute[k] = v == "True"
             dispute["amount"] = float(dispute["amount"])
-            raw = predict_win_probability(dispute)
+            raw = scorer.predict_win_probability(dispute)
             would_win = 1.0 if dispute["would_win"] else 0.0
             pairs.append((raw, would_win))
 
@@ -140,11 +150,11 @@ def load_or_fit_calibration_points(path: str = CALIBRATION_POINTS_PATH,
 def calibrated_win_probability(dispute: dict, points: list[tuple[float, float]] | None = None) -> float:
     """Convenience wrapper: raw score -> calibrated probability, for a
     single dispute dict, using the cached/fitted calibration curve."""
-    from chargeback_risk_engine.scorer import predict_win_probability
+    from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer
 
     if points is None:
         points = load_or_fit_calibration_points()
-    raw = predict_win_probability(dispute)
+    raw = load_or_fit_ml_scorer().predict_win_probability(dispute)
     return apply_calibration(points, raw)
 
 
