@@ -1,6 +1,7 @@
 {
   "dataset": "data/test.csv",
   "held_out_rows": 5000,
+  "base_rate": 0.5648,
   "oracle_ceiling": {
     "roc_auc": 0.8155698008665223,
     "pr_auc": 0.7917190137672473,
@@ -14,7 +15,9 @@
       "brier": 0.2301797785174841,
       "net_value": 10879407.59,
       "pct_of_oracle_roc": 85.23230459309582,
+      "chance_adjusted_roc_skill": 61.833843513560325,
       "pct_of_oracle_pr": 89.50952641037057,
+      "chance_adjusted_pr_skill": 63.398803535909096,
       "pct_of_oracle_net_value": 99.80906110765,
       "bootstrap_ci": {
         "roc_auc_pct": {
@@ -40,7 +43,9 @@
       "brier": 0.21650102515928074,
       "net_value": 10895685.419999998,
       "pct_of_oracle_roc": 85.47336071461636,
+      "chance_adjusted_roc_skill": 62.45683751516098,
       "pct_of_oracle_pr": 91.37227429393751,
+      "chance_adjusted_pr_skill": 69.89791920185031,
       "pct_of_oracle_net_value": 99.95839597866477,
       "bootstrap_ci": {
         "roc_auc_pct": {
@@ -61,57 +66,66 @@
       }
     },
     "hgb": {
-      "roc_auc": 0.5932097254624229,
-      "pr_auc": 0.6407084489872752,
-      "brier": 0.23955665345899296,
-      "net_value": 10894941.82,
-      "pct_of_oracle_roc": 72.73561684507598,
-      "pct_of_oracle_pr": 80.92624249840654,
-      "pct_of_oracle_net_value": 99.95157409822454,
+      "roc_auc": 0.6971638353243209,
+      "pr_auc": 0.7254448859761069,
+      "brier": 0.21694436700812939,
+      "net_value": 10895802.59,
+      "pct_of_oracle_roc": 85.48181094783082,
+      "chance_adjusted_roc_skill": 62.47867659799171,
+      "pct_of_oracle_pr": 91.62908473351078,
+      "chance_adjusted_pr_skill": 70.79392921250826,
+      "pct_of_oracle_net_value": 99.95947091106282,
       "bootstrap_ci": {
         "roc_auc_pct": {
-          "mean": 72.66131430246963,
-          "ci_lower": 70.62512941337921,
-          "ci_upper": 74.53426161396636
+          "mean": 85.38809643561417,
+          "ci_lower": 83.80470303109827,
+          "ci_upper": 87.35434143071086
         },
         "pr_auc_pct": {
-          "mean": 80.97993531556187,
-          "ci_lower": 78.69157566548392,
-          "ci_upper": 83.22440048088748
+          "mean": 91.59492285487445,
+          "ci_lower": 89.8999314595565,
+          "ci_upper": 93.43079268097122
         },
         "net_value_pct": {
-          "mean": 99.94769519946996,
-          "ci_lower": 99.90093100832703,
-          "ci_upper": 99.99440878679127
+          "mean": 99.95499605003099,
+          "ci_lower": 99.91295883508526,
+          "ci_upper": 99.99943187251685
         }
       }
     },
     "hybrid": {
-      "roc_auc": 0.6968204680730294,
-      "pr_auc": 0.7248591148489777,
-      "brier": 0.21703034605874336,
-      "net_value": 10895712.45,
-      "pct_of_oracle_roc": 85.43970943169735,
-      "pct_of_oracle_pr": 91.55509748336986,
-      "pct_of_oracle_net_value": 99.95864395530316,
+      "roc_auc": 0.696776285983586,
+      "pr_auc": 0.7266025589470423,
+      "brier": 0.21699829139848262,
+      "net_value": 10895714.02,
+      "pct_of_oracle_roc": 85.43429210391051,
+      "chance_adjusted_roc_skill": 62.35586721012546,
+      "pct_of_oracle_pr": 91.7753074401535,
+      "chance_adjusted_pr_skill": 71.30409931756732,
+      "pct_of_oracle_net_value": 99.95865835868172,
       "bootstrap_ci": {
         "roc_auc_pct": {
-          "mean": 85.3284648923144,
-          "ci_lower": 83.74851190873967,
-          "ci_upper": 87.50914658542875
+          "mean": 85.31812026182325,
+          "ci_lower": 83.7611241905143,
+          "ci_upper": 87.3706756049507
         },
         "pr_auc_pct": {
-          "mean": 91.5825273724398,
-          "ci_lower": 89.48208013818645,
-          "ci_upper": 93.76602137084589
+          "mean": 91.7335418016904,
+          "ci_lower": 89.86241829267718,
+          "ci_upper": 93.70362905411878
         },
         "net_value_pct": {
-          "mean": 99.95396566859334,
-          "ci_lower": 99.9161412707045,
-          "ci_upper": 100.00051120432401
+          "mean": 99.95329327687894,
+          "ci_lower": 99.91103510865067,
+          "ci_upper": 100.00430156680213
         }
       }
     }
   },
-  "assessment": "The live Logistic and Hybrid models capture ~85-92% of the theoretical oracle ROC-AUC ceiling. They remain constrained by observation noise and missing evidence inherent to the data-generating process."
+  "notes": {
+    "net_value_context": "Contest cost is \u20b9150 while average dispute amount is ~\u20b94,000. Contesting every dispute achieves \u20b910,895,685 (99.95% of oracle value). All models land within 0.2% of each other on net value when contesting everything; predictive discrimination must be evaluated using ROC-AUC and PR-AUC, not unconstrained net value.",
+    "chance_adjusted_skill": "Chance ROC-AUC is 0.5 (random guess). Chance PR-AUC is the positive class base rate (~0.565). Normalized Gini skill is (ROC - 0.5) / (Oracle - 0.5) \u2248 62.4%. Normalized PR skill is (PR - Base) / (Oracle - Base) \u2248 69.8%.",
+    "conservative_automation": "The headline \u20b949.73L realized net value in the evaluation report is an automated-only figure under conservative thresholding (only ~33% auto-contested with 74.8% precision; 60% of cases routed to HUMAN-REVIEW are counted as \u20b90 automated recovery)."
+  },
+  "assessment": "The live Logistic model captures 85.5% of raw ROC-AUC (62.4% chance-adjusted Gini skill) and 91.4% of raw PR-AUC (69.8% chance-adjusted PR skill). The models remain constrained by observation noise and missing evidence inherent to the data-generating process."
 }

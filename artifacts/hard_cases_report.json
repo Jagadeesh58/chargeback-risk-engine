@@ -36,7 +36,7 @@
     {
       "case": "graph-escalation",
       "action": "HUMAN-REVIEW",
-      "reason": "Relationship risk score 0.65 triggered manual-review safety escalation.",
+      "reason": "Relationship risk score 0.60 triggered manual-review safety escalation.",
       "passed": true
     },
     {

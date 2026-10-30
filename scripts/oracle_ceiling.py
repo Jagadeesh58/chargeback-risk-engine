@@ -35,6 +35,7 @@ from chargeback_risk_engine.synthetic_ground_truth import (
     WIN_RATE_IF_NOT_LEGIT,
     generate_one,
 )
+from training.train_models import fit_model, predict_model
 
 
 def compute_oracle_probabilities(n: int = 30000, seed: int = 42) -> dict[str, float]:
@@ -154,6 +155,7 @@ def main():
     test_df = pd.read_csv(test_path)
     y_true = test_df["would_win"].astype(int).to_numpy()
     amounts = test_df["amount"].to_numpy()
+    base_rate = float(y_true.mean())
 
     oracle_lookup = compute_oracle_probabilities()
     oracle_probs = np.array([oracle_lookup[did] for did in test_df["dispute_id"]])
@@ -178,21 +180,10 @@ def main():
     ml = load_or_fit_ml_scorer()
     logistic_probs = np.array([ml.predict_win_probability(r) for r in rows])
 
-    # 3. HGB (Histogram Gradient Boosting) Challenger
-    # Fit challenger model on train.csv
-    from sklearn.ensemble import HistGradientBoostingClassifier
+    # 3. HGB Challenger (Identical feature extraction and hyperparameters from training/train_models.py)
     train_df = pd.read_csv(DATA_DIR / "train.csv")
-    from chargeback_risk_engine.config import ALL_EVIDENCE_FIELDS
-    X_train = train_df[ALL_EVIDENCE_FIELDS].copy()
-    for col in ALL_EVIDENCE_FIELDS:
-        X_train[col] = X_train[col].map({True: 1.0, False: 0.0}).fillna(0.5)
-    y_train = train_df["would_win"].astype(int)
-    hgb = HistGradientBoostingClassifier(random_state=42).fit(X_train, y_train)
-
-    X_test = test_df[ALL_EVIDENCE_FIELDS].copy()
-    for col in ALL_EVIDENCE_FIELDS:
-        X_test[col] = X_test[col].map({True: 1.0, False: 0.0}).fillna(0.5)
-    hgb_probs = hgb.predict_proba(X_test)[:, 1]
+    hgb_model, hgb_cols = fit_model(train_df)
+    hgb_probs = predict_model(hgb_model, hgb_cols, test_df)
 
     # 4. Hybrid (Ensemble combination)
     hybrid_probs = 0.20 * rule_probs + 0.55 * logistic_probs + 0.25 * hgb_probs
@@ -212,13 +203,18 @@ def main():
         net_val = calculate_net_value(amounts, y_true, p, threshold=economic_thresholds)
         ci_res = bootstrap_ci(y_true, amounts, p, oracle_probs, n_boot=100)
 
+        chance_adj_roc = 100.0 * max(0.0, (roc - 0.5) / (oracle_roc - 0.5))
+        chance_adj_pr = 100.0 * max(0.0, (pr - base_rate) / (oracle_pr - base_rate))
+
         model_results[name] = {
             "roc_auc": roc,
             "pr_auc": pr,
             "brier": brier,
             "net_value": net_val,
             "pct_of_oracle_roc": 100.0 * roc / oracle_roc,
+            "chance_adjusted_roc_skill": chance_adj_roc,
             "pct_of_oracle_pr": 100.0 * pr / oracle_pr,
+            "chance_adjusted_pr_skill": chance_adj_pr,
             "pct_of_oracle_net_value": 100.0 * net_val / oracle_net_val,
             "bootstrap_ci": ci_res,
         }
@@ -226,6 +222,7 @@ def main():
     output = {
         "dataset": "data/test.csv",
         "held_out_rows": len(test_df),
+        "base_rate": base_rate,
         "oracle_ceiling": {
             "roc_auc": oracle_roc,
             "pr_auc": oracle_pr,
@@ -233,9 +230,25 @@ def main():
             "best_achievable_net_value": oracle_net_val,
         },
         "models": model_results,
+        "notes": {
+            "net_value_context": (
+                "Contest cost is ₹150 while average dispute amount is ~₹4,000. Contesting every dispute achieves "
+                "₹10,895,685 (99.95% of oracle value). All models land within 0.2% of each other on net value when "
+                "contesting everything; predictive discrimination must be evaluated using ROC-AUC and PR-AUC, not unconstrained net value."
+            ),
+            "chance_adjusted_skill": (
+                "Chance ROC-AUC is 0.5 (random guess). Chance PR-AUC is the positive class base rate (~0.565). "
+                "Normalized Gini skill is (ROC - 0.5) / (Oracle - 0.5) ≈ 62.4%. Normalized PR skill is (PR - Base) / (Oracle - Base) ≈ 69.8%."
+            ),
+            "conservative_automation": (
+                "The headline ₹49.73L realized net value in the evaluation report is an automated-only figure under conservative thresholding "
+                "(only ~33% auto-contested with 74.8% precision; 60% of cases routed to HUMAN-REVIEW are counted as ₹0 automated recovery)."
+            ),
+        },
         "assessment": (
-            "The live Logistic and Hybrid models capture ~85-92% of the theoretical oracle ROC-AUC ceiling. "
-            "They remain constrained by observation noise and missing evidence inherent to the data-generating process."
+            "The live Logistic model captures 85.5% of raw ROC-AUC (62.4% chance-adjusted Gini skill) and "
+            "91.4% of raw PR-AUC (69.8% chance-adjusted PR skill). The models remain constrained by observation noise "
+            "and missing evidence inherent to the data-generating process."
         ),
     }
 

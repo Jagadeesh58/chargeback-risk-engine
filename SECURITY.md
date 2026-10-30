@@ -13,7 +13,7 @@
 - Dispute IDs are constrained to a safe identifier pattern at the API boundary.
 - Unknown reason codes are rejected.
 - Request body size is capped by default at 64 KB (configurable via `CHARGEBACK_MAX_BODY_BYTES`), rejecting larger payloads with 413.
-- In-memory per-client rate limiting is available via `CHARGEBACK_RATE_LIMIT`, returning 429 with `Retry-After`.
+- In-memory per-client rate limiting is available via `CHARGEBACK_RATE_LIMIT`, returning 429 with `Retry-After`. Rate limits are keyed strictly on remote network IP (`request.client.host`) to prevent spoofing bypasses.
 - Amounts, model scores and graph scores are checked for finite valid ranges before policy evaluation.
 - Evidence values are explicit booleans or unknown values; unknown is not treated as a positive result.
 - Extra text fields are not interpreted as instructions by the decision engine.
@@ -40,6 +40,16 @@ The regression suite verifies that:
 ## Model artifacts & integrity verification
 
 Pickle deserialization executes arbitrary code and is only safe for trusted, hash-verified files. Model artifacts are accompanied by a `.sha256` sidecar file containing their SHA-256 digest. When loading `ml_scorer_model.pkl`, the SHA-256 checksum is verified before unpickling; mismatches raise a ValueError. Setting `CHARGEBACK_REQUIRE_MODEL_HASH=1` strictly requires the sidecar file. The live scorer additionally records model version, feature version, and scikit-learn version and rejects incompatible metadata.
+
+## Audit hash chain boundaries & concurrency
+
+The SQLite audit log links decisions into a SHA-256 hash chain. Writes are serialized via thread locks and database-level `BEGIN IMMEDIATE` transactions to prevent chain forking under concurrency.
+- **Tamper Evidence Boundary**: The hash chain provides tamper-evidence against partial edits, in-place record mutations, and retroactive modifications.
+- **Threat Boundary**: An adversary with unrestricted filesystem or SQLite database write access could recompute the entire hash chain from scratch, and tail deletion is undetectable without external anchoring. Production systems should periodically publish the head digest to an external append-only log or write-once ledger.
+
+## Privacy & third-party AI disclosure
+
+When `CHARGEBACK_AI_ANALYST_URL` is configured, unstructured dispute notes (`evidence_text`), reason codes, and assembled evidence lists are transmitted via HTTP POST to the external service. Deployments processing production cardholder data or sensitive PII must ensure the target URL is an internal, authorized service compliant with data governance rules, or redact sensitive customer details before forwarding.
 
 ## Secrets and credentials
 

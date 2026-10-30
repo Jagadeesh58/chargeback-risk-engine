@@ -277,6 +277,11 @@ These are **synthetic evaluation results** and are not production-performance gu
 
 The operating point intentionally prioritizes safe automation over maximizing automatic contest recall.
 
+> [!NOTE]
+> **Automation vs. Unconstrained Recovery**: The headline ₹49.73L realized net value reflects **conservative automated recovery only** (contesting ~33% of disputes with 74.8% precision, with the 59.9% of cases routed to `HUMAN-REVIEW` counted as ₹0 automated recovery). In contrast, an unconstrained contest-everything strategy recovers ₹108.95L because the fixed contest cost (₹150) is very low relative to dispute amounts (~₹4,000). The engine is explicitly tuned for safe, high-precision automation with human oversight rather than blind contesting.
+>
+> **Skill vs. Chance**: Against the theoretical oracle ceiling (PR-AUC 0.7917, ROC-AUC 0.8156), the live Logistic model captures 85.5% of raw ROC-AUC (62.5% chance-adjusted Gini skill above chance) and 91.4% of raw PR-AUC (69.9% normalized skill above base rate). Machine learning provides modest lift over rules (0.723 vs 0.709 PR-AUC) because synthetic ground truth is generated from noisy evidence rules.
+
 ---
 
 ## Evaluation methodology

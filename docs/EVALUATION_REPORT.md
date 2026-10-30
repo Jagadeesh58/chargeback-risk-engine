@@ -23,7 +23,7 @@ The data is generated with a fixed seed and kept in separate train/dev/test file
 | HGB challenger | 0.7254 | 0.2169 | 0.0130 |
 | Offline hybrid challenger | 0.7266 | 0.2170 | 0.0244 |
 
-Logistic Regression remains the live risk estimator. Challenger models are evaluated offline and do not have authority over the final decision.
+Logistic Regression remains the live risk estimator. Challenger models are evaluated offline and do not have authority over the final decision. Note that machine learning provides modest lift over deterministic rules (0.723 vs 0.709 PR-AUC; 0.697 vs 0.695 ROC-AUC) because the synthetic data generator is fundamentally a noisy combination of evidence validity flags.
 
 ## Policy selection
 
@@ -54,6 +54,8 @@ The selected profile is stored in `artifacts/policy_profile.json`.
 | Synthetic false positives | 417 |
 
 Expected values use the model's probability signal. Realized recovery/net value use the synthetic `would_win` label and are not production financial results.
+
+**Conservative Automation Notice**: The headline realized net value of ₹49.73L reflects **conservative automated recovery only** (contesting ~33% of disputes with 74.8% precision). The 59.9% of disputes held for `HUMAN-REVIEW` are counted as ₹0 automated recovery. In comparison, an unconstrained "contest-everything" strategy across all 5,000 cases recovers ₹108.95L because the dispute fee (₹150) is small relative to the average dispute amount (~₹4,000). The engine is tuned to prioritize high automation precision and human oversight over unconstrained recovery.
 
 ## Historical pre-change comparison
 
@@ -109,15 +111,18 @@ The workflow regenerates ignored benchmark/report outputs from the tracked sourc
 
 Computed via `scripts/oracle_ceiling.py` on `data/test.csv` (synthetic ground truth).
 
-| Model | ROC-AUC | % of Ceiling (95% CI) | PR-AUC | % of Ceiling (95% CI) | Realized Net Value |
-|---|---:|---:|---:|---:|---:|
-| **Oracle Ceiling** | **0.8156** | **100.0%** | **0.7917** | **100.0%** | **₹10,900,220.35** |
-| Logistic (Live) | 0.6971 | 85.5% [83.9%, 87.4%] | 0.7234 | 91.4% [89.4%, 93.1%] | ₹10,895,685.42 |
-| Hybrid Challenger | 0.6968 | 85.4% [83.7%, 87.5%] | 0.7249 | 91.6% [89.5%, 93.8%] | ₹10,895,712.45 |
-| Rules Only | 0.6951 | 85.2% [83.6%, 87.2%] | 0.7087 | 89.5% [87.7%, 91.5%] | ₹10,879,407.59 |
-| HGB Challenger | 0.5932 | 72.7% [70.6%, 74.5%] | 0.6407 | 80.9% [78.7%, 83.2%] | ₹10,894,941.82 |
+| Model | ROC-AUC | % of Ceiling (95% CI) | Chance-Adjusted Skill (Gini) | PR-AUC | % of Ceiling (95% CI) | Normalized PR Skill | Realized Net Value |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **Oracle Ceiling** | **0.8156** | **100.0%** | **100.0%** | **0.7917** | **100.0%** | **100.0%** | **₹10,900,220.35** |
+| Logistic (Live) | 0.6971 | 85.5% [83.9%, 87.4%] | 62.5% | 0.7234 | 91.4% [89.4%, 93.1%] | 69.9% | ₹10,895,685.42 |
+| HGB Challenger | 0.6972 | 85.5% [83.8%, 87.4%] | 62.5% | 0.7254 | 91.6% [89.9%, 93.4%] | 70.8% | ₹10,895,802.59 |
+| Hybrid Challenger | 0.6968 | 85.4% [83.8%, 87.4%] | 62.4% | 0.7266 | 91.8% [89.9%, 93.7%] | 71.3% | ₹10,895,714.02 |
+| Rules Only | 0.6951 | 85.2% [83.6%, 87.2%] | 61.8% | 0.7087 | 89.5% [87.7%, 91.5%] | 63.4% | ₹10,879,407.59 |
 
-**Assessment**: The live Logistic model captures 85.5% of the theoretical ROC-AUC ceiling and 91.4% of the PR-AUC ceiling. The model is near the achievable ceiling given observable evidence; the remaining performance ceiling cannot be crossed without direct access to the hidden seller legitimacy state.
+**Methodological Notes**:
+1. **Net Value Column**: All models land within 0.2% of each other on unconstrained net value (~₹108.8L to ₹109.0L). Because the fixed dispute cost is only ₹150 while disputes average ₹4,000, contesting everything recovers 99.95% of oracle value. Therefore, net value under unconstrained contesting cannot distinguish model predictive quality; models must be evaluated on PR-AUC and ROC-AUC.
+2. **Chance-Adjusted Skill**: Because ROC-AUC 0.5 represents random chance, the raw ratio (85.5%) overstates skill. Chance-adjusted normalized Gini skill is `(0.6971 - 0.5) / (0.8156 - 0.5) = 62.5%`. Similarly, for PR-AUC with positive base rate 0.565, normalized skill is `(0.7234 - 0.565) / (0.7917 - 0.565) = 69.9%`.
+3. **Observability Limit**: The remaining gap to the oracle ceiling cannot be crossed without direct access to the hidden seller legitimacy state, which is unobservable in live transaction data.
 
 ## AI Analyst Safety Evaluation
 
