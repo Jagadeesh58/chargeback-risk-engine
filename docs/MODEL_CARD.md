@@ -25,7 +25,7 @@ The bundled test snapshot reports:
 - ROC-AUC: **0.6971** (vs. rules baseline 0.6951 and theoretical oracle ceiling 0.8156)
 - Normalized Chance-Adjusted Skill: **62.5%** of oracle Gini skill; **69.9%** of oracle normalized PR skill
 - Policy operating point (0.65 threshold): 74.8% precision and 43.9% recall
-- Automated realized net value: **₹49.73L** (conservative automation with 59.9% held for manual review valued at ₹0)
+- Automated realized net value: **₹49.73L** (conservative automation with 66.5% held for manual review valued at ₹0)
 
 ## Known limitations
 

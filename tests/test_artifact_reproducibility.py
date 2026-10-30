@@ -32,3 +32,12 @@ def test_candidate_benchmark_reproducibility(tmp_path):
     generated = json.loads((tmp_path / "candidate_benchmark.json").read_text(encoding="utf-8"))
     committed = json.loads((ARTIFACTS_DIR / "candidate_benchmark.json").read_text(encoding="utf-8"))
     assert generated == committed
+
+
+def test_strategy_comparison_reproducibility():
+    import scripts.generate_report as gr
+    oracle_data = json.loads((ARTIFACTS_DIR / "oracle_ceiling.json").read_text(encoding="utf-8"))
+    bm_data = json.loads((ARTIFACTS_DIR / "candidate_benchmark.json").read_text(encoding="utf-8"))
+    generated = gr.compute_strategy_comparison(bm_data["case_results"], oracle_data)
+    committed = json.loads((ARTIFACTS_DIR / "strategy_comparison.json").read_text(encoding="utf-8"))
+    assert generated == committed

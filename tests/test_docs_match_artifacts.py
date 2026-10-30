@@ -111,3 +111,44 @@ def test_evaluation_report_metrics_match_artifacts(artifacts):
     match_rec = re.search(r"\|\s*Auto-contest recall\s*\|\s*([0-9.]+)\s*\|", eval_report)
     assert match_rec
     assert pytest.approx(float(match_rec.group(1)), abs=1e-4) == strategy["auto_contest_recall"]
+
+
+def test_strategy_comparison_table_matches_docs(artifacts):
+    strategy_comp_path = ARTIFACTS_DIR / "strategy_comparison.json"
+    if not strategy_comp_path.exists():
+        import subprocess
+        import sys
+        subprocess.run([sys.executable, str(REPO_ROOT / "scripts" / "generate_report.py")], check=True)
+
+    assert strategy_comp_path.exists(), "strategy_comparison.json missing. Run scripts/generate_report.py"
+    strat_comp = json.loads(strategy_comp_path.read_text(encoding="utf-8"))
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    eval_report = (REPO_ROOT / "docs" / "EVALUATION_REPORT.md").read_text(encoding="utf-8")
+
+    # Check each strategy row's net value and precision in README and EVALUATION_REPORT
+    for row in strat_comp["strategy_table"]:
+        net_str = f"₹{row['realized_net_value_lakh']:.2f} lakh"
+        prec_str = f"{row['contested_precision']*100:.1f}%"
+        assert net_str in readme, f"Net value {net_str} for {row['strategy']} missing in README.md"
+        assert net_str in eval_report, f"Net value {net_str} for {row['strategy']} missing in EVALUATION_REPORT.md"
+        assert prec_str in readme, f"Precision {prec_str} for {row['strategy']} missing in README.md"
+        assert prec_str in eval_report, f"Precision {prec_str} for {row['strategy']} missing in EVALUATION_REPORT.md"
+
+    # Check Bootstrap 95% CI
+    b_ci = strat_comp["bootstrap_diff_vs_contest_everything"]
+    ci_str = f"[-₹{abs(b_ci['ci_95_lower_lakh']):.2f} lakh, -₹{abs(b_ci['ci_95_upper_lakh']):.2f} lakh]"
+    assert ci_str in readme, f"Bootstrap CI {ci_str} missing in README.md"
+    assert ci_str in eval_report, f"Bootstrap CI {ci_str} missing in EVALUATION_REPORT.md"
+
+    # Check break-even penalty levels
+    b_even = strat_comp["break_even_analysis"]
+    thresh_auto_ce = f"₹{b_even['ranking_flip_vs_auto_only']['threshold_inr_ce_only']:,.2f}"
+    thresh_auto_both = f"₹{b_even['ranking_flip_vs_auto_only']['threshold_inr_both_penalized']:,.2f}"
+    thresh_policy_b = f"₹{b_even['ranking_flip_vs_policy_scenario_b']['threshold_inr_ce_only']:,.2f}"
+
+    assert thresh_auto_ce in readme, f"Threshold {thresh_auto_ce} missing in README.md"
+    assert thresh_auto_ce in eval_report, f"Threshold {thresh_auto_ce} missing in EVALUATION_REPORT.md"
+    assert thresh_auto_both in readme, f"Threshold {thresh_auto_both} missing in README.md"
+    assert thresh_auto_both in eval_report, f"Threshold {thresh_auto_both} missing in EVALUATION_REPORT.md"
+    assert thresh_policy_b in readme, f"Threshold {thresh_policy_b} missing in README.md"
+    assert thresh_policy_b in eval_report, f"Threshold {thresh_policy_b} missing in EVALUATION_REPORT.md"

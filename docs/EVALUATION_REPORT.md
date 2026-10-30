@@ -45,7 +45,7 @@ The selected profile is stored in `artifacts/policy_profile.json`.
 | Auto-contest count | 1,657 |
 | Auto-contest precision | 0.7483 |
 | Auto-contest recall | 0.4391 |
-| Human-review rate | 0.5990 |
+| Human-review rate | 0.6654 |
 | Expected recovery | ₹5,276,669.04 |
 | Expected contest cost | ₹248,550.00 |
 | Expected net value | ₹5,028,119.04 |
@@ -55,7 +55,32 @@ The selected profile is stored in `artifacts/policy_profile.json`.
 
 Expected values use the model's probability signal. Realized recovery/net value use the synthetic `would_win` label and are not production financial results.
 
-**Conservative Automation Notice**: The headline realized net value of ₹49.73L reflects **conservative automated recovery only** (contesting ~33% of disputes with 74.8% precision). The 59.9% of disputes held for `HUMAN-REVIEW` are counted as ₹0 automated recovery. In comparison, an unconstrained "contest-everything" strategy across all 5,000 cases recovers ₹108.95L because the dispute fee (₹150) is small relative to the average dispute amount (~₹4,000). The engine is tuned to prioritize high automation precision and human oversight over unconstrained recovery.
+**Conservative Automation Notice**: The headline realized net value of ₹49.73L reflects **conservative automated recovery only** (contesting ~33% of disputes with 74.8% precision). The 66.5% of disputes held for `HUMAN-REVIEW` are counted as ₹0 automated recovery. In comparison, an unconstrained "contest-everything" strategy across all 5,000 cases recovers ₹108.95L because the dispute fee (₹150) is small relative to the average dispute amount (~₹4,000). The engine is tuned to prioritize high automation precision and human oversight over unconstrained recovery.
+
+## Comprehensive Strategy Comparison & Economic Trade-off Analysis
+
+Evaluated on `data/test.csv` (5,000 held-out disputes) under identical operational cost assumptions (`CONTEST_COST = ₹150`, `HUMAN_REVIEW_COST = ₹50`).
+
+| Strategy | Auto-Contest Share | Human-Review Share | Contested Precision | Realized Net Value | Cost & Penalty Assumptions |
+|---|---:|---:|---:|---:|---|
+| Contest Everything (Unconstrained) | 100.0% | 0.0% | 56.5% | **₹108.95 lakh** | Blind 100% contesting; ₹150 filing fee; assumes zero compliance penalties |
+| Contest Everything (with Loss Penalty) | 100.0% | 0.0% | 56.5% | **₹18.64 lakh** | Documented Visa VAMP / Mastercard VFMP fine of $50 (₹4,150) per lost contest |
+| **Live Policy (Automated-Only)** | 33.1% | 66.5% | 74.8% | **₹49.73 lakh** | Conservative automation: only high-confidence cases automated; reviewed cases valued at ₹0 |
+| Live Policy + Human Review (Scenario a: Model Rate) | 33.1% | 66.5% | 56.5% | **₹108.09 lakh** | Reviewed cases recover at model calibrated win probability with ₹50 review fee |
+| Live Policy + Human Review (Scenario b: Observed Rate) | 33.1% | 66.5% | 56.6% | **₹107.29 lakh** | Reviewed cases recover at observed held-out win rate (47.5%) with ₹50 review fee |
+| **Theoretical Oracle Ceiling** | 100.0% | 0.0% | 100.0% | **₹109.00 lakh** | Bayes-optimal ceiling with hidden seller-legitimacy state access |
+
+### Statistical Comparison & Break-Even Analysis
+
+- **Bootstrap 95% Confidence Interval**:
+  The difference between Live Policy (with review scenario b) and Contest Everything (unconstrained) is **-₹1.66 lakh (-₹165,622.71)** with bootstrap 95% CI **[-₹1.69 lakh, -₹1.62 lakh]** ([-₹169,104.28, -₹162,191.78]).
+  The difference is entirely accounted for by the operational cost of human review (3,327 reviews × ₹50 = ₹166,350) minus ₹727.29 saved by accepting negative-EV disputes as losses. Even with zero review lift over raw baseline odds, the policy captures **98.48%** of Contest-Everything gross recovery while protecting merchant standing.
+
+- **Break-Even Loss Penalty Level**:
+  - **Raw Value Comparison**: Contest Everything (unconstrained) wins on raw unpenalized value (₹108.95L vs ₹49.73L automated-only, or ₹107.29L with review scenario b).
+  - **Ranking Flip vs. Automated-Only**: Contest Everything falls below the Live Policy automated-only recovery (₹49.73L) when the penalty per lost contest exceeds **₹2,721.43** (if penalty applies to Contest Everything for entering monitoring) or **₹3,366.59** (if losing disputes in both are penalized). Both break-even thresholds are substantially below the documented minimum card-network monitoring penalty of **$50 per dispute (₹4,150)** under Visa VAMP / Mastercard VFMP.
+  - **Ranking Flip vs. Policy with Review (Scenario b)**: Contest Everything falls below the Live Policy + Human Review when the penalty per lost contest on Contest Everything exceeds just **₹76.11**.
+
 
 ## Historical pre-change comparison
 

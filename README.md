@@ -16,7 +16,7 @@ Chargeback disputes cost online merchants over \$100B annually in lost revenue, 
 | **Representment Win Rate** | ~50.2% baseline | ~50.2% (submits weak/failed claims) | **74.8% high-precision automation** |
 | **Card Network Standing** | Unmanaged dispute ratio | Severe risk of Visa VAMP / Mastercard VFMP bans | **Protected (monitors dispute hygiene & limits)** |
 | **Arbitration Risk** | Sporadic | Extreme (\$500 non-refundable network fee on loss) | **Shielded by strict evidence completeness gates** |
-| **Operational Impact** | Heavy manual triage | Zero oversight; catastrophic compliance fines | **Automates 33.3%, routes 59.9% to review, accepts 6.8% loss** |
+| **Operational Impact** | Heavy manual triage | Zero oversight; catastrophic compliance fines | **Automates 33.1%, routes 66.5% to review, accepts 0.3% loss** |
 | **Auditability** | Ephemeral application logs | Mutable database records | **Tamper-evident SHA-256 hash-chained ledger** |
 
 ---
@@ -55,7 +55,33 @@ streamlit run scripts/demo.py
 | Hard cases | **8 / 8 passed** |
 
 > [!NOTE]
-> **Automation vs. Unconstrained Recovery**: The headline ₹49.73L realized net value reflects **conservative automated recovery only** (contesting ~33% of disputes with 74.8% precision, with the 59.9% of cases routed to `HUMAN-REVIEW` counted as ₹0 automated recovery). In contrast, an unconstrained contest-everything strategy recovers ₹108.95L because the fixed contest cost (₹150) is very low relative to dispute amounts (~₹4,000). The engine is explicitly tuned for safe, high-precision automation with human oversight rather than blind contesting. See [docs/WHY_NOT_CONTEST_EVERYTHING.md](docs/WHY_NOT_CONTEST_EVERYTHING.md) for detailed analysis of card-brand dispute monitoring programs (Visa VAMP / Mastercard VFMP), \$500 arbitration penalties, operational review staffing costs (`human_review_cost`), and payment processing termination risks.
+> **Automation vs. Unconstrained Recovery**: The headline ₹49.73L realized net value reflects **conservative automated recovery only** (contesting ~33% of disputes with 74.8% precision, with the 66.5% of cases routed to `HUMAN-REVIEW` counted as ₹0 automated recovery). In contrast, an unconstrained contest-everything strategy recovers ₹108.95L because the fixed contest cost (₹150) is very low relative to dispute amounts (~₹4,000). The engine is explicitly tuned for safe, high-precision automation with human oversight rather than blind contesting. See [docs/WHY_NOT_CONTEST_EVERYTHING.md](docs/WHY_NOT_CONTEST_EVERYTHING.md) for detailed analysis of card-brand dispute monitoring programs (Visa VAMP / Mastercard VFMP), \$500 arbitration penalties, operational review staffing costs (`human_review_cost`), and payment processing termination risks.
+
+
+### Comprehensive Strategy Comparison & Economic Trade-off Analysis
+
+Evaluated on `data/test.csv` (5,000 held-out disputes) under identical operational cost assumptions (`CONTEST_COST = ₹150`, `HUMAN_REVIEW_COST = ₹50`).
+
+| Strategy | Auto-Contest Share | Human-Review Share | Contested Precision | Realized Net Value | Cost & Penalty Assumptions |
+|---|---:|---:|---:|---:|---|
+| Contest Everything (Unconstrained) | 100.0% | 0.0% | 56.5% | **₹108.95 lakh** | Blind 100% contesting; ₹150 filing fee; assumes zero compliance penalties |
+| Contest Everything (with Loss Penalty) | 100.0% | 0.0% | 56.5% | **₹18.64 lakh** | Documented Visa VAMP / Mastercard VFMP fine of $50 (₹4,150) per lost contest |
+| **Live Policy (Automated-Only)** | 33.1% | 66.5% | 74.8% | **₹49.73 lakh** | Conservative automation: only high-confidence cases automated; reviewed cases valued at ₹0 |
+| Live Policy + Human Review (Scenario a: Model Rate) | 33.1% | 66.5% | 56.5% | **₹108.09 lakh** | Reviewed cases recover at model calibrated win probability with ₹50 review fee |
+| Live Policy + Human Review (Scenario b: Observed Rate) | 33.1% | 66.5% | 56.6% | **₹107.29 lakh** | Reviewed cases recover at observed held-out win rate (47.5%) with ₹50 review fee |
+| **Theoretical Oracle Ceiling** | 100.0% | 0.0% | 100.0% | **₹109.00 lakh** | Bayes-optimal ceiling with hidden seller-legitimacy state access |
+
+### Statistical Comparison & Break-Even Analysis
+
+- **Bootstrap 95% Confidence Interval**:
+  The difference between Live Policy (with review scenario b) and Contest Everything (unconstrained) is **-₹1.66 lakh (-₹165,622.71)** with bootstrap 95% CI **[-₹1.69 lakh, -₹1.62 lakh]** ([-₹169,104.28, -₹162,191.78]).
+  The difference is entirely accounted for by the operational cost of human review (3,327 reviews × ₹50 = ₹166,350) minus ₹727.29 saved by accepting negative-EV disputes as losses. Even with zero review lift over raw baseline odds, the policy captures **98.48%** of Contest-Everything gross recovery while protecting merchant standing.
+
+- **Break-Even Loss Penalty Level**:
+  - **Raw Value Comparison**: Contest Everything (unconstrained) wins on raw unpenalized value (₹108.95L vs ₹49.73L automated-only, or ₹107.29L with review scenario b).
+  - **Ranking Flip vs. Automated-Only**: Contest Everything falls below the Live Policy automated-only recovery (₹49.73L) when the penalty per lost contest exceeds **₹2,721.43** (if penalty applies to Contest Everything for entering monitoring) or **₹3,366.59** (if losing disputes in both are penalized). Both break-even thresholds are substantially below the documented minimum card-network monitoring penalty of **$50 per dispute (₹4,150)** under Visa VAMP / Mastercard VFMP.
+  - **Ranking Flip vs. Policy with Review (Scenario b)**: Contest Everything falls below the Live Policy + Human Review when the penalty per lost contest on Contest Everything exceeds just **₹76.11**.
+
 
 ---
 
@@ -329,7 +355,7 @@ These are **synthetic evaluation results** and are not production-performance gu
 The operating point intentionally prioritizes safe automation over maximizing automatic contest recall.
 
 > [!NOTE]
-> **Automation vs. Unconstrained Recovery**: The headline ₹49.73L realized net value reflects **conservative automated recovery only** (contesting ~33% of disputes with 74.8% precision, with the 59.9% of cases routed to `HUMAN-REVIEW` counted as ₹0 automated recovery). In contrast, an unconstrained contest-everything strategy recovers ₹108.95L because the fixed contest cost (₹150) is very low relative to dispute amounts (~₹4,000). The engine is explicitly tuned for safe, high-precision automation with human oversight rather than blind contesting. See [docs/WHY_NOT_CONTEST_EVERYTHING.md](docs/WHY_NOT_CONTEST_EVERYTHING.md) for detailed analysis of card-brand dispute monitoring programs (Visa VAMP / Mastercard VFMP), \$500 arbitration penalties, operational review staffing costs (`human_review_cost`), and payment processing termination risks.
+> **Automation vs. Unconstrained Recovery**: The headline ₹49.73L realized net value reflects **conservative automated recovery only** (contesting ~33% of disputes with 74.8% precision, with the 66.5% of cases routed to `HUMAN-REVIEW` counted as ₹0 automated recovery). In contrast, an unconstrained contest-everything strategy recovers ₹108.95L because the fixed contest cost (₹150) is very low relative to dispute amounts (~₹4,000). The engine is explicitly tuned for safe, high-precision automation with human oversight rather than blind contesting. See [docs/WHY_NOT_CONTEST_EVERYTHING.md](docs/WHY_NOT_CONTEST_EVERYTHING.md) for detailed analysis of card-brand dispute monitoring programs (Visa VAMP / Mastercard VFMP), \$500 arbitration penalties, operational review staffing costs (`human_review_cost`), and payment processing termination risks.
 >
 > **Skill vs. Chance**: Against the theoretical oracle ceiling (PR-AUC 0.7917, ROC-AUC 0.8156), the live Logistic model captures 85.5% of raw ROC-AUC (62.5% chance-adjusted Gini skill above chance) and 91.4% of raw PR-AUC (69.9% normalized skill above base rate). Machine learning provides modest lift over rules (0.723 vs 0.709 PR-AUC) because synthetic ground truth is generated from noisy evidence rules.
 
