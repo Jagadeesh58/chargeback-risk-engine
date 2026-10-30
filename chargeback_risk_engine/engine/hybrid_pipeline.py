@@ -74,7 +74,7 @@ def _score_case(
                 raise PayloadConflictError(dispute_id)
     ml = load_or_fit_ml_scorer()
     points = load_or_fit_calibration_points()
-    graph = risk_graph if risk_graph is not None else RiskGraph(load_graph_rows(db_path))
+    graph = risk_graph if risk_graph is not None else RiskGraph(load_graph_rows(db_path, dispute=dispute))
 
     def compute():
         packet = assemble(dispute)
@@ -225,7 +225,7 @@ def decide_case(
     call_ai_analyst: bool = True,
 ) -> dict:
     """Public canonical entry point used by API, UI, demo and evaluation."""
-    active_graph = risk_graph if risk_graph is not None else RiskGraph(load_graph_rows(db_path))
+    active_graph = risk_graph if risk_graph is not None else RiskGraph(load_graph_rows(db_path, dispute=dispute))
     result = _score_case(dispute, risk_graph=active_graph, db_path=db_path, call_ai_analyst=call_ai_analyst)
     if include_counterfactual:
         from chargeback_risk_engine.engine.counterfactual import find_minimal_decision_reversal

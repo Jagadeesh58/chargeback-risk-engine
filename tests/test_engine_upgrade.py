@@ -78,6 +78,55 @@ def test_risk_graph_merchant_id_does_not_trigger_fraud_escalation():
         assert len(analysis.suspicious_clusters) == 0
 
 
+def test_risk_graph_nat_hub_cap_does_not_escalate_to_organized_abuse():
+    """50 distinct customers on one shared ISP NAT IP must not escalate to ORGANIZED_ABUSE due to hub cap."""
+    rows = [
+        {
+            "dispute_id": f"d_{i}",
+            "customer_id": f"cust_{i}",
+            "device_id": f"dev_{i}",
+            "ip_address": "198.51.100.1",
+            "card_fingerprint": f"card_{i}",
+            "amount": 2000.0,
+        }
+        for i in range(50)
+    ]
+    graph = RiskGraph(rows, max_hub_degree=20)
+    new_dispute = {
+        "dispute_id": "d_50",
+        "customer_id": "cust_50",
+        "device_id": "dev_50",
+        "ip_address": "198.51.100.1",
+        "card_fingerprint": "card_50",
+        "amount": 2000.0,
+    }
+    analysis = graph.analyze(new_dispute)
+    assert analysis.risk_type != "ORGANIZED_ABUSE"
+    assert analysis.cluster_size == 1
+    assert analysis.risk_score < 0.60
+
+
+def test_load_graph_rows_subgraph_2_hops(tmp_path):
+    from chargeback_risk_engine.audit_log import log_new_decision, load_graph_rows
+    db = str(tmp_path / "subgraph_test.db")
+    log_new_decision("D1", "item_not_received", 1000.0, 0.8, "AUTO-CONTEST", "test", 800.0, [], db_path=db,
+                     graph_data={"customer_id": "c1", "ip_address": "1.1.1.1"})
+    log_new_decision("D2", "item_not_received", 1000.0, 0.8, "AUTO-CONTEST", "test", 800.0, [], db_path=db,
+                     graph_data={"customer_id": "c2", "ip_address": "1.1.1.1", "device_id": "dev_shared"})
+    log_new_decision("D3", "item_not_received", 1000.0, 0.8, "AUTO-CONTEST", "test", 800.0, [], db_path=db,
+                     graph_data={"customer_id": "c3", "device_id": "dev_shared"})
+    for i in range(20):
+        log_new_decision(f"UNRELATED_{i}", "item_not_received", 500.0, 0.5, "HUMAN-REVIEW", "test", 0.0, [], db_path=db,
+                         graph_data={"customer_id": f"unrel_{i}", "ip_address": f"10.0.0.{i}"})
+    
+    subgraph = load_graph_rows(db, dispute={"customer_id": "c1"})
+    found_ids = {r["dispute_id"] for r in subgraph}
+    assert "D1" in found_ids
+    assert "D2" in found_ids
+    assert "D3" in found_ids
+    assert not any(r["dispute_id"].startswith("UNRELATED_") for r in subgraph)
+
+
 def test_feedback_is_idempotent_by_dispute_id(tmp_path):
     db = str(tmp_path / "audit.db")
     first = record_outcome(db, "d1", 0.8, "AUTO-CONTEST", recovered_amount=100)

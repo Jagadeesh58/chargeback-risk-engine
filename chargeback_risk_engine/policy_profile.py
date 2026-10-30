@@ -5,6 +5,7 @@ If the artifact is missing or malformed, safe defaults are used.
 """
 from __future__ import annotations
 
+import functools
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,6 +27,7 @@ class RuntimePolicyProfile:
     profile_version: str = "fallback"
 
 
+@functools.lru_cache(maxsize=16)
 def load_policy_profile(path: str | Path = PROFILE_PATH) -> RuntimePolicyProfile:
     """Load a validated profile; fall back safely on missing/corrupt artifacts."""
     p = Path(path)

@@ -36,7 +36,8 @@ class GraphAnalysis:
 
 
 class RiskGraph:
-    def __init__(self, rows: Iterable[dict] = ()):
+    def __init__(self, rows: Iterable[dict] = (), max_hub_degree: int = 20):
+        self.max_hub_degree = max_hub_degree
         self.entity_to_nodes: dict[str, set[str]] = defaultdict(set)
         self.node_to_entities: dict[str, set[str]] = defaultdict(set)
         self.node_amounts: dict[str, float] = {}
@@ -45,7 +46,7 @@ class RiskGraph:
 
     def clone(self) -> RiskGraph:
         """Return an independent copy with isolated node and entity indexes."""
-        g = RiskGraph()
+        g = RiskGraph(max_hub_degree=self.max_hub_degree)
         g.entity_to_nodes = defaultdict(set, {k: set(v) for k, v in self.entity_to_nodes.items()})
         g.node_to_entities = defaultdict(set, {k: set(v) for k, v in self.node_to_entities.items()})
         g.node_amounts = dict(self.node_amounts)
@@ -75,6 +76,9 @@ class RiskGraph:
         while queue:
             current = queue.popleft()
             for entity in self.node_to_entities.get(current, set()):
+                # Hub degree capping: do not expand through high-degree benign hubs (e.g., ISP NAT, large carriers)
+                if len(self.entity_to_nodes.get(entity, set())) > self.max_hub_degree:
+                    continue
                 for neighbor in self.entity_to_nodes.get(entity, set()):
                     if neighbor not in connected_nodes:
                         connected_nodes.add(neighbor)
@@ -82,7 +86,7 @@ class RiskGraph:
         shared: dict[str, list[str]] = {}
         for entity in start_entities:
             nodes = self.entity_to_nodes.get(entity, set())
-            if len(nodes) > 1:
+            if 1 < len(nodes) <= self.max_hub_degree:
                 kind, value = entity.split(":", 1)
                 shared.setdefault(kind, []).append(value)
         other_disputes = max(0, len(connected_nodes) - 1)

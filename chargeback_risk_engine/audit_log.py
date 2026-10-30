@@ -57,6 +57,8 @@ def canonical_payload_hash(dispute: dict) -> str:
 def _get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path, timeout=30)
     conn.execute("PRAGMA busy_timeout = 30000")
+    conn.execute("PRAGMA synchronous = NORMAL")
+    
     conn.execute("""
         CREATE TABLE IF NOT EXISTS decisions (
             dispute_id TEXT PRIMARY KEY,
@@ -80,6 +82,16 @@ def _get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
             payload_hash TEXT NOT NULL DEFAULT ''
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS graph_entities (
+            dispute_id TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_value TEXT NOT NULL,
+            amount REAL NOT NULL DEFAULT 0.0
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_graph_entities_type_val ON graph_entities(entity_type, entity_value)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_graph_entities_dispute_id ON graph_entities(dispute_id)")
     existing_columns = {
         row[1] for row in conn.execute("PRAGMA table_info(decisions)").fetchall()
     }
@@ -170,13 +182,82 @@ def get_existing_decision(dispute_id: str, db_path: str = DB_PATH) -> LoggedDeci
         conn.close()
 
 
-def load_graph_rows(db_path: str = DB_PATH) -> list[dict]:
-    """Load historical relationship rows from the audit log for graph analysis."""
+def load_graph_rows(db_path: str = DB_PATH, dispute: dict | None = None) -> list[dict]:
+    """Load historical relationship rows from the audit log for graph analysis.
+    
+    If dispute is provided, loads only the subgraph within 2 hops of the dispute's
+    entities (customer_id, card_fingerprint, ip_address, device_id), capped for hubs.
+    If no entities match or dispute has no entities, returns an empty list.
+    If dispute is None, loads all historical rows (for backwards compatibility).
+    """
     conn = _get_connection(db_path)
     try:
-        cursor = conn.execute(
-            "SELECT dispute_id, amount, graph_data_json FROM decisions WHERE graph_data_json != '{}'"
-        )
+        if dispute is None:
+            cursor = conn.execute(
+                "SELECT dispute_id, amount, graph_data_json FROM decisions WHERE graph_data_json != '{}'"
+            )
+            rows = []
+            for dispute_id, amount, graph_data_json in cursor.fetchall():
+                try:
+                    graph_data = json.loads(graph_data_json or "{}")
+                except (TypeError, json.JSONDecodeError):
+                    graph_data = {}
+                rows.append({"dispute_id": dispute_id, "amount": amount, **graph_data})
+            return rows
+
+        # Subgraph query: 2-hop traversal from dispute's entities
+        target_entities = []
+        for field in ("customer_id", "device_id", "ip_address", "card_fingerprint"):
+            val = dispute.get(field)
+            if val not in (None, ""):
+                target_entities.append((field, str(val)))
+
+        if not target_entities:
+            return []
+
+        # Find direct disputes sharing any entity (hop 1 from entities)
+        placeholders = " OR ".join(["(entity_type = ? AND entity_value = ?)"] * len(target_entities))
+        flat_params = [item for pair in target_entities for item in pair]
+
+        query = f"""
+            WITH hop1_disputes AS (
+                SELECT DISTINCT dispute_id
+                FROM graph_entities
+                WHERE {placeholders}
+            ),
+            hop1_entities AS (
+                SELECT g.entity_type, g.entity_value
+                FROM graph_entities g
+                JOIN hop1_disputes d ON g.dispute_id = d.dispute_id
+                GROUP BY g.entity_type, g.entity_value
+                HAVING COUNT(DISTINCT g.dispute_id) <= 20
+            ),
+            hop2_disputes AS (
+                SELECT DISTINCT g.dispute_id
+                FROM graph_entities g
+                JOIN hop1_entities e ON g.entity_type = e.entity_type AND g.entity_value = e.entity_value
+            ),
+            hop2_entities AS (
+                SELECT g.entity_type, g.entity_value
+                FROM graph_entities g
+                JOIN hop2_disputes d ON g.dispute_id = d.dispute_id
+                GROUP BY g.entity_type, g.entity_value
+                HAVING COUNT(DISTINCT g.dispute_id) <= 20
+            ),
+            relevant_disputes AS (
+                SELECT DISTINCT g.dispute_id
+                FROM graph_entities g
+                JOIN hop2_entities e ON g.entity_type = e.entity_type AND g.entity_value = e.entity_value
+                UNION
+                SELECT dispute_id FROM hop2_disputes
+                UNION
+                SELECT dispute_id FROM hop1_disputes
+            )
+            SELECT d.dispute_id, d.amount, d.graph_data_json
+            FROM decisions d
+            JOIN relevant_disputes r ON d.dispute_id = r.dispute_id
+        """
+        cursor = conn.execute(query, flat_params)
         rows = []
         for dispute_id, amount, graph_data_json in cursor.fetchall():
             try:
@@ -236,6 +317,17 @@ def log_new_decision(
                  json.dumps(evidence, sort_keys=True), created_at, model_version, feature_version, policy_version,
                  json.dumps(graph_data, sort_keys=True), json.dumps(ai_metadata, sort_keys=True), request_id, routing_score, prev_hash, record_hash, payload_hash),
             )
+            if graph_data:
+                entity_rows = []
+                for field in ("customer_id", "device_id", "ip_address", "card_fingerprint"):
+                    val = graph_data.get(field)
+                    if val not in (None, ""):
+                        entity_rows.append((dispute_id, field, str(val), float(amount or 0.0)))
+                if entity_rows:
+                    conn.executemany(
+                        "INSERT INTO graph_entities (dispute_id, entity_type, entity_value, amount) VALUES (?, ?, ?, ?)",
+                        entity_rows,
+                    )
             conn.commit()
         except sqlite3.IntegrityError:
             conn.rollback()

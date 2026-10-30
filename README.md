@@ -363,6 +363,18 @@ make hard-cases
 make latency
 ```
 
+Benchmark across database scales (`python scripts/latency.py`):
+
+| SQLite History Scale | Runs | P50 Latency | P95 Latency | Subgraph Traversal |
+|---|---:|---:|---:|---|
+| Clean DB | 50 | 30.5 ms | 35.7 ms | 0 rows loaded |
+| 100 historical rows | 50 | 32.5 ms | 109.3 ms | $\le 2$-hop indexed subgraph |
+| 1,000 historical rows | 50 | 34.5 ms | 44.3 ms | $\le 2$-hop indexed subgraph |
+| 10,000 historical rows | 50 | 34.9 ms | 53.4 ms | $\le 2$-hop indexed subgraph |
+| 50,000 historical rows | 25 | 32.6 ms | 41.0 ms | $\le 2$-hop indexed subgraph |
+
+*Measured locally with unique dispute IDs per request. Indexed lookup on `graph_entities(entity_type, entity_value)` with hub degree capping ($\le 20$) keeps decision latency flat and isolated from table growth.*
+
 ---
 
 ## Streamlit application
