@@ -27,6 +27,12 @@ CASES = [
 
 
 def main() -> int:
+    # Ensure no stray database or temporary files exist in root
+    stray_files = [str(f.name) for f in ROOT.glob("*.db")] + [str(f.name) for f in ROOT.glob("test_*.pkl*")]
+    if stray_files:
+        print(f"ERROR: Stray test files found in repository root: {stray_files}", file=sys.stderr)
+        return 1
+
     profile = load_policy_profile()
     results = []
     with tempfile.TemporaryDirectory(prefix="release_verify_") as tmp:
@@ -66,6 +72,7 @@ def main() -> int:
     (ARTIFACTS_DIR / "release_verification.json").write_text(json.dumps(report, indent=2))
     print(json.dumps(report, indent=2))
     return 0 if report["valid"] else 1
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

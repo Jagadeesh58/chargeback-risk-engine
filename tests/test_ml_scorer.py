@@ -24,13 +24,15 @@ TEST_MODEL_PATH = "test_ml_scorer_model_pytest.pkl"
 
 @pytest.fixture(autouse=True)
 def clean_model_file():
-    if os.path.exists(TEST_MODEL_PATH):
-        os.remove(TEST_MODEL_PATH)
+    for f in (TEST_MODEL_PATH, TEST_MODEL_PATH + ".sha256"):
+        if os.path.exists(f):
+            os.remove(f)
     import chargeback_risk_engine.ml_scorer as ml_scorer
     ml_scorer._cached_scorer = None
     yield
-    if os.path.exists(TEST_MODEL_PATH):
-        os.remove(TEST_MODEL_PATH)
+    for f in (TEST_MODEL_PATH, TEST_MODEL_PATH + ".sha256"):
+        if os.path.exists(f):
+            os.remove(f)
     ml_scorer._cached_scorer = None
 
 

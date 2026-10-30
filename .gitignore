@@ -29,6 +29,7 @@ Thumbs.db
 artifacts/*
 !artifacts/hard_cases_report.json
 !artifacts/policy_profile.json
+!artifacts/candidate_benchmark.json
 audit_log.db
 !artifacts/baseline_benchmark.json
 !artifacts/baseline_manifest.json

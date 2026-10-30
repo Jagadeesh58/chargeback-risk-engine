@@ -21,6 +21,11 @@ def artifacts():
     profile_path = ARTIFACTS_DIR / "policy_profile.json"
     oracle_path = ARTIFACTS_DIR / "oracle_ceiling.json"
 
+    if not benchmark_path.exists():
+        import subprocess
+        import sys
+        subprocess.run([sys.executable, str(REPO_ROOT / "scripts" / "benchmark.py")], check=True)
+
     assert benchmark_path.exists(), "candidate_benchmark.json missing. Run scripts/benchmark.py"
     assert profile_path.exists(), "policy_profile.json missing."
 
