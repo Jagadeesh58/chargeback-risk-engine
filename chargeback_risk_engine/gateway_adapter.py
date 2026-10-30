@@ -1,28 +1,12 @@
 """
-razorpay_adapter.py — translates between this project's internal
-dispute/evidence shapes and Razorpay's real Disputes API shapes, so the
-evidence this system assembles could plug into a real integration later
-without changing scorer.py/evidence.py/policy.py at all.
+payment-gateway adapter — translates between this project's internal
+ dispute/evidence shapes and a generic payment‑gateway dispute API shape, enabling
+ integration without vendor lock‑in. The adapter provides mock request/response
+ structures suitable for demo and testing; no network calls or credentials are used.
 
-The field names below mirror Razorpay's public Disputes API
-(razorpay.com/docs/api/disputes), specifically the dispute entity
-(id, payment_id, amount, currency, reason_code, respond_by, status,
-phase) and the PATCH /v1/disputes/:id/contest endpoint's request body
-(amount, summary, shipping_proof, billing_proof, cancellation_proof,
-customer_communication, proof_of_service, explanation_letter,
-refund_confirmation, access_activity_log, refund_cancellation_policy,
-term_and_conditions, others, action). That endpoint's own "action"
-field takes "draft" or "submit" -- this project only ever produces
-"draft".
-
-There is no code here that actually calls Razorpay's servers. This
-project has zero Razorpay credentials, and an autonomous system
-shouldn't auto-submit real evidence to a real dispute without a human
-in the loop anyway, so a live-submission path would be both unverified
-and against the project's own safety stance. Everything below is a
-mock: it produces exactly the request/response shapes a real
-integration would use, so the pipeline's output is realistic and
-swappable later, without ever making a network call.
+Field mappings are defined generically; the adapter produces a draft payload
+ for contesting disputes. The `action` field is always "draft" in the automatic
+ pipeline, preserving safety by preventing unintended submissions.
 """
 
 import hashlib
@@ -30,14 +14,11 @@ import hashlib
 from chargeback_risk_engine.paths import DATA_DIR
 from datetime import datetime, timedelta, timezone
 
-# Best-effort mapping from this project's evidence fields to Razorpay's
-# evidence categories. Razorpay's categories are generic across reason
-# codes (shipping_proof, billing_proof, ...), not specific to the 4
-# reason codes this project uses, so this mapping is my own judgment
-# call about the closest match for each field -- not something
-# Razorpay documents directly. Anything without an obvious match falls
-# back to "others".
-EVIDENCE_FIELD_TO_RAZORPAY_CATEGORY = {
+# Mapping from internal evidence fields to generic payment‑gateway evidence categories.
+# Categories are generic across reason codes (shipping_proof, billing_proof, ...).
+# This mapping is based on domain knowledge and does not rely on any vendor documentation.
+# Fields without a clear match fall back to "others".
+EVIDENCE_FIELD_TO_GATEWAY_CATEGORY = {
     "has_tracking_number": "shipping_proof",
     "has_delivery_confirmation": "shipping_proof",
     "has_signature_confirmation": "shipping_proof",
@@ -47,7 +28,7 @@ EVIDENCE_FIELD_TO_RAZORPAY_CATEGORY = {
     "has_refund_already_issued": "refund_confirmation",
 }
 
-RAZORPAY_EVIDENCE_CATEGORIES = (
+GATEWAY_EVIDENCE_CATEGORIES = (
     "shipping_proof", "billing_proof", "cancellation_proof",
     "customer_communication", "proof_of_service", "explanation_letter",
     "refund_confirmation", "access_activity_log",
@@ -68,19 +49,19 @@ def _mock_document_id(dispute_id: str, field_name: str) -> str:
 
 
 # IMPORTANT: this adapter is intentionally local/mock.
-# It never uses Razorpay credentials or performs a network request.
+# It never uses gateway credentials or performs a network request.
 
 def fetch_dispute(dispute_id: str, csv_path: str | None = None) -> dict:
     """
     Stands in for GET /v1/disputes/:id. A real integration would call
-    that endpoint on Razorpay's servers and get back a JSON object
+    that endpoint on the payment gateway's servers and get back a JSON object
     shaped like the one this function returns; this mock looks the
     dispute up in our own synthetic dataset instead, so the whole
-    pipeline can be exercised with zero Razorpay credentials.
+    pipeline can be exercised with zero gateway credentials.
 
-    Note: a real Razorpay dispute entity would NOT include the
+    Note: a real payment-gateway dispute entity would not typically include the
     has_tracking_number-style evidence fields returned here -- those
-    come from the merchant's own systems, not from Razorpay. They're
+    come from the merchant's own systems, not from the gateway. They're
     bundled in below only because that's how this project's synthetic
     dataset happens to store everything in one row.
     """
@@ -114,7 +95,7 @@ def fetch_dispute(dispute_id: str, csv_path: str | None = None) -> dict:
         "id": f"disp_MOCK{dispute_id}",
         "entity": "dispute",
         "payment_id": f"pay_MOCK{dispute_id}",
-        "amount": int(round(row["amount"] * 100)),  # Razorpay amounts are in paise
+        "amount": int(round(row["amount"] * 100)),  # amounts in minor units (e.g. paise/cents)
         "currency": "INR",
         "amount_deducted": int(round(row["amount"] * 100)),
         "reason_code": row["reason_code"],
@@ -128,35 +109,34 @@ def fetch_dispute(dispute_id: str, csv_path: str | None = None) -> dict:
     }
 
 
-def razorpay_dispute_to_internal_dict(rp_dispute: dict) -> dict:
-    """The inverse of fetch_dispute()'s shaping: takes a Razorpay-shaped
-    dispute (paise, disp_/pay_ prefixed ids) and converts it into the
+def gateway_dispute_to_internal_dict(gateway_dispute: dict) -> dict:
+    """The inverse of fetch_dispute()'s shaping: takes a payment-gateway-shaped
+    dispute (minor currency units, disp_/pay_ prefixed ids) and converts it into the
     plain dict scorer.py/evidence.py/policy.py already expect."""
-    internal = dict(rp_dispute)
-    internal["dispute_id"] = rp_dispute["id"].removeprefix("disp_MOCK")
-    internal["payment_id"] = rp_dispute["payment_id"]
-    internal["amount"] = rp_dispute["amount"] / 100.0  # paise -> rupees
+    internal = dict(gateway_dispute)
+    internal["dispute_id"] = gateway_dispute["id"].removeprefix("disp_MOCK")
+    internal["payment_id"] = gateway_dispute["payment_id"]
+    internal["amount"] = gateway_dispute["amount"] / 100.0  # minor units -> major units
     return internal
 
 
 def build_contest_payload(dispute_id: str, amount: float, evidence_items: list[dict],
                             summary: str, action: str = "draft") -> dict:
     """
-    Builds the exact request body PATCH /v1/disputes/:id/contest would
-    take on the real API. `action` mirrors Razorpay's own field of the
-    same name ("draft" | "submit"). Nothing here calls a network
-    endpoint regardless of the value -- this only shapes a dict.
+    Builds the dispute contest request body for the payment gateway API.
+    `action` mirrors standard gateway fields of the same name ("draft" | "submit").
+    Nothing here calls a network endpoint regardless of the value -- this only shapes a dict.
     """
     if action not in ("draft", "submit"):
         raise ValueError(f"action must be 'draft' or 'submit', got {action!r}")
 
-    payload = {category: [] for category in RAZORPAY_EVIDENCE_CATEGORIES}
+    payload = {category: [] for category in GATEWAY_EVIDENCE_CATEGORIES}
     others = []
 
     for item in evidence_items:
         if item["status"] != "PASS":
             continue  # never attach evidence that wasn't confirmed present
-        category = EVIDENCE_FIELD_TO_RAZORPAY_CATEGORY.get(item["field"], "others")
+        category = EVIDENCE_FIELD_TO_GATEWAY_CATEGORY.get(item["field"], "others")
         doc_id = _mock_document_id(dispute_id, item["field"])
         if category == "others":
             others.append({"type": item["field"], "document_ids": [doc_id]})

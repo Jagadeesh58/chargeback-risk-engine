@@ -13,7 +13,7 @@ from chargeback_risk_engine.evidence import assemble
 from chargeback_risk_engine.ml_scorer import dispute_from_evidence_items, load_or_fit_ml_scorer
 from chargeback_risk_engine.policy import decide
 from chargeback_risk_engine.policy_profile import decision_score, load_policy_profile
-from chargeback_risk_engine.razorpay_adapter import generate_contest_draft
+from chargeback_risk_engine.gateway_adapter import generate_contest_draft
 from chargeback_risk_engine.engine.economic_decision import calculate_economic_value
 from chargeback_risk_engine.ai_analyst import analyze_evidence
 from chargeback_risk_engine.engine.evidence_score import score_evidence

@@ -16,7 +16,7 @@ flowchart TD
     DEC --> AC["AUTO-CONTEST"]
     DEC --> HR["HUMAN-REVIEW"]
     DEC --> AL["ACCEPT-LOSS"]
-    AC --> DRAFT["Razorpay-compatible contest draft<br/>no external submission"]
+    AC --> DRAFT["Chargeback Risk Engine contest draft<br/>no external submission"]
     DEC --> EXP["Structured explanation"]
     EXP --> CF["Bounded read-only counterfactual<br/>reruns the same decision path"]
     DEC --> AUDIT["SQLite audit/idempotency"]
@@ -58,8 +58,8 @@ The following all call `decide_case(...)`:
 
 - FastAPI `/decision`
 - Streamlit `apps/app_deployed.py`
-- `scripts/demo.py`
-- `scripts/benchmark.py`
+
+
 - `chargeback_risk_engine.metrics.run_pipeline`
 - `engine/counterfactual.py`
 
@@ -145,7 +145,7 @@ The chronological check is intentionally not advertised as temporal robustness b
 
 ## External integration boundary
 
-`razorpay_adapter.py` creates a contest draft only. There is no production submission path in the demo or benchmark.
+`gateway_adapter.py` creates a contest draft only. There is no production submission path in the demo or benchmark.
 
 ## Submission notes
 

@@ -72,4 +72,4 @@ These are synthetic demo cases, not production examples.
 
 ## Integration scope
 
-The Razorpay-compatible adapter creates a **contest draft**. The demo never submits a real dispute externally and does not require credentials.
+The payment-gateway adapter creates a **contest draft**. The demo never submits a real dispute externally and does not require credentials.

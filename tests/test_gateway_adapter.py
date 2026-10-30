@@ -1,16 +1,16 @@
 """
-test_razorpay_adapter.py — real, runnable tests for razorpay_adapter.py.
+test_gateway_adapter.py — real, runnable tests for gateway_adapter.py.
 """
 
 import csv
 
 import pytest
 
-from chargeback_risk_engine.razorpay_adapter import (
+from chargeback_risk_engine.gateway_adapter import (
     build_contest_payload,
     fetch_dispute,
     generate_contest_draft,
-    razorpay_dispute_to_internal_dict,
+    gateway_dispute_to_internal_dict,
 )
 
 
@@ -87,14 +87,14 @@ def test_build_contest_payload_supports_explicit_submit():
     assert payload["action"] == "submit"
 
 
-def test_razorpay_dispute_to_internal_dict_round_trips_amount():
-    rp_dispute = {
+def test_gateway_dispute_to_internal_dict_round_trips_amount():
+    gw_dispute = {
         "id": "disp_MOCKD0001",
         "payment_id": "pay_MOCKD0001",
         "amount": 200000,
         "reason_code": "item_not_received",
     }
-    internal = razorpay_dispute_to_internal_dict(rp_dispute)
+    internal = gateway_dispute_to_internal_dict(gw_dispute)
     assert internal["dispute_id"] == "D0001"
     assert internal["amount"] == 2000.0
 
@@ -104,11 +104,11 @@ def test_fetch_dispute_matches_real_csv_row():
     with open("data/test.csv", newline="") as f:
         row = next(r for r in csv.DictReader(f) if r["dispute_id"] == dispute_id)
 
-    rp_dispute = fetch_dispute(dispute_id)
-    assert rp_dispute["id"] == f"disp_MOCK{dispute_id}"
-    assert rp_dispute["reason_code"] == row["reason_code"]
-    assert rp_dispute["amount"] == int(round(float(row["amount"]) * 100))
-    assert rp_dispute["currency"] == "INR"
+    gw_dispute = fetch_dispute(dispute_id)
+    assert gw_dispute["id"] == f"disp_MOCK{dispute_id}"
+    assert gw_dispute["reason_code"] == row["reason_code"]
+    assert gw_dispute["amount"] == int(round(float(row["amount"]) * 100))
+    assert gw_dispute["currency"] == "INR"
 
 
 def test_fetch_dispute_round_trips_through_internal_dict():
@@ -116,8 +116,8 @@ def test_fetch_dispute_round_trips_through_internal_dict():
     with open("data/test.csv", newline="") as f:
         row = next(r for r in csv.DictReader(f) if r["dispute_id"] == dispute_id)
 
-    rp_dispute = fetch_dispute(dispute_id)
-    internal = razorpay_dispute_to_internal_dict(rp_dispute)
+    gw_dispute = fetch_dispute(dispute_id)
+    internal = gateway_dispute_to_internal_dict(gw_dispute)
     assert internal["dispute_id"] == dispute_id
     assert internal["amount"] == pytest.approx(float(row["amount"]))
 

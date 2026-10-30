@@ -38,7 +38,7 @@ python scripts/latency.py
 | Development | 5,000 |
 | Held-out test | 5,000 |
 
-The bundled dataset is synthetic. It is included for reproducible development and evaluation and is not a representation of production Razorpay traffic.
+The bundled dataset is synthetic. It is included for reproducible development and evaluation and is not a representation of production payment-gateway traffic.
 
 ## Safety verification
 
