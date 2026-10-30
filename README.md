@@ -2,17 +2,68 @@
 
 [![CI](https://github.com/Jagadeesh58/chargeback-risk-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/Jagadeesh58/chargeback-risk-engine/actions/workflows/ci.yml)
 
-> **ML estimates risk. Evidence adds context. Economics measures value. Deterministic policy controls the financial action.**
+Chargeback disputes cost online merchants over \$100B annually in lost revenue, bank fines, and manual triage costs. This engine automates high-confidence dispute representments while strictly enforcing deterministic safety policy, card network dispute limits, and cryptographic audit trails.
 
-Chargeback Risk Engine is an auditable decision system for evaluating chargeback disputes and deciding whether a case should be:
+**Live demo:** https://chargebackriskengine.streamlit.app/ | **Key Decisions:** [docs/DECISIONS.md](docs/DECISIONS.md) | **Economics Deep Dive:** [docs/WHY_NOT_CONTEST_EVERYTHING.md](docs/WHY_NOT_CONTEST_EVERYTHING.md)
 
-- `AUTO-CONTEST`
-- `HUMAN-REVIEW`
-- `ACCEPT-LOSS`
+---
 
-The system combines reason-code-aware risk scoring, evidence validation, relationship context, economic decisioning, bounded AI analysis, deterministic safety controls, and durable auditability.
+### Strategy Comparison
 
-**Live demo:** https://chargebackriskengine.streamlit.app/
+| Dimension | Naive Baseline (Rules / Manual) | Always-Contest (Spreadsheet Strategy) | Chargeback Risk Engine (This System) |
+|---|---|---|---|
+| **Action Selection** | Static heuristic rules | Blind 100% automated contest | **Deterministic policy gating calibrated ML** |
+| **Representment Win Rate** | ~50.2% baseline | ~50.2% (submits weak/failed claims) | **74.8% high-precision automation** |
+| **Card Network Standing** | Unmanaged dispute ratio | Severe risk of Visa VAMP / Mastercard VFMP bans | **Protected (monitors dispute hygiene & limits)** |
+| **Arbitration Risk** | Sporadic | Extreme (\$500 non-refundable network fee on loss) | **Shielded by strict evidence completeness gates** |
+| **Operational Impact** | Heavy manual triage | Zero oversight; catastrophic compliance fines | **Automates 33.3%, routes 59.9% to review, accepts 6.8% loss** |
+| **Auditability** | Ephemeral application logs | Mutable database records | **Tamper-evident SHA-256 hash-chained ledger** |
+
+---
+
+### 30-Second Quickstart
+
+```bash
+# 1. Clone repository and install dependencies
+git clone https://github.com/Jagadeesh58/chargeback-risk-engine.git
+cd chargeback-risk-engine
+pip install -r requirements.txt
+
+# 2. Run test suite & verify release criteria
+pytest -q
+python scripts/verify_release.py
+
+# 3. Launch interactive Streamlit demo or API
+streamlit run scripts/demo.py
+# or launch REST API: uvicorn chargeback_risk_engine.api:app --port 8000
+```
+
+---
+
+### Key Evaluation Snapshot
+
+*(Evaluated on 5,000 held-out synthetic test disputes; synthetic evaluation only, not a production performance guarantee)*
+
+| Metric | Result |
+|---|---:|
+| PR-AUC | **0.7234** |
+| Auto-contest precision | **74.8%** |
+| Auto-contest recall | **43.9%** |
+| Realized net value | **₹49.73 lakh (synthetic-only)** |
+| Selected policy threshold | **0.65** from `dev.csv` |
+| P95 local latency | **5.68 ms** |
+| Hard cases | **8 / 8 passed** |
+
+> [!NOTE]
+> **Automation vs. Unconstrained Recovery**: The headline ₹49.73L realized net value reflects **conservative automated recovery only** (contesting ~33% of disputes with 74.8% precision, with the 59.9% of cases routed to `HUMAN-REVIEW` counted as ₹0 automated recovery). In contrast, an unconstrained contest-everything strategy recovers ₹108.95L because the fixed contest cost (₹150) is very low relative to dispute amounts (~₹4,000). The engine is explicitly tuned for safe, high-precision automation with human oversight rather than blind contesting. See [docs/WHY_NOT_CONTEST_EVERYTHING.md](docs/WHY_NOT_CONTEST_EVERYTHING.md) for detailed analysis of card-brand dispute monitoring programs (Visa VAMP / Mastercard VFMP), \$500 arbitration penalties, operational review staffing costs (`human_review_cost`), and payment processing termination risks.
+
+---
+
+### What This Project Is NOT
+
+- **NOT an Unconstrained Auto-Responder:** It does NOT blindly contest every dispute. Submitting weak representments triggers card network fines (\$50–\$100/dispute) and payment processor termination.
+- **NOT a Payment Gateway:** It does NOT process credit cards, hold merchant funds, or initiate payment capture.
+- **NOT an LLM Financial Decision-Maker:** LLMs and ML models **only provide advisory signals**. They are strictly forbidden from choosing financial actions (`AUTO-CONTEST`, `HUMAN-REVIEW`, `ACCEPT-LOSS`). Only deterministic Python policy decides financial actions.
 
 ---
 
@@ -117,7 +168,7 @@ A deterministic relationship graph tracks contextual relationships such as:
 customer
 device
 IP address
-merchant
+card fingerprint
 related disputes
 ```
 
