@@ -25,8 +25,9 @@ HARD_CASES = [
 ]
 
 
-def main() -> dict:
-    ARTIFACTS_DIR.mkdir(exist_ok=True)
+def main(output_dir: Path | None = None) -> dict:
+    target_dir = Path(output_dir) if output_dir is not None else ARTIFACTS_DIR
+    target_dir.mkdir(exist_ok=True, parents=True)
     rows = []
     with tempfile.TemporaryDirectory(prefix="hard_cases_") as tmp:
         db = str(Path(tmp) / "audit.db")
@@ -47,10 +48,12 @@ def main() -> dict:
                 passed = result["action"] == "HUMAN-REVIEW"
             rows.append({"case": name, "action": result["action"], "reason": result["reason"], "passed": passed})
     report = {"suite": "frozen-hard-cases-v1", "total": len(rows), "passed": sum(r["passed"] for r in rows), "cases": rows}
-    (ARTIFACTS_DIR / "hard_cases_report.json").write_text(json.dumps(report, indent=2))
+    out_file = target_dir / "hard_cases_report.json"
+    out_file.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
     return report
 
 
 if __name__ == "__main__":
-    main()
+    out_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else None
+    main(output_dir=out_dir)

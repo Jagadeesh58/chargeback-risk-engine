@@ -187,11 +187,15 @@ def evaluate() -> dict:
     return result
 
 
-def main():
+def main(output_dir: Path | None = None) -> dict:
+    target_dir = Path(output_dir) if output_dir is not None else ARTIFACTS_DIR
+    target_dir.mkdir(exist_ok=True, parents=True)
     result = evaluate()
     print(json.dumps(result, indent=2))
-    (ARTIFACTS_DIR / "candidate_benchmark.json").write_text(json.dumps(result, indent=2))
+    (target_dir / "candidate_benchmark.json").write_text(json.dumps(result, indent=2))
+    return result
 
 
 if __name__ == "__main__":
-    main()
+    out_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else None
+    main(output_dir=out_dir)

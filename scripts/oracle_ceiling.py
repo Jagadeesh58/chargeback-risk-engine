@@ -146,7 +146,7 @@ def bootstrap_ci(
     }
 
 
-def main():
+def main(output_dir: Path | None = None) -> dict:
     test_path = DATA_DIR / "test.csv"
     if not test_path.exists():
         print(f"Error: {test_path} not found.")
@@ -252,12 +252,15 @@ def main():
         ),
     }
 
-    ARTIFACTS_DIR.mkdir(exist_ok=True)
-    out_file = ARTIFACTS_DIR / "oracle_ceiling.json"
+    target_dir = Path(output_dir) if output_dir is not None else ARTIFACTS_DIR
+    target_dir.mkdir(exist_ok=True, parents=True)
+    out_file = target_dir / "oracle_ceiling.json"
     out_file.write_text(json.dumps(output, indent=2), encoding="utf-8")
     print(f"Wrote oracle ceiling results to {out_file}")
     print(json.dumps(output, indent=2))
+    return output
 
 
 if __name__ == "__main__":
-    main()
+    out_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else None
+    main(output_dir=out_dir)
