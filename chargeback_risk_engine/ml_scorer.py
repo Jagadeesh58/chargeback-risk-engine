@@ -1,6 +1,14 @@
-"""Reason-aware Logistic Regression used as the single live risk model."""
+"""Reason-aware Logistic Regression used as the single live risk model.
+
+Security Note:
+Pickle deserialization executes arbitrary code and is only safe for trusted,
+hash-verified files. When saving, a SHA-256 sidecar (.sha256) is written.
+When loading, integrity is verified against the sidecar before unpickling.
+Set CHARGEBACK_REQUIRE_MODEL_HASH=1 to mandate the presence of the sidecar.
+"""
 from __future__ import annotations
 
+import hashlib
 import os
 import pickle
 
@@ -76,6 +84,11 @@ def save_ml_scorer(path: str = MODEL_PATH, train_csv: str | None = None) -> MLSc
             },
             f,
         )
+    # Write sidecar SHA-256 for integrity verification
+    with open(path, "rb") as f:
+        digest = hashlib.sha256(f.read()).hexdigest()
+    with open(path + ".sha256", "w", encoding="utf-8") as f:
+        f.write(digest.strip() + "\n")
     return scorer
 
 
@@ -87,6 +100,21 @@ def load_or_fit_ml_scorer(path: str = MODEL_PATH, train_csv: str | None = None) 
         return _cached_scorer
 
     if os.path.exists(path):
+        sidecar_path = path + ".sha256"
+        require_hash = os.getenv("CHARGEBACK_REQUIRE_MODEL_HASH", "0").lower() in ("1", "true", "yes")
+        if os.path.exists(sidecar_path):
+            with open(sidecar_path, "r", encoding="utf-8") as sf:
+                expected_hash = sf.read().strip()
+            with open(path, "rb") as f:
+                actual_hash = hashlib.sha256(f.read()).hexdigest()
+            if actual_hash != expected_hash:
+                raise ValueError(
+                    f"Model integrity failure: SHA-256 mismatch for {path}. "
+                    f"Expected {expected_hash}, got {actual_hash}."
+                )
+        elif require_hash:
+            raise ValueError(f"Model integrity failure: missing required sidecar hash {sidecar_path}")
+
         with open(path, "rb") as f:
             bundle = pickle.load(f)
         if isinstance(bundle, dict) and "scorer" in bundle:

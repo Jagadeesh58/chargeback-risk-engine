@@ -30,7 +30,9 @@ def clean_audit_db():
 def test_health_check():
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["auth"] in ("demo-open", "api-key")
 
 
 def test_score_strong_evidence_auto_contests():
@@ -305,3 +307,124 @@ def test_apps_api_audit_verify_endpoint_uses_canonical_audit_checker():
     data = response.json()
     assert data["valid"] is True
     assert "checked" in data
+
+
+# ---------------------------------------------------------------------------
+# API Hardening Tests (Auth, Rate Limit, Size Limit, Model Hash Integrity)
+# ---------------------------------------------------------------------------
+
+def test_api_key_auth_flow(monkeypatch):
+    """Test demo mode, missing key, wrong key, and correct key."""
+    from chargeback_risk_engine.api import _reset_rate_limiter
+    _reset_rate_limiter()
+
+    sample_payload = {
+        "dispute_id": "D_AUTH_TEST_1",
+        "payment_id": "pay_auth",
+        "reason_code": "item_not_received",
+        "amount": 1000.0,
+        "has_tracking_number": True,
+    }
+
+    # 1. Unset -> Demo mode
+    monkeypatch.delenv("CHARGEBACK_API_KEY", raising=False)
+    health = client.get("/health").json()
+    assert health["auth"] == "demo-open"
+    resp = client.post("/decision", json=sample_payload)
+    assert resp.status_code == 200
+
+    # 2. Key set -> Missing key returns 401
+    monkeypatch.setenv("CHARGEBACK_API_KEY", "secret-test-key-123")
+    health = client.get("/health").json()
+    assert health["auth"] == "api-key"
+
+    # Health remains open without credentials
+    health_resp = client.get("/health")
+    assert health_resp.status_code == 200
+
+    # Decision without key is rejected
+    unauth = client.post("/decision", json=sample_payload)
+    assert unauth.status_code == 401
+
+    # Decision with wrong key is rejected
+    wrong = client.post("/decision", json=sample_payload, headers={"X-API-Key": "wrong-key"})
+    assert wrong.status_code == 401
+
+    # Decision with correct key succeeds
+    sample_payload["dispute_id"] = "D_AUTH_TEST_2"
+    correct = client.post("/decision", json=sample_payload, headers={"X-API-Key": "secret-test-key-123"})
+    assert correct.status_code == 200
+
+
+def test_request_body_size_limit(monkeypatch):
+    """Payloads exceeding maximum body size should return 413."""
+    from chargeback_risk_engine.api import _reset_rate_limiter
+    _reset_rate_limiter()
+    monkeypatch.setenv("CHARGEBACK_MAX_BODY_BYTES", "512")
+    monkeypatch.delenv("CHARGEBACK_API_KEY", raising=False)
+
+    large_payload = {
+        "dispute_id": "D_LARGE",
+        "payment_id": "pay_large",
+        "reason_code": "item_not_received",
+        "amount": 1000.0,
+        "customer_id": "x" * 1000,
+    }
+    resp = client.post("/decision", json=large_payload)
+    assert resp.status_code == 413
+
+
+def test_rate_limiter_enforcement(monkeypatch):
+    """Requests exceeding rate limit return 429 with Retry-After header."""
+    from chargeback_risk_engine.api import _reset_rate_limiter
+    _reset_rate_limiter()
+    monkeypatch.setenv("CHARGEBACK_RATE_LIMIT", "2")
+    monkeypatch.delenv("CHARGEBACK_API_KEY", raising=False)
+
+    payload = {
+        "dispute_id": "D_RATE_1",
+        "payment_id": "pay_rate",
+        "reason_code": "item_not_received",
+        "amount": 1000.0,
+    }
+    headers = {"X-Client-Id": "test-rate-client"}
+
+    r1 = client.post("/decision", json=payload, headers=headers)
+    assert r1.status_code == 200
+
+    payload["dispute_id"] = "D_RATE_2"
+    r2 = client.post("/decision", json=payload, headers=headers)
+    assert r2.status_code == 200
+
+    payload["dispute_id"] = "D_RATE_3"
+    r3 = client.post("/decision", json=payload, headers=headers)
+    assert r3.status_code == 429
+    assert "Retry-After" in r3.headers
+
+
+def test_model_hash_verification(tmp_path, monkeypatch):
+    """Loading model with corrupted/mismatched sidecar hash raises ValueError."""
+    import chargeback_risk_engine.ml_scorer as ml_mod
+    monkeypatch.setattr(ml_mod, "_cached_scorer", None)
+
+    fake_model = tmp_path / "test_model.pkl"
+    fake_model.write_bytes(b"dummy model bytes")
+
+    sidecar = tmp_path / "test_model.pkl.sha256"
+    sidecar.write_text("invalid_hash_value\n")
+
+    with pytest.raises(ValueError, match="Model integrity failure"):
+        ml_mod.load_or_fit_ml_scorer(path=str(fake_model))
+
+    # Correct hash allows load to proceed (will fail later on pickle format, but integrity passes)
+    import hashlib
+    correct_hash = hashlib.sha256(b"dummy model bytes").hexdigest()
+    sidecar.write_text(correct_hash + "\n")
+
+    # Requiring hash sidecar when missing
+    missing_sidecar_model = tmp_path / "no_sidecar.pkl"
+    missing_sidecar_model.write_bytes(b"test")
+    monkeypatch.setenv("CHARGEBACK_REQUIRE_MODEL_HASH", "1")
+    with pytest.raises(ValueError, match="missing required sidecar hash"):
+        ml_mod.load_or_fit_ml_scorer(path=str(missing_sidecar_model))
+
