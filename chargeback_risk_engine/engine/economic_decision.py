@@ -16,6 +16,8 @@ class EconomicDecision:
     expected_cost: float
     expected_net_value: float
     economically_viable: bool
+    expected_human_review_net_value: float = 0.0
+    human_review_viable: bool = False
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -39,6 +41,7 @@ def calculate_economic_value(
     expected_recovery = probability_of_success * recoverable_amount
     expected_cost = float(contest_cost) + float(operational_cost)
     net = expected_recovery - expected_cost
+    human_review_net = expected_recovery - expected_cost - float(human_review_cost)
     return EconomicDecision(
         disputed_amount=amount,
         probability_of_success=probability_of_success,
@@ -50,4 +53,6 @@ def calculate_economic_value(
         expected_cost=expected_cost,
         expected_net_value=net,
         economically_viable=net > float(min_positive_net_value),
+        expected_human_review_net_value=human_review_net,
+        human_review_viable=human_review_net > float(min_positive_net_value),
     )

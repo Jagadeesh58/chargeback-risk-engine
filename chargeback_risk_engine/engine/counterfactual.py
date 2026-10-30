@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Callable
 
 from chargeback_risk_engine.config import RELEVANT_EVIDENCE_BY_REASON
+from chargeback_risk_engine.policy import GRAPH_HUMAN_REVIEW_THRESHOLD
 
 
 def _candidate_inputs(dispute: dict, limit: int = 10):
@@ -38,6 +39,8 @@ def find_minimal_decision_reversal(
     """Flip one valid input at a time and rerun the same canonical path."""
     original_action = current_result["action"]
     best_risk_change: dict | None = None
+    graph_risk = float(current_result.get("graph_analysis", {}).get("risk_score", 0.0))
+    is_graph_escalated = graph_risk >= GRAPH_HUMAN_REVIEW_THRESHOLD
 
     with TemporaryDirectory(prefix="chargeback_cf_") as tmp:
         db_path = str(Path(tmp) / "counterfactual.db")
@@ -50,6 +53,7 @@ def find_minimal_decision_reversal(
                 risk_graph=risk_graph,
                 db_path=db_path,
                 include_counterfactual=False,
+                call_ai_analyst=False,
             )
             delta = abs(float(result["win_probability"]) - float(current_result["win_probability"]))
             if result["action"] != original_action:
@@ -71,11 +75,18 @@ def find_minimal_decision_reversal(
                     "risk_delta_abs": delta,
                 }
 
+    if is_graph_escalated:
+        stmt = "No valid single-evidence change altered the decision; the case is held for manual review by relationship-risk cluster escalation."
+    elif best_risk_change is None:
+        stmt = "No valid single-input change altered the risk estimate or final decision within the bounded search."
+    else:
+        stmt = f"Changing {best_risk_change['field']} from {best_risk_change['from_value']!r} to {best_risk_change['to_value']!r} changes the modeled risk, but the deterministic policy still returns {original_action}."
+
     if best_risk_change is None:
         return {
             "status": "NO_CHANGE_FOUND",
             "from_action": original_action,
-            "statement": "No valid single-input change altered the risk estimate or final decision within the bounded search.",
+            "statement": stmt,
         }
     return {
         "status": "RISK_CHANGED_DECISION_UNCHANGED",
@@ -84,5 +95,5 @@ def find_minimal_decision_reversal(
         "from_value": best_risk_change["from_value"],
         "to_value": best_risk_change["to_value"],
         "risk_delta_abs": best_risk_change["risk_delta_abs"],
-        "statement": f"Changing {best_risk_change['field']} from {best_risk_change['from_value']!r} to {best_risk_change['to_value']!r} changes the modeled risk, but the deterministic policy still returns {original_action}.",
+        "statement": stmt,
     }

@@ -68,6 +68,9 @@ def deterministic_analysis(packet: dict, *, reason_code: str) -> EvidenceAnalysi
     )
 
 
+fallback_analysis = deterministic_analysis
+
+
 def analyze_evidence(packet: dict, *, reason_code: str, context_text: str | None = None) -> EvidenceAnalysis:
     """Return bounded structured analysis; fall back safely when no API is configured."""
     fallback = deterministic_analysis(packet, reason_code=reason_code)

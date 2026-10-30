@@ -9,12 +9,15 @@ instead of accidentally using fields from a mutated retry payload.
 import hashlib
 import json
 import sqlite3
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from chargeback_risk_engine.paths import REPO_ROOT
 
 DB_PATH = str(REPO_ROOT / "audit_log.db")
+
+_AUDIT_WRITE_LOCK = threading.Lock()
 
 
 def _get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
@@ -170,35 +173,41 @@ def log_new_decision(
     created_at = datetime.now(timezone.utc).isoformat()
     graph_data = graph_data or {}
     ai_metadata = ai_metadata or {}
-    conn = _get_connection(db_path)
-    try:
-        prev_row = conn.execute("SELECT record_hash FROM decisions ORDER BY rowid DESC LIMIT 1").fetchone()
-        prev_hash = prev_row[0] if prev_row and prev_row[0] else ""
-        payload = {"dispute_id": dispute_id, "reason_code": reason_code, "amount": float(amount), "win_probability": float(win_probability),
-                   "action": action, "reason": reason, "expected_value": float(expected_value), "evidence": evidence,
-                   "created_at": created_at, "model_version": model_version, "feature_version": feature_version,
-                   "policy_version": policy_version, "graph_data": graph_data, "ai_metadata": ai_metadata,
-                   "request_id": request_id, "routing_score": routing_score, "prev_hash": prev_hash}
-        record_hash = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-        conn.execute(
-            """INSERT INTO decisions
-               (dispute_id, reason_code, amount, win_probability, action,
-                reason, expected_value, evidence_json, created_at,
-                model_version, feature_version, policy_version, graph_data_json, ai_metadata_json, request_id, routing_score, prev_hash, record_hash)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (dispute_id, reason_code, amount, win_probability, action, reason, expected_value,
-             json.dumps(evidence, sort_keys=True), created_at, model_version, feature_version, policy_version,
-             json.dumps(graph_data, sort_keys=True), json.dumps(ai_metadata, sort_keys=True), request_id, routing_score, prev_hash, record_hash),
-        )
-        conn.commit()
-    except sqlite3.IntegrityError:
-        # Another concurrent request won the insert race. Replay its durable row.
-        existing = get_existing_decision(dispute_id, db_path)
-        if existing is None:
+    with _AUDIT_WRITE_LOCK:
+        conn = _get_connection(db_path)
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            prev_row = conn.execute("SELECT record_hash FROM decisions ORDER BY rowid DESC LIMIT 1").fetchone()
+            prev_hash = prev_row[0] if prev_row and prev_row[0] else ""
+            payload = {"dispute_id": dispute_id, "reason_code": reason_code, "amount": float(amount), "win_probability": float(win_probability),
+                       "action": action, "reason": reason, "expected_value": float(expected_value), "evidence": evidence,
+                       "created_at": created_at, "model_version": model_version, "feature_version": feature_version,
+                       "policy_version": policy_version, "graph_data": graph_data, "ai_metadata": ai_metadata,
+                       "request_id": request_id, "routing_score": routing_score, "prev_hash": prev_hash}
+            record_hash = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            conn.execute(
+                """INSERT INTO decisions
+                   (dispute_id, reason_code, amount, win_probability, action,
+                    reason, expected_value, evidence_json, created_at,
+                    model_version, feature_version, policy_version, graph_data_json, ai_metadata_json, request_id, routing_score, prev_hash, record_hash)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (dispute_id, reason_code, amount, win_probability, action, reason, expected_value,
+                 json.dumps(evidence, sort_keys=True), created_at, model_version, feature_version, policy_version,
+                 json.dumps(graph_data, sort_keys=True), json.dumps(ai_metadata, sort_keys=True), request_id, routing_score, prev_hash, record_hash),
+            )
+            conn.commit()
+        except sqlite3.IntegrityError:
+            conn.rollback()
+            # Another concurrent request won the insert race. Replay its durable row.
+            existing = get_existing_decision(dispute_id, db_path)
+            if existing is None:
+                raise
+            return existing
+        except Exception:
+            conn.rollback()
             raise
-        return existing
-    finally:
-        conn.close()
+        finally:
+            conn.close()
 
     return LoggedDecision(
         dispute_id=dispute_id,

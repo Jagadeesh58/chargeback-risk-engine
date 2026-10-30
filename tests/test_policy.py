@@ -121,3 +121,60 @@ def test_evidence_gate_never_overrides_the_ceiling():
     packet = assemble(dispute)
     decision = decide(win_probability=0.99, amount=MONETARY_CEILING + 1, evidence_packet=packet)
     assert decision.action == "HUMAN-REVIEW"
+
+
+def test_low_probability_large_dispute_with_positive_ev_routes_to_human_review():
+    """Even if routing score is below accept_loss_threshold (e.g. 0.25 <= 0.30),
+    a large dispute amount (e.g. ₹40,000) yields positive EV (+₹9,850).
+    The policy must NOT walk away (ACCEPT-LOSS), but route to HUMAN-REVIEW."""
+    decision = decide(win_probability=0.25, amount=40_000.0)
+    assert decision.action == "HUMAN-REVIEW"
+    assert decision.expected_value == 9850.0
+    assert "positive" in decision.reason
+
+
+def test_monetary_bounds_and_policy_gates():
+    """Verify behavior across monetary spectrum and ensure policy gates fire."""
+    packet = assemble({
+        "reason_code": "item_not_received",
+        "has_tracking_number": True,
+        "has_delivery_confirmation": True,
+        "has_signature_confirmation": True,
+    })
+    from chargeback_risk_engine.engine.evidence_score import score_evidence
+    quality = score_evidence({
+        "reason_code": "item_not_received",
+        "has_tracking_number": True,
+        "has_delivery_confirmation": True,
+        "has_signature_confirmation": True,
+    }, packet)
+
+    # 1. Retry contest count limit gate
+    d_count = decide(0.9, 2000, evidence_packet=packet, evidence_quality=quality, contest_count=1)
+    assert d_count.action == "HUMAN-REVIEW"
+    assert "retry/contest limit" in d_count.reason
+
+    # 2. External service availability gate
+    d_ext = decide(0.9, 2000, evidence_packet=packet, evidence_quality=quality, external_service_available=False)
+    assert d_ext.action == "HUMAN-REVIEW"
+    assert "Required external service is unavailable" in d_ext.reason
+
+    # 3. Model confidence gate
+    d_conf = decide(0.9, 2000, evidence_packet=packet, evidence_quality=quality, model_confidence=0.4)
+    assert d_conf.action == "HUMAN-REVIEW"
+    assert "below the minimum" in d_conf.reason
+
+    # 4. Monetary bounds: sub-training, in-training, above training, exactly at ceiling, and extreme (₹100M)
+    # Small amount (₹150 dispute, EV <= 0)
+    d_small = decide(0.20, 150.0)
+    assert d_small.action == "ACCEPT-LOSS"
+    assert d_small.expected_value < 0
+
+    # In-training amount (₹4000)
+    d_mid = decide(0.9, 4000.0, evidence_packet=packet, evidence_quality=quality)
+    assert d_mid.action == "AUTO-CONTEST"
+
+    # Extreme amount (₹100,000,000)
+    d_extreme = decide(0.99, 100_000_000.0, evidence_packet=packet, evidence_quality=quality)
+    assert d_extreme.action == "HUMAN-REVIEW"
+    assert "exceeds monetary ceiling" in d_extreme.reason

@@ -54,7 +54,10 @@ async def security_middleware(request: Request, call_next):
         rate_limit = int(os.getenv("CHARGEBACK_RATE_LIMIT", "0"))
         if rate_limit > 0:
             client_ip = request.client.host if request.client else "unknown"
-            client_id = request.headers.get("X-Client-Id", client_ip)
+            if os.getenv("CHARGEBACK_ALLOW_TEST_CLIENT_HEADER") == "1":
+                client_id = request.headers.get("X-Client-Id", client_ip)
+            else:
+                client_id = client_ip
             now = time.time()
             cutoff = now - 60.0
             history = [t for t in _client_request_times[client_id] if t > cutoff]

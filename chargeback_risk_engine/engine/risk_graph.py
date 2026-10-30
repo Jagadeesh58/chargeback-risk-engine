@@ -5,7 +5,8 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 from typing import Iterable
 
-ENTITY_FIELDS = ("customer_id", "device_id", "ip_address", "card_fingerprint", "merchant_id")
+# Buyer-side identifiers only. merchant_id must not link unrelated buyer disputes.
+ENTITY_FIELDS = ("customer_id", "device_id", "ip_address", "card_fingerprint")
 
 
 @dataclass(frozen=True)
@@ -78,9 +79,6 @@ class RiskGraph:
                 shared.setdefault(kind, []).append(value)
         other_disputes = max(0, len(connected_nodes) - 1)
         shared_count = sum(len(v) for v in shared.values())
-        # Deterministic relationship-risk heuristic used for escalation context.
-        # These weights are hand-defined safety/demo parameters, not learned model weights.
-        risk_score = min(1.0, 0.10 * other_disputes + 0.15 * shared_count)
         connected_customers = set()
         historical_disputed_value = 0.0
         for related_node in connected_nodes:
@@ -90,10 +88,14 @@ class RiskGraph:
                     connected_customers.add(value)
             try:
                 dispute_id = related_node.split(":", 1)[1]
-                # Values are optionally attached to the node during add().
                 historical_disputed_value += float(getattr(self, "node_amounts", {}).get(dispute_id, 0.0))
             except (ValueError, TypeError):
                 pass
+
+        # Deterministic relationship-risk heuristic used for escalation context.
+        # Cross-customer infrastructure sharing (sybil/fraud ring) escalates risk.
+        cross_account_boost = 0.10 if len(connected_customers) > 1 else 0.0
+        risk_score = min(1.0, 0.10 * other_disputes + 0.15 * shared_count + cross_account_boost)
         risk_type = "ORGANIZED_ABUSE" if risk_score >= 0.60 else "SHARED_INFRASTRUCTURE" if risk_score > 0 else "NO_CLUSTER"
         clusters = []
         if other_disputes:

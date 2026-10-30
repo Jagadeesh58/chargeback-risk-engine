@@ -15,7 +15,7 @@ from chargeback_risk_engine.policy import decide
 from chargeback_risk_engine.policy_profile import decision_score, load_policy_profile
 from chargeback_risk_engine.gateway_adapter import generate_contest_draft
 from chargeback_risk_engine.engine.economic_decision import calculate_economic_value
-from chargeback_risk_engine.ai_analyst import analyze_evidence
+from chargeback_risk_engine.ai_analyst import analyze_evidence, fallback_analysis
 from chargeback_risk_engine.engine.evidence_score import score_evidence
 from chargeback_risk_engine.engine.decision_result import CanonicalDecision
 from chargeback_risk_engine.engine.explainability import build_explanation, logistic_feature_contributions
@@ -58,11 +58,13 @@ def _score_case(
     *,
     risk_graph: RiskGraph | None = None,
     db_path: str = DB_PATH,
+    call_ai_analyst: bool = True,
 ) -> dict:
     """Score and persist one case through the canonical decision path."""
     existing = get_existing_decision(dispute["dispute_id"], db_path)
     ml = load_or_fit_ml_scorer()
     points = load_or_fit_calibration_points()
+    graph = risk_graph if risk_graph is not None else RiskGraph(load_graph_rows(db_path))
 
     def compute():
         packet = assemble(dispute)
@@ -89,13 +91,24 @@ def _score_case(
             monetary_ceiling=profile.monetary_ceiling,
             min_evidence_completeness=profile.min_evidence_completeness,
             decision_score=routing_score,
+            contest_count=int(dispute.get("contest_count", 0) or 0),
+            external_service_available=bool(dispute.get("external_service_available", True)),
+            model_confidence=(
+                float(dispute["model_confidence"])
+                if dispute.get("model_confidence") is not None
+                else None
+            ),
         )
         evidence_list = [{"field": item.field, "status": item.status} for item in packet.items]
-        ai_analysis = analyze_evidence(
-            {"reason_code": packet.reason_code, "items": evidence_list},
-            reason_code=packet.reason_code,
-            context_text=str(dispute.get("evidence_text", "")),
-        )
+        if call_ai_analyst:
+            ai_analysis = analyze_evidence(
+                {"reason_code": packet.reason_code, "items": evidence_list},
+                reason_code=packet.reason_code,
+                context_text=str(dispute.get("evidence_text", "")),
+            )
+        else:
+            ai_analysis = fallback_analysis({"reason_code": packet.reason_code, "items": evidence_list}, reason_code=packet.reason_code)
+
         return (
             risk_probability,
             evidence_list,
@@ -108,7 +121,6 @@ def _score_case(
         )
 
     if existing is None:
-        graph = risk_graph or RiskGraph(load_graph_rows(db_path))
         logged = get_or_create_decision(
             dispute_id=dispute["dispute_id"],
             reason_code=dispute["reason_code"],
@@ -125,7 +137,6 @@ def _score_case(
         logged = existing
 
     original_dispute = _logged_dispute(logged)
-    graph = RiskGraph(load_graph_rows(db_path)) if risk_graph is None else risk_graph
     known_ids = {
         node_id.split(":", 1)[1]
         for node_id in graph.node_to_entities
@@ -150,7 +161,13 @@ def _score_case(
         graph_analysis=graph_result.to_dict(),
         feature_importance=contributions,
     )
-    ai_analysis = logged.ai_metadata or analyze_evidence({"reason_code": logged.reason_code, "items": logged.evidence}, reason_code=logged.reason_code).to_dict()
+    if logged.ai_metadata:
+        ai_analysis = logged.ai_metadata
+    elif call_ai_analyst:
+        ai_analysis = analyze_evidence({"reason_code": logged.reason_code, "items": logged.evidence}, reason_code=logged.reason_code).to_dict()
+    else:
+        ai_analysis = fallback_analysis({"reason_code": logged.reason_code, "items": logged.evidence}, reason_code=logged.reason_code).to_dict()
+
     draft = None
     if logged.action == "AUTO-CONTEST":
         draft = generate_contest_draft(
@@ -194,9 +211,11 @@ def decide_case(
     risk_graph: RiskGraph | None = None,
     db_path: str = DB_PATH,
     include_counterfactual: bool = True,
+    call_ai_analyst: bool = True,
 ) -> dict:
     """Public canonical entry point used by API, UI, demo and evaluation."""
-    result = _score_case(dispute, risk_graph=risk_graph, db_path=db_path)
+    active_graph = risk_graph if risk_graph is not None else RiskGraph(load_graph_rows(db_path))
+    result = _score_case(dispute, risk_graph=active_graph, db_path=db_path, call_ai_analyst=call_ai_analyst)
     if include_counterfactual:
         from chargeback_risk_engine.engine.counterfactual import find_minimal_decision_reversal
         original_record = get_existing_decision(dispute["dispute_id"], db_path)
@@ -205,7 +224,7 @@ def decide_case(
             counterfactual_input,
             result,
             decide_case,
-            risk_graph=risk_graph,
+            risk_graph=active_graph,
         )
         result["explanation"]["what_would_change"] = result["counterfactual"]["statement"]
     result_obj = CanonicalDecision(**result)

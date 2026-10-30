@@ -55,6 +55,29 @@ def test_risk_graph_detects_shared_device_and_ip():
     assert result.risk_score > 0
 
 
+def test_risk_graph_merchant_id_does_not_trigger_fraud_escalation():
+    """Verify that multiple unrelated disputes sharing only merchant_id are NOT linked."""
+    rows = [
+        {
+            "dispute_id": f"d_{i}",
+            "merchant_id": "merchant_busy_1",
+            "customer_id": f"cust_{i}",
+            "device_id": f"dev_{i}",
+            "ip_address": f"192.168.1.{i}",
+            "card_fingerprint": f"card_{i}",
+            "amount": 1000.0,
+        }
+        for i in range(15)
+    ]
+    graph = RiskGraph(rows)
+    for row in rows:
+        analysis = graph.analyze(row)
+        assert analysis.cluster_size == 1
+        assert analysis.risk_type == "NO_CLUSTER"
+        assert analysis.risk_score == 0.0
+        assert len(analysis.suspicious_clusters) == 0
+
+
 def test_feedback_is_idempotent_by_dispute_id(tmp_path):
     db = str(tmp_path / "audit.db")
     first = record_outcome(db, "d1", 0.8, "AUTO-CONTEST", recovered_amount=100)

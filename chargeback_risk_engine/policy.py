@@ -147,6 +147,12 @@ def decide(
         )
 
     if policy_score <= float(accept_loss_threshold):
+        if ev > 0:
+            return PolicyDecision(
+                HUMAN_REVIEW,
+                f"Routing score {policy_score:.2f} <= {float(accept_loss_threshold):.2f}, but expected net value ₹{ev:,.2f} is positive; routing to human review rather than accepting loss.",
+                ev,
+            )
         return PolicyDecision(
             ACCEPT_LOSS,
             f"Routing score {policy_score:.2f} <= {float(accept_loss_threshold):.2f}; contesting is not worthwhile at the configured threshold.",
