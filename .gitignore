@@ -34,3 +34,5 @@ audit_log.db
 !artifacts/baseline_manifest.json
 !artifacts/baseline_model_evaluation.json
 !artifacts/baseline_temporal_evaluation.json
+!artifacts/ml_scorer_model.pkl.sha256
+!artifacts/oracle_ceiling.json
