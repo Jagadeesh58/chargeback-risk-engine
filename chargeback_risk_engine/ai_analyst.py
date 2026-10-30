@@ -96,21 +96,56 @@ def analyze_evidence(packet: dict, *, reason_code: str, context_text: str | None
             raw = json.loads(response.read().decode("utf-8"))
         content = raw.get("choices", [{}])[0].get("message", {}).get("content", "")
         parsed = json.loads(content) if isinstance(content, str) else content
+        if not isinstance(parsed, dict):
+            return fallback
+
         required = {"summary", "supporting_evidence", "contradicting_evidence", "missing_evidence", "possible_dispute_arguments", "confidence"}
         if not required.issubset(parsed):
             return fallback
-        confidence = float(parsed["confidence"])
-        if not 0.0 <= confidence <= 1.0:
+
+        try:
+            confidence = float(parsed["confidence"])
+        except (ValueError, TypeError):
             return fallback
+        import math
+        if math.isnan(confidence) or not (0.0 <= confidence <= 1.0):
+            return fallback
+
+        for key in ("supporting_evidence", "contradicting_evidence", "missing_evidence", "possible_dispute_arguments"):
+            val = parsed.get(key)
+            if not isinstance(val, list) or not all(isinstance(x, str) for x in val):
+                return fallback
+
+        packet_items = packet.get("items", [])
+        field_status = {}
+        for item in packet_items:
+            if isinstance(item, dict):
+                field_status[item["field"]] = item.get("status")
+            elif hasattr(item, "field"):
+                field_status[item.field] = getattr(item, "status", None)
+
+        for field in parsed["supporting_evidence"] + parsed["contradicting_evidence"] + parsed["missing_evidence"]:
+            if field not in field_status:
+                return fallback
+
+        for field in parsed["supporting_evidence"]:
+            if field_status.get(field) == "FAIL":
+                return fallback
+
+        for field in parsed["contradicting_evidence"]:
+            if field_status.get(field) == "PASS":
+                return fallback
+
         return EvidenceAnalysis(
-            summary=_sanitize_text(parsed["summary"], 2000),
-            supporting_evidence=[_sanitize_text(v, 200) for v in parsed["supporting_evidence"][:20]],
-            contradicting_evidence=[_sanitize_text(v, 200) for v in parsed["contradicting_evidence"][:20]],
-            missing_evidence=[_sanitize_text(v, 200) for v in parsed["missing_evidence"][:20]],
-            possible_dispute_arguments=[_sanitize_text(v, 500) for v in parsed["possible_dispute_arguments"][:20]],
+            summary=str(parsed.get("summary", "")),
+            supporting_evidence=list(parsed["supporting_evidence"]),
+            contradicting_evidence=list(parsed["contradicting_evidence"]),
+            missing_evidence=list(parsed["missing_evidence"]),
+            possible_dispute_arguments=list(parsed["possible_dispute_arguments"]),
             confidence=confidence,
             provider=model,
             fallback=False,
         )
+
     except (OSError, urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError, KeyError, TypeError):
         return fallback
