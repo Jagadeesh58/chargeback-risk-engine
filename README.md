@@ -1,6 +1,6 @@
 # Chargeback Risk Engine
 
-**Razorpay AI Buildathon 2026 — Track 02: AI Risk Manager**
+**Chargeback Risk Engine**
 
 > **ML estimates risk. Evidence adds context. Economics measures value. Deterministic policy controls the financial action.**
 
@@ -266,10 +266,10 @@ The current public evaluation snapshot reports approximately:
 | Metric | Result |
 |---|---:|
 | PR-AUC | **0.7234** |
-| Auto-contest precision | **74.0%** |
-| Auto-contest recall | **48.4%** |
-| Realized net value | **₹54.41 lakh** |
-| Selected policy threshold | **0.645** from `dev.csv` |
+| Auto-contest precision | **74.8%** |
+| Auto-contest recall | **43.9%** |
+| Realized net value | **₹49.73 lakh (synthetic-only)** |
+| Selected policy threshold | **0.65** from `dev.csv` |
 | P95 local latency | **5.68 ms** |
 | Hard cases | **8 / 8 passed** |
 
@@ -447,7 +447,7 @@ chargeback-risk-engine/
 │   ├── policy.py
 │   ├── policy_optimizer.py
 │   ├── policy_profile.py
-│   └── razorpay_adapter.py
+│   └── gateway_adapter.py
 │
 ├── data/
 │   ├── train.csv
@@ -493,6 +493,19 @@ chargeback-risk-engine/
 
 ---
 
+
+## What goes beyond a basic scorer
+
+This repository implements safety-critical architectural controls beyond tabular probability scoring:
+
+1. **Deterministic Safety Authority**: The AI analyst and ML models provide signals only. Only deterministic policy can select financial actions (enforced by `tests/test_ai_analyst_evaluation.py` and `tests/test_safety_regression.py`).
+2. **Cryptographic Audit Log**: Every decision is persisted in a local SQLite hash chain using SHA-256 links, guaranteeing tamper evidence and idempotent decision replays.
+3. **Actionable Counterfactuals**: Automatically determines the minimal evidence reversal required to flip an adverse decision.
+4. **Distribution Drift Guard**: Continuous monitoring of incoming feature distributions and output risk scores.
+5. **Operational Review-Budget Optimizer**: Knapsack optimization that prioritizes human-review capacity toward maximum marginal financial recovery.
+6. **Leakage Verification Tooling**: Enforces strict separation between ground-truth training variables and live runtime features.
+7. **API Hardening & Model Integrity**: Constant-time API-key verification (`hmac.compare_digest`), request payload limits (413), rate limiting (429), and SHA-256 sidecar model hash verification before deserialization.
+
 ## Testing
 
 The test suite covers the decision engine and its supporting components, including:
@@ -513,7 +526,7 @@ The test suite covers the decision engine and its supporting components, includi
 - hard cases
 - drift monitoring
 - stress scenarios
-- Razorpay adapter behavior
+- Payment‑gateway adapter behavior
 - dashboard data dependencies
 
 Run:
@@ -574,7 +587,7 @@ For the complete security contract, see [`SECURITY.md`](SECURITY.md).
 
 The bundled dataset is synthetic.
 
-It should not be interpreted as a representation of Razorpay's production transaction or chargeback distribution.
+It should not be interpreted as a representation of production payment traffic or chargeback distribution.
 
 ### Predictive-performance claims
 
@@ -626,6 +639,6 @@ A production deployment would require additional:
 
 ## Project status
 
-Built for the **Razorpay AI Buildathon 2026 — Track 02: AI Risk Manager**.
+An auditable chargeback-dispute decision system combining machine learning, evidence assembly, risk graphs, and deterministic policy.
 
 This repository demonstrates an auditable, safety-bounded chargeback decision workflow in which automated financial actions remain under deterministic control.

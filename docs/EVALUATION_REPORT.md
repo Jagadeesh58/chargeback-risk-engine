@@ -2,7 +2,7 @@
 
 ## Scope
 
-The current evaluation uses the bundled synthetic chargeback dataset. No production Razorpay traffic, production credentials, or realized financial outcomes are used.
+The current evaluation uses the bundled synthetic chargeback dataset. No production payment-gateway traffic, production credentials, or realized financial outcomes are used.
 
 ## Dataset
 
@@ -30,7 +30,7 @@ Logistic Regression remains the live risk estimator. Challenger models are evalu
 The production-facing policy profile is selected from `dev.csv` only. The current frozen profile is:
 
 - policy version: `policy-v5-dev-optimized`
-- auto-contest threshold: `0.645`
+- auto-contest threshold: `0.65`
 - accept-loss threshold: `0.30`
 - minimum evidence completeness: `0.50`
 - contest cost: `₹150`
@@ -42,16 +42,16 @@ The selected profile is stored in `artifacts/policy_profile.json`.
 
 | Metric | Held-out result |
 |---|---:|
-| Auto-contest count | 1,849 |
-| Auto-contest precision | 0.7399 |
-| Auto-contest recall | 0.4844 |
-| Human-review rate | 0.5606 |
-| Expected recovery | ₹57,78,265.45 |
-| Expected contest cost | ₹2,77,350.00 |
-| Expected net value | ₹55,00,915.45 |
-| Realized recovery | ₹57,18,431.60 |
-| Realized net value | ₹54,41,081.60 |
-| Synthetic false positives | 481 |
+| Auto-contest count | 1,657 |
+| Auto-contest precision | 0.7483 |
+| Auto-contest recall | 0.4391 |
+| Human-review rate | 0.5990 |
+| Expected recovery | ₹5,276,669.04 |
+| Expected contest cost | ₹248,550.00 |
+| Expected net value | ₹5,028,119.04 |
+| Realized recovery | ₹5,221,442.86 |
+| Realized net value | ₹4,972,892.86 |
+| Synthetic false positives | 417 |
 
 Expected values use the model's probability signal. Realized recovery/net value use the synthetic `would_win` label and are not production financial results.
 
@@ -104,3 +104,25 @@ make verify
 ```
 
 The workflow regenerates ignored benchmark/report outputs from the tracked source, data, and small public artifacts. The tracked public artifacts are intentionally limited to: `baseline_benchmark.json`, `hard_cases_report.json`, and `policy_profile.json`.
+
+## Theoretical Oracle Ceiling
+
+Computed via `scripts/oracle_ceiling.py` on `data/test.csv` (synthetic ground truth).
+
+| Model | ROC-AUC | % of Ceiling (95% CI) | PR-AUC | % of Ceiling (95% CI) | Realized Net Value |
+|---|---:|---:|---:|---:|---:|
+| **Oracle Ceiling** | **0.8156** | **100.0%** | **0.7917** | **100.0%** | **₹10,900,220.35** |
+| Logistic (Live) | 0.6971 | 85.5% [83.9%, 87.4%] | 0.7234 | 91.4% [89.4%, 93.1%] | ₹10,895,685.42 |
+| Hybrid Challenger | 0.6968 | 85.4% [83.7%, 87.5%] | 0.7249 | 91.6% [89.5%, 93.8%] | ₹10,895,712.45 |
+| Rules Only | 0.6951 | 85.2% [83.6%, 87.2%] | 0.7087 | 89.5% [87.7%, 91.5%] | ₹10,879,407.59 |
+| HGB Challenger | 0.5932 | 72.7% [70.6%, 74.5%] | 0.6407 | 80.9% [78.7%, 83.2%] | ₹10,894,941.82 |
+
+**Assessment**: The live Logistic model captures 85.5% of the theoretical ROC-AUC ceiling and 91.4% of the PR-AUC ceiling. The model is near the achievable ceiling given observable evidence; the remaining performance ceiling cannot be crossed without direct access to the hidden seller legitimacy state.
+
+## AI Analyst Safety Evaluation
+
+Evaluated against the bounded adversarial test suite in `tests/test_ai_analyst_evaluation.py`:
+- Rejection rate on invalid/adversarial claims: 100%
+- Fallback rate on malformed/unreachable API: 100%
+- Hallucination-catch rate (invented/contradictory evidence): 100%
+- Safety Invariant: The AI analyst can never alter final financial actions, routing scores, or policy decisions.

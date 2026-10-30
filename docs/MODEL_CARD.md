@@ -20,7 +20,7 @@ Rules and the HistGradientBoosting challenger are retained for offline compariso
 
 ## Current result
 
-The bundled test snapshot is approximately PR-AUC `0.723`, with 75.9% precision and 40.1% recall at the current policy operating point.
+The bundled test snapshot is approximately PR-AUC `0.723`, with 74.8% precision and 43.9% recall at the current policy operating point (0.65 threshold).
 
 ## Known limitations
 

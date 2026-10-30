@@ -1,0 +1,117 @@
+{
+  "dataset": "data/test.csv",
+  "held_out_rows": 5000,
+  "oracle_ceiling": {
+    "roc_auc": 0.8155698008665223,
+    "pr_auc": 0.7917190137672473,
+    "brier": 0.146064,
+    "best_achievable_net_value": 10900220.35
+  },
+  "models": {
+    "rules": {
+      "roc_auc": 0.6951289368438593,
+      "pr_auc": 0.7086639397239196,
+      "brier": 0.2301797785174841,
+      "net_value": 10879407.59,
+      "pct_of_oracle_roc": 85.23230459309582,
+      "pct_of_oracle_pr": 89.50952641037057,
+      "pct_of_oracle_net_value": 99.80906110765,
+      "bootstrap_ci": {
+        "roc_auc_pct": {
+          "mean": 85.11686355063519,
+          "ci_lower": 83.57489367181743,
+          "ci_upper": 87.2199284649846
+        },
+        "pr_auc_pct": {
+          "mean": 89.44990417904992,
+          "ci_lower": 87.68162894389954,
+          "ci_upper": 91.4542260393091
+        },
+        "net_value_pct": {
+          "mean": 99.80814773820593,
+          "ci_lower": 99.70042689658774,
+          "ci_upper": 99.90923586019996
+        }
+      }
+    },
+    "logistic": {
+      "roc_auc": 0.6970949177741209,
+      "pr_auc": 0.7234116688966661,
+      "brier": 0.21650102515928074,
+      "net_value": 10895685.419999998,
+      "pct_of_oracle_roc": 85.47336071461636,
+      "pct_of_oracle_pr": 91.37227429393751,
+      "pct_of_oracle_net_value": 99.95839597866477,
+      "bootstrap_ci": {
+        "roc_auc_pct": {
+          "mean": 85.35040011551911,
+          "ci_lower": 83.89867587012704,
+          "ci_upper": 87.42104910712202
+        },
+        "pr_auc_pct": {
+          "mean": 91.3233127027923,
+          "ci_lower": 89.41808776201636,
+          "ci_upper": 93.11789939255469
+        },
+        "net_value_pct": {
+          "mean": 99.95337312586825,
+          "ci_lower": 99.91192399533944,
+          "ci_upper": 100.00046802469198
+        }
+      }
+    },
+    "hgb": {
+      "roc_auc": 0.5932097254624229,
+      "pr_auc": 0.6407084489872752,
+      "brier": 0.23955665345899296,
+      "net_value": 10894941.82,
+      "pct_of_oracle_roc": 72.73561684507598,
+      "pct_of_oracle_pr": 80.92624249840654,
+      "pct_of_oracle_net_value": 99.95157409822454,
+      "bootstrap_ci": {
+        "roc_auc_pct": {
+          "mean": 72.66131430246963,
+          "ci_lower": 70.62512941337921,
+          "ci_upper": 74.53426161396636
+        },
+        "pr_auc_pct": {
+          "mean": 80.97993531556187,
+          "ci_lower": 78.69157566548392,
+          "ci_upper": 83.22440048088748
+        },
+        "net_value_pct": {
+          "mean": 99.94769519946996,
+          "ci_lower": 99.90093100832703,
+          "ci_upper": 99.99440878679127
+        }
+      }
+    },
+    "hybrid": {
+      "roc_auc": 0.6968204680730294,
+      "pr_auc": 0.7248591148489777,
+      "brier": 0.21703034605874336,
+      "net_value": 10895712.45,
+      "pct_of_oracle_roc": 85.43970943169735,
+      "pct_of_oracle_pr": 91.55509748336986,
+      "pct_of_oracle_net_value": 99.95864395530316,
+      "bootstrap_ci": {
+        "roc_auc_pct": {
+          "mean": 85.3284648923144,
+          "ci_lower": 83.74851190873967,
+          "ci_upper": 87.50914658542875
+        },
+        "pr_auc_pct": {
+          "mean": 91.5825273724398,
+          "ci_lower": 89.48208013818645,
+          "ci_upper": 93.76602137084589
+        },
+        "net_value_pct": {
+          "mean": 99.95396566859334,
+          "ci_lower": 99.9161412707045,
+          "ci_upper": 100.00051120432401
+        }
+      }
+    }
+  },
+  "assessment": "The live Logistic and Hybrid models capture ~85-92% of the theoretical oracle ROC-AUC ceiling. They remain constrained by observation noise and missing evidence inherent to the data-generating process."
+}
