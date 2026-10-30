@@ -1,9 +1,11 @@
 """FastAPI boundary for the canonical chargeback decision service."""
 import hmac
+import logging
 import math
 import os
 import time
 from collections import defaultdict
+from contextlib import asynccontextmanager
 from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Header, Request
@@ -14,9 +16,26 @@ from chargeback_risk_engine.config import REASON_CODES
 from chargeback_risk_engine.audit_log import verify_audit_integrity, DB_PATH, PayloadConflictError
 from chargeback_risk_engine.engine.hybrid_pipeline import decide_case
 
-app = FastAPI(title="Chargeback Risk Engine API", version="1.0")
+logger = logging.getLogger("chargeback_risk_engine")
+
+
+def _log_auth_status_on_startup():
+    if not os.getenv("CHARGEBACK_API_KEY"):
+        logger.warning(
+            "SECURITY WARNING: CHARGEBACK_API_KEY is not set. API is running in development mode without authentication."
+        )
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _log_auth_status_on_startup()
+    yield
+
+
+app = FastAPI(title="Chargeback Risk Engine API", version="1.0", lifespan=lifespan)
 
 _client_request_times: dict[str, list[float]] = defaultdict(list)
+_MAX_CLIENT_ENTRIES = 5000
 
 
 def _reset_rate_limiter():
@@ -35,21 +54,7 @@ def require_api_key(x_api_key: str | None = Header(default=None, alias="X-API-Ke
 
 @app.middleware("http")
 async def security_middleware(request: Request, call_next):
-    # Request body size limit
-    max_bytes = int(os.getenv("CHARGEBACK_MAX_BODY_BYTES", "65536"))  # default 64 KB
-    content_length = request.headers.get("content-length")
-    if content_length:
-        try:
-            if int(content_length) > max_bytes:
-                return JSONResponse(status_code=413, content={"detail": "Payload Too Large"})
-        except ValueError:
-            pass
-
-    body = await request.body()
-    if len(body) > max_bytes:
-        return JSONResponse(status_code=413, content={"detail": "Payload Too Large"})
-
-    # Rate limiting
+    # 1. Rate limiting evaluated BEFORE reading body or allocating memory
     if request.url.path != "/health":
         rate_limit = int(os.getenv("CHARGEBACK_RATE_LIMIT", "0"))
         if rate_limit > 0:
@@ -70,6 +75,33 @@ async def security_middleware(request: Request, call_next):
                 )
             history.append(now)
             _client_request_times[client_id] = history
+            
+            # Bound memory size: evict expired clients if size exceeds threshold
+            if len(_client_request_times) > _MAX_CLIENT_ENTRIES:
+                expired = [k for k, v in _client_request_times.items() if not v or v[-1] <= cutoff]
+                for k in expired:
+                    _client_request_times.pop(k, None)
+
+    # 2. Request body size limit (content-length header + streaming chunk abort)
+    max_bytes = int(os.getenv("CHARGEBACK_MAX_BODY_BYTES", "65536"))  # default 64 KB
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > max_bytes:
+                return JSONResponse(status_code=413, content={"detail": "Payload Too Large"})
+        except ValueError:
+            pass
+
+    # Stream-read body with immediate abort for chunked transfer-encoding
+    body_chunks = []
+    received = 0
+    async for chunk in request.stream():
+        received += len(chunk)
+        if received > max_bytes:
+            return JSONResponse(status_code=413, content={"detail": "Payload Too Large"})
+        body_chunks.append(chunk)
+    body_bytes = b"".join(body_chunks)
+    request._body = body_bytes
 
     return await call_next(request)
 

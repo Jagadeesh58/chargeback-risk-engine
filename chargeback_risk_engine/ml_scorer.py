@@ -103,7 +103,10 @@ def load_or_fit_ml_scorer(path: str = MODEL_PATH, train_csv: str | None = None) 
 
     if os.path.exists(path):
         sidecar_path = path + ".sha256"
-        require_hash = os.getenv("CHARGEBACK_REQUIRE_MODEL_HASH", "0").lower() in ("1", "true", "yes")
+        require_hash = (
+            path == MODEL_PATH
+            or os.getenv("CHARGEBACK_REQUIRE_MODEL_HASH", "0").lower() in ("1", "true", "yes")
+        )
         if os.path.exists(sidecar_path):
             with open(sidecar_path, "r", encoding="utf-8") as sf:
                 expected_hash = sf.read().strip()

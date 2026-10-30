@@ -436,3 +436,46 @@ def test_model_hash_verification(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="missing required sidecar hash"):
         ml_mod.load_or_fit_ml_scorer(path=str(missing_sidecar_model))
 
+
+def test_streaming_chunked_body_size_limit_aborts(monkeypatch):
+    """Chunked transfer payloads exceeding max_bytes abort with 413."""
+    from chargeback_risk_engine.api import _reset_rate_limiter
+    _reset_rate_limiter()
+    monkeypatch.setenv("CHARGEBACK_MAX_BODY_BYTES", "512")
+    monkeypatch.delenv("CHARGEBACK_API_KEY", raising=False)
+
+    def chunk_generator():
+        for _ in range(10):
+            yield b"x" * 200
+
+    resp = client.post("/decision", content=chunk_generator(), headers={"Content-Type": "application/json"})
+    assert resp.status_code == 413
+
+
+def test_rate_limiter_evaluates_before_body_parsing(monkeypatch):
+    """Rate limited client receives 429 even when sending an oversized body."""
+    from chargeback_risk_engine.api import _reset_rate_limiter
+    _reset_rate_limiter()
+    monkeypatch.setenv("CHARGEBACK_RATE_LIMIT", "1")
+    monkeypatch.setenv("CHARGEBACK_MAX_BODY_BYTES", "512")
+    monkeypatch.delenv("CHARGEBACK_API_KEY", raising=False)
+    headers = {"X-Client-Id": "pre-rate-client"}
+
+    r1 = client.post("/decision", json={
+        "dispute_id": "D_PRE_1", "payment_id": "p1", "reason_code": "item_not_received", "amount": 1000.0
+    }, headers=headers)
+    assert r1.status_code == 200
+
+    oversized = {"dispute_id": "D_PRE_2", "payment_id": "p2", "reason_code": "item_not_received", "amount": 1000.0, "x": "x" * 2000}
+    r2 = client.post("/decision", json=oversized, headers=headers)
+    assert r2.status_code == 429
+
+
+def test_startup_warning_when_api_key_unset(monkeypatch, caplog):
+    import logging
+    from chargeback_risk_engine.api import _log_auth_status_on_startup
+    monkeypatch.delenv("CHARGEBACK_API_KEY", raising=False)
+    with caplog.at_level(logging.WARNING):
+        _log_auth_status_on_startup()
+    assert "CHARGEBACK_API_KEY is not set" in caplog.text
+
