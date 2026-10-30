@@ -236,8 +236,8 @@ def test_live_win_probability_matches_ml_scorer_module_directly():
     assert data["win_probability"] == expected
 
 def test_mutated_replay_uses_only_original_request_context():
-    """A retry with changed evidence/amount must be a true replay of the
-    original response data, not a hybrid of old and new request fields."""
+    """A retry with changed evidence/amount must return HTTP 409 Conflict,
+    naming the conflicting dispute_id, without overwriting the original decision."""
     payload = {
         "dispute_id": "D_API_MUTATED_REPLAY",
         "payment_id": "pay_original",
@@ -252,6 +252,12 @@ def test_mutated_replay_uses_only_original_request_context():
     assert first.status_code == 200
     first_data = first.json()
 
+    # Identical payload replays with 200 and replayed=True
+    exact = client.post("/score", json=payload)
+    assert exact.status_code == 200
+    assert exact.json()["replayed"] is True
+
+    # Mutated payload returns 409 Conflict naming the dispute_id
     mutated = dict(payload)
     mutated.update({
         "amount": 9999,
@@ -261,12 +267,14 @@ def test_mutated_replay_uses_only_original_request_context():
         "has_signature_confirmation": False,
     })
     second = client.post("/score", json=mutated)
-    assert second.status_code == 200
-    second_data = second.json()
+    assert second.status_code == 409
+    assert "D_API_MUTATED_REPLAY" in second.json()["detail"]
 
-    expected = dict(first_data)
-    expected["replayed"] = True
-    assert second_data == expected
+    # Verify original row was never overwritten
+    third = client.post("/score", json=payload)
+    assert third.status_code == 200
+    assert third.json()["amount"] == 3000
+    assert third.json()["replayed"] is True
 
 
 def test_live_api_graph_uses_persisted_relationship_history():

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from chargeback_risk_engine.audit_log import (
     DB_PATH,
+    PayloadConflictError,
+    canonical_payload_hash,
     get_existing_decision,
     get_or_create_decision,
     load_graph_rows,
@@ -61,7 +63,15 @@ def _score_case(
     call_ai_analyst: bool = True,
 ) -> dict:
     """Score and persist one case through the canonical decision path."""
-    existing = get_existing_decision(dispute["dispute_id"], db_path)
+    dispute_id = dispute["dispute_id"]
+    current_payload_hash = canonical_payload_hash(dispute)
+    existing = get_existing_decision(dispute_id, db_path)
+    if existing is not None:
+        if existing.payload_hash and existing.payload_hash != current_payload_hash:
+            raise PayloadConflictError(dispute_id)
+        if not existing.payload_hash:
+            if abs(float(existing.amount) - float(dispute.get("amount", 0))) > 1e-4 or existing.reason_code != dispute.get("reason_code"):
+                raise PayloadConflictError(dispute_id)
     ml = load_or_fit_ml_scorer()
     points = load_or_fit_calibration_points()
     graph = risk_graph if risk_graph is not None else RiskGraph(load_graph_rows(db_path))
@@ -132,6 +142,7 @@ def _score_case(
             policy_version=POLICY_VERSION,
             ai_metadata=None,
             request_id=str(dispute.get("request_id", dispute["dispute_id"])),
+            payload_hash=current_payload_hash,
         )
     else:
         logged = existing

@@ -20,6 +20,40 @@ DB_PATH = str(REPO_ROOT / "audit_log.db")
 _AUDIT_WRITE_LOCK = threading.Lock()
 
 
+class PayloadConflictError(Exception):
+    """Raised when an existing dispute_id is submitted with a conflicting payload."""
+
+    def __init__(self, dispute_id: str, message: str | None = None):
+        self.dispute_id = dispute_id
+        super().__init__(
+            message or f"Conflict: dispute_id '{dispute_id}' already exists with a different payload"
+        )
+
+
+def canonical_payload_hash(dispute: dict) -> str:
+    """Deterministic SHA-256 hash of normalized dispute request payload."""
+    ignored_keys = {
+        "request_id",
+        "created_at",
+        "db_path",
+        "risk_graph",
+        "call_ai_analyst",
+        "replayed",
+    }
+    normalized = {}
+    for k, v in dispute.items():
+        if k in ignored_keys:
+            continue
+        if isinstance(v, float):
+            normalized[k] = round(float(v), 4)
+        elif v is not None:
+            normalized[k] = v
+        else:
+            normalized[k] = None
+    canonical_json = json.dumps(normalized, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
+
 def _get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path, timeout=30)
     conn.execute("PRAGMA busy_timeout = 30000")
@@ -42,7 +76,8 @@ def _get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
             request_id TEXT NOT NULL DEFAULT '',
             routing_score REAL,
             prev_hash TEXT NOT NULL DEFAULT '',
-            record_hash TEXT NOT NULL DEFAULT ''
+            record_hash TEXT NOT NULL DEFAULT '',
+            payload_hash TEXT NOT NULL DEFAULT ''
         )
     """)
     existing_columns = {
@@ -58,6 +93,7 @@ def _get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
         "prev_hash": "TEXT NOT NULL DEFAULT ''",
         "record_hash": "TEXT NOT NULL DEFAULT ''",
         "routing_score": "REAL",
+        "payload_hash": "TEXT NOT NULL DEFAULT ''",
     }
     for name, definition in migrations.items():
         if name not in existing_columns:
@@ -86,6 +122,7 @@ class LoggedDecision:
     routing_score: float | None = None
     prev_hash: str = ""
     record_hash: str = ""
+    payload_hash: str = ""
     replayed: bool = False
 
 
@@ -114,6 +151,7 @@ def _row_to_logged_decision(record: dict, *, replayed: bool) -> LoggedDecision:
         routing_score=float(record.get("routing_score")) if record.get("routing_score") is not None else None,
         prev_hash=record.get("prev_hash", ""),
         record_hash=record.get("record_hash", ""),
+        payload_hash=record.get("payload_hash", ""),
         replayed=replayed,
     )
 
@@ -168,6 +206,7 @@ def log_new_decision(
     ai_metadata: dict | None = None,
     request_id: str = "",
     routing_score: float | None = None,
+    payload_hash: str = "",
 ) -> LoggedDecision:
     """Persist a new decision without replacing an existing dispute_id."""
     created_at = datetime.now(timezone.utc).isoformat()
@@ -184,16 +223,18 @@ def log_new_decision(
                        "created_at": created_at, "model_version": model_version, "feature_version": feature_version,
                        "policy_version": policy_version, "graph_data": graph_data, "ai_metadata": ai_metadata,
                        "request_id": request_id, "routing_score": routing_score, "prev_hash": prev_hash}
+            if payload_hash:
+                payload["payload_hash"] = payload_hash
             record_hash = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
             conn.execute(
                 """INSERT INTO decisions
                    (dispute_id, reason_code, amount, win_probability, action,
                     reason, expected_value, evidence_json, created_at,
-                    model_version, feature_version, policy_version, graph_data_json, ai_metadata_json, request_id, routing_score, prev_hash, record_hash)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    model_version, feature_version, policy_version, graph_data_json, ai_metadata_json, request_id, routing_score, prev_hash, record_hash, payload_hash)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (dispute_id, reason_code, amount, win_probability, action, reason, expected_value,
                  json.dumps(evidence, sort_keys=True), created_at, model_version, feature_version, policy_version,
-                 json.dumps(graph_data, sort_keys=True), json.dumps(ai_metadata, sort_keys=True), request_id, routing_score, prev_hash, record_hash),
+                 json.dumps(graph_data, sort_keys=True), json.dumps(ai_metadata, sort_keys=True), request_id, routing_score, prev_hash, record_hash, payload_hash),
             )
             conn.commit()
         except sqlite3.IntegrityError:
@@ -202,6 +243,8 @@ def log_new_decision(
             existing = get_existing_decision(dispute_id, db_path)
             if existing is None:
                 raise
+            if payload_hash and existing.payload_hash and existing.payload_hash != payload_hash:
+                raise PayloadConflictError(dispute_id)
             return existing
         except Exception:
             conn.rollback()
@@ -228,6 +271,7 @@ def log_new_decision(
         routing_score=routing_score,
         prev_hash=prev_hash,
         record_hash=record_hash,
+        payload_hash=payload_hash,
         replayed=False,
     )
 
@@ -247,6 +291,8 @@ def verify_audit_integrity(db_path: str = DB_PATH) -> dict:
                 "created_at": rec["created_at"], "model_version": rec["model_version"], "feature_version": rec["feature_version"],
                 "policy_version": rec["policy_version"], "graph_data": json.loads(rec["graph_data_json"] or "{}"), "ai_metadata": json.loads(rec.get("ai_metadata_json") or "{}"),
                 "request_id": rec.get("request_id", ""), "routing_score": rec.get("routing_score"), "prev_hash": rec.get("prev_hash", "") }
+            if rec.get("payload_hash"):
+                expected_payload["payload_hash"] = rec["payload_hash"]
             expected = hashlib.sha256(json.dumps(expected_payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
             if rec.get("prev_hash", "") != prev_hash or rec.get("record_hash", "") != expected:
                 return {"valid": False, "checked": checked, "failed_dispute_id": rec["dispute_id"]}
@@ -268,6 +314,7 @@ def get_or_create_decision(
     ai_metadata: dict | None = None,
     request_id: str = "",
     routing_score: float | None = None,
+    payload_hash: str = "",
 ) -> LoggedDecision:
     """Return an existing decision or compute and persist a new one.
 
@@ -277,6 +324,8 @@ def get_or_create_decision(
     """
     existing = get_existing_decision(dispute_id, db_path)
     if existing is not None:
+        if payload_hash and existing.payload_hash and existing.payload_hash != payload_hash:
+            raise PayloadConflictError(dispute_id)
         return existing
 
     computed = compute_decision_fn()
@@ -312,4 +361,5 @@ def get_or_create_decision(
         ai_metadata=ai_metadata,
         request_id=request_id,
         routing_score=routing_score,
+        payload_hash=payload_hash,
     )

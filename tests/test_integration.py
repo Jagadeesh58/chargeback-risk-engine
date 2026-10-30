@@ -63,7 +63,11 @@ def test_generated_case_matches_live_model_and_audit_round_trip():
     mutated = dict(request)
     mutated["amount"] = 9999
     mutated["has_tracking_number"] = False
-    replay = client.post("/decision", json=mutated).json()
+    conflict_resp = client.post("/decision", json=mutated)
+    assert conflict_resp.status_code == 409
+    assert "D_INTEGRATION_001" in conflict_resp.json()["detail"]
+
+    replay = client.post("/decision", json=request).json()
     assert replay["replayed"] is True
     assert replay["amount"] == data["amount"]
     assert replay["win_probability"] == data["win_probability"]

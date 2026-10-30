@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from chargeback_risk_engine.config import REASON_CODES
-from chargeback_risk_engine.audit_log import verify_audit_integrity, DB_PATH
+from chargeback_risk_engine.audit_log import verify_audit_integrity, DB_PATH, PayloadConflictError
 from chargeback_risk_engine.engine.hybrid_pipeline import decide_case
 
 app = FastAPI(title="Chargeback Risk Engine API", version="1.0")
@@ -144,7 +144,13 @@ def _score(request: DisputeRequest, request_id: str | None = None) -> DecisionRe
         )
     dispute = request.model_dump() if hasattr(request, "model_dump") else request.dict()
     dispute["request_id"] = request_id or dispute["dispute_id"]
-    return DecisionResponse(**decide_case(dispute))
+    try:
+        return DecisionResponse(**decide_case(dispute))
+    except PayloadConflictError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Conflict: dispute_id '{exc.dispute_id}' already exists with a different payload",
+        )
 
 
 @app.post("/decision", response_model=DecisionResponse, dependencies=[Depends(require_api_key)])

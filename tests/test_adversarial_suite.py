@@ -77,8 +77,14 @@ def test_invalid_case_id_is_rejected():
 
 
 def test_duplicate_request_replays_original_decision():
-    first = client.post("/decision", json=_base(dispute_id="ADV_REPLAY")).json()
-    second = client.post("/decision", json=_base(dispute_id="ADV_REPLAY", has_tracking_number=False)).json()
+    req = _base(dispute_id="ADV_REPLAY")
+    first = client.post("/decision", json=req).json()
+    second = client.post("/decision", json=req).json()
     assert first["replayed"] is False
     assert second["replayed"] is True
     assert second["action"] == first["action"]
+
+    # Same dispute_id with conflicting payload returns 409 naming the dispute
+    conflict = client.post("/decision", json=_base(dispute_id="ADV_REPLAY", has_tracking_number=False))
+    assert conflict.status_code == 409
+    assert "ADV_REPLAY" in conflict.json()["detail"]

@@ -9,7 +9,12 @@ import threading
 
 import pytest
 
-from chargeback_risk_engine.audit_log import get_or_create_decision, get_existing_decision
+from chargeback_risk_engine.audit_log import (
+    get_or_create_decision,
+    get_existing_decision,
+    verify_audit_integrity,
+    PayloadConflictError,
+)
 
 TEST_DB = "test_audit_log_pytest.db"
 
@@ -100,3 +105,53 @@ def test_concurrent_duplicate_submissions_only_compute_once():
     # At most a small number of threads may have raced into compute() before
     # the DB lock resolved, but they must all converge to the same stored answer.
     assert len(calls) >= 1
+
+
+def test_idempotency_conflict_raises_payload_conflict_error():
+    calls = []
+    # First submission
+    first = get_or_create_decision(
+        "D_CONFLICT",
+        "item_not_received",
+        2000.0,
+        _fake_compute(calls),
+        db_path=TEST_DB,
+        payload_hash="hash_alpha",
+    )
+    assert first.replayed is False
+    assert first.amount == 2000.0
+
+    # Same dispute_id, same payload_hash -> replay OK
+    replay = get_or_create_decision(
+        "D_CONFLICT",
+        "item_not_received",
+        2000.0,
+        _fake_compute(calls),
+        db_path=TEST_DB,
+        payload_hash="hash_alpha",
+    )
+    assert replay.replayed is True
+    assert replay.amount == 2000.0
+
+    # Same dispute_id, different payload_hash -> PayloadConflictError naming the dispute_id
+    with pytest.raises(PayloadConflictError) as exc_info:
+        get_or_create_decision(
+            "D_CONFLICT",
+            "item_not_received",
+            90000.0,
+            _fake_compute(calls),
+            db_path=TEST_DB,
+            payload_hash="hash_beta",
+        )
+    assert "D_CONFLICT" in str(exc_info.value)
+    assert exc_info.value.dispute_id == "D_CONFLICT"
+
+    # Verify audit row was NOT overwritten
+    existing = get_existing_decision("D_CONFLICT", db_path=TEST_DB)
+    assert existing.amount == 2000.0
+    assert existing.payload_hash == "hash_alpha"
+
+    # Verify audit chain integrity remains valid
+    audit_status = verify_audit_integrity(db_path=TEST_DB)
+    assert audit_status["valid"] is True
+    assert audit_status["checked"] == 1

@@ -120,12 +120,17 @@ def test_invalid_reason_is_rejected():
 
 
 def test_duplicate_request_is_replayed():
-    first = client.post("/decision", json=_base()).json()
-    second = client.post("/decision", json=_base(has_tracking_number=False)).json()
+    req = _base()
+    first = client.post("/decision", json=req).json()
+    second = client.post("/decision", json=req).json()
     assert first["replayed"] is False
     assert second["replayed"] is True
     assert second["win_probability"] == first["win_probability"]
     assert second["action"] == first["action"]
+
+    # Same dispute_id with conflicting payload returns 409
+    conflict = client.post("/decision", json=_base(has_tracking_number=False))
+    assert conflict.status_code == 409
 
 
 def test_ml_probability_is_advisory_to_policy():
