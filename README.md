@@ -1,6 +1,6 @@
 # Chargeback Risk Engine
 
-**Chargeback Risk Engine**
+[![CI](https://github.com/Jagadeesh58/chargeback-risk-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/Jagadeesh58/chargeback-risk-engine/actions/workflows/ci.yml)
 
 > **ML estimates risk. Evidence adds context. Economics measures value. Deterministic policy controls the financial action.**
 

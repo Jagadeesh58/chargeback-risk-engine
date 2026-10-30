@@ -2,7 +2,9 @@ name: verify
 
 on:
   push:
+    branches: [ main ]
   pull_request:
+    branches: [ main ]
 
 jobs:
   verify:
@@ -15,5 +17,7 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Run full verification
-        run: make verify
+      - name: Run test suite
+        run: python -m pytest -q
+      - name: Run release verification
+        run: python scripts/verify_release.py
