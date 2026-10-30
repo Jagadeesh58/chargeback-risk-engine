@@ -43,6 +43,14 @@ class RiskGraph:
         for row in rows:
             self.add(row)
 
+    def clone(self) -> RiskGraph:
+        """Return an independent copy with isolated node and entity indexes."""
+        g = RiskGraph()
+        g.entity_to_nodes = defaultdict(set, {k: set(v) for k, v in self.entity_to_nodes.items()})
+        g.node_to_entities = defaultdict(set, {k: set(v) for k, v in self.node_to_entities.items()})
+        g.node_amounts = dict(self.node_amounts)
+        return g
+
     def add(self, row: dict) -> None:
         node = f"dispute:{row.get('dispute_id', 'unknown')}"
         try:

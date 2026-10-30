@@ -505,7 +505,7 @@ This repository implements safety-critical architectural controls beyond tabular
 
 1. **Deterministic Safety Authority**: The AI analyst and ML models provide signals only. Only deterministic policy can select financial actions (enforced by `tests/test_ai_analyst_evaluation.py` and `tests/test_safety_regression.py`).
 2. **Cryptographic Audit Log**: Every decision is persisted in a local SQLite hash chain using SHA-256 links, guaranteeing tamper evidence and idempotent decision replays.
-3. **Actionable Counterfactuals**: Automatically determines the minimal evidence reversal required to flip an adverse decision.
+3. **Actionable Counterfactuals**: Evaluates single-change evidence reversals (checking actionable flips from missing/unconfirmed to confirmed) to explain what evidence would flip an adverse decision without promising joint-flip optimality.
 4. **Distribution Drift Guard**: Continuous monitoring of incoming feature distributions and output risk scores.
 5. **Operational Review-Budget Optimizer**: Knapsack optimization that prioritizes human-review capacity toward maximum marginal financial recovery.
 6. **Leakage Verification Tooling**: Enforces strict separation between ground-truth training variables and live runtime features.

@@ -1,8 +1,9 @@
 """Bounded, read-only counterfactual decision analysis."""
 from __future__ import annotations
 
-from tempfile import TemporaryDirectory
+import copy
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Callable
 
 from chargeback_risk_engine.config import RELEVANT_EVIDENCE_BY_REASON
@@ -14,12 +15,11 @@ def _candidate_inputs(dispute: dict, limit: int = 10):
     candidates: list[tuple[str, object, object]] = []
     for field in fields:
         value = dispute.get(field)
-        if isinstance(value, bool):
-            candidates.append((field, value, not value))
-        elif value is None:
-            candidates.append((field, None, True))
-            if len(candidates) < limit:
-                candidates.append((field, None, False))
+        # Restrict candidate flips to merchant-obtainable fields:
+        # Flipping a boolean that is already True to False is never an actionable suggestion.
+        # Only flip None or False -> True.
+        if value is False or value is None:
+            candidates.append((field, value, True))
         if len(candidates) >= limit:
             break
     return candidates[:limit]
@@ -28,7 +28,7 @@ def _candidate_inputs(dispute: dict, limit: int = 10):
 # Counterfactual cases are read-only simulations.
 # Candidate disputes must never be persisted or treated as real disputes.
 
-def find_minimal_decision_reversal(
+def find_single_change_decision_reversal(
     dispute: dict,
     current_result: dict,
     decision_fn: Callable[..., dict],
@@ -36,11 +36,25 @@ def find_minimal_decision_reversal(
     risk_graph=None,
     limit: int = 10,
 ) -> dict:
-    """Flip one valid input at a time and rerun the same canonical path."""
+    """Single-change counterfactual decision reversal analysis.
+
+    Evaluates whether flipping a single unconfirmed or missing evidence field (None/False -> True)
+    reverses the deterministic policy decision. Operates on an isolated copy of the risk graph
+    so candidate simulations never mutate shared caller state. Note: this examines single-change
+    reversals and does not guarantee joint-flip optimality.
+    """
     original_action = current_result["action"]
     best_risk_change: dict | None = None
     graph_risk = float(current_result.get("graph_analysis", {}).get("risk_score", 0.0))
     is_graph_escalated = graph_risk >= GRAPH_HUMAN_REVIEW_THRESHOLD
+
+    base_graph = (
+        risk_graph.clone()
+        if hasattr(risk_graph, "clone")
+        else copy.deepcopy(risk_graph)
+        if risk_graph is not None
+        else None
+    )
 
     with TemporaryDirectory(prefix="chargeback_cf_") as tmp:
         db_path = str(Path(tmp) / "counterfactual.db")
@@ -48,9 +62,16 @@ def find_minimal_decision_reversal(
             candidate = dict(dispute)
             candidate["dispute_id"] = f"CF_{dispute.get('dispute_id', 'CASE')}_{field}_{new_value!r}"[:120]
             candidate[field] = new_value
+            candidate_graph = (
+                base_graph.clone()
+                if hasattr(base_graph, "clone")
+                else copy.deepcopy(base_graph)
+                if base_graph is not None
+                else None
+            )
             result = decision_fn(
                 candidate,
-                risk_graph=risk_graph,
+                risk_graph=candidate_graph,
                 db_path=db_path,
                 include_counterfactual=False,
                 call_ai_analyst=False,
@@ -97,3 +118,6 @@ def find_minimal_decision_reversal(
         "risk_delta_abs": best_risk_change["risk_delta_abs"],
         "statement": stmt,
     }
+
+
+find_minimal_decision_reversal = find_single_change_decision_reversal
