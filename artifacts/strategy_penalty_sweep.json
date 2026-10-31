@@ -1,0 +1,1590 @@
+{
+  "base_case_penalty_inr": 4150.0,
+  "break_even_verification": {
+    "ranking_flip_vs_auto_only": {
+      "absolute_error_inr": 0.0,
+      "analytic_threshold_inr": 3366.5929,
+      "sweep_interpolated_threshold_inr": 3366.5929,
+      "tolerance_inr": 0.5,
+      "verified": true
+    },
+    "ranking_flip_vs_scenario_b": {
+      "absolute_error_inr": 0.0,
+      "analytic_threshold_inr": 13801.8925,
+      "sweep_interpolated_threshold_inr": 13801.8925,
+      "tolerance_inr": 0.5,
+      "verified": true
+    }
+  },
+  "grid_step_inr": 250.0,
+  "max_penalty_inr": 15000.0,
+  "min_penalty_inr": 0.0,
+  "strategies": {
+    "Contest Everything": {
+      "contested_count": 5000,
+      "lost_contest_count": 2176.0,
+      "points": [
+        {
+          "penalty_inr": 0.0,
+          "realized_net_value_inr": 10894729.8,
+          "realized_net_value_lakh": 108.9473
+        },
+        {
+          "penalty_inr": 250.0,
+          "realized_net_value_inr": 10350729.8,
+          "realized_net_value_lakh": 103.5073
+        },
+        {
+          "penalty_inr": 500.0,
+          "realized_net_value_inr": 9806729.8,
+          "realized_net_value_lakh": 98.0673
+        },
+        {
+          "penalty_inr": 750.0,
+          "realized_net_value_inr": 9262729.8,
+          "realized_net_value_lakh": 92.6273
+        },
+        {
+          "penalty_inr": 1000.0,
+          "realized_net_value_inr": 8718729.8,
+          "realized_net_value_lakh": 87.1873
+        },
+        {
+          "penalty_inr": 1250.0,
+          "realized_net_value_inr": 8174729.8,
+          "realized_net_value_lakh": 81.7473
+        },
+        {
+          "penalty_inr": 1500.0,
+          "realized_net_value_inr": 7630729.8,
+          "realized_net_value_lakh": 76.3073
+        },
+        {
+          "penalty_inr": 1750.0,
+          "realized_net_value_inr": 7086729.8,
+          "realized_net_value_lakh": 70.8673
+        },
+        {
+          "penalty_inr": 2000.0,
+          "realized_net_value_inr": 6542729.8,
+          "realized_net_value_lakh": 65.4273
+        },
+        {
+          "penalty_inr": 2250.0,
+          "realized_net_value_inr": 5998729.8,
+          "realized_net_value_lakh": 59.9873
+        },
+        {
+          "penalty_inr": 2500.0,
+          "realized_net_value_inr": 5454729.8,
+          "realized_net_value_lakh": 54.5473
+        },
+        {
+          "penalty_inr": 2750.0,
+          "realized_net_value_inr": 4910729.8,
+          "realized_net_value_lakh": 49.1073
+        },
+        {
+          "penalty_inr": 3000.0,
+          "realized_net_value_inr": 4366729.8,
+          "realized_net_value_lakh": 43.6673
+        },
+        {
+          "penalty_inr": 3250.0,
+          "realized_net_value_inr": 3822729.8,
+          "realized_net_value_lakh": 38.2273
+        },
+        {
+          "penalty_inr": 3500.0,
+          "realized_net_value_inr": 3278729.8,
+          "realized_net_value_lakh": 32.7873
+        },
+        {
+          "penalty_inr": 3750.0,
+          "realized_net_value_inr": 2734729.8,
+          "realized_net_value_lakh": 27.3473
+        },
+        {
+          "penalty_inr": 4000.0,
+          "realized_net_value_inr": 2190729.8,
+          "realized_net_value_lakh": 21.9073
+        },
+        {
+          "penalty_inr": 4250.0,
+          "realized_net_value_inr": 1646729.8,
+          "realized_net_value_lakh": 16.4673
+        },
+        {
+          "penalty_inr": 4500.0,
+          "realized_net_value_inr": 1102729.8,
+          "realized_net_value_lakh": 11.0273
+        },
+        {
+          "penalty_inr": 4750.0,
+          "realized_net_value_inr": 558729.8,
+          "realized_net_value_lakh": 5.5873
+        },
+        {
+          "penalty_inr": 5000.0,
+          "realized_net_value_inr": 14729.8,
+          "realized_net_value_lakh": 0.1473
+        },
+        {
+          "penalty_inr": 5250.0,
+          "realized_net_value_inr": -529270.2,
+          "realized_net_value_lakh": -5.2927
+        },
+        {
+          "penalty_inr": 5500.0,
+          "realized_net_value_inr": -1073270.2,
+          "realized_net_value_lakh": -10.7327
+        },
+        {
+          "penalty_inr": 5750.0,
+          "realized_net_value_inr": -1617270.2,
+          "realized_net_value_lakh": -16.1727
+        },
+        {
+          "penalty_inr": 6000.0,
+          "realized_net_value_inr": -2161270.2,
+          "realized_net_value_lakh": -21.6127
+        },
+        {
+          "penalty_inr": 6250.0,
+          "realized_net_value_inr": -2705270.2,
+          "realized_net_value_lakh": -27.0527
+        },
+        {
+          "penalty_inr": 6500.0,
+          "realized_net_value_inr": -3249270.2,
+          "realized_net_value_lakh": -32.4927
+        },
+        {
+          "penalty_inr": 6750.0,
+          "realized_net_value_inr": -3793270.2,
+          "realized_net_value_lakh": -37.9327
+        },
+        {
+          "penalty_inr": 7000.0,
+          "realized_net_value_inr": -4337270.2,
+          "realized_net_value_lakh": -43.3727
+        },
+        {
+          "penalty_inr": 7250.0,
+          "realized_net_value_inr": -4881270.2,
+          "realized_net_value_lakh": -48.8127
+        },
+        {
+          "penalty_inr": 7500.0,
+          "realized_net_value_inr": -5425270.2,
+          "realized_net_value_lakh": -54.2527
+        },
+        {
+          "penalty_inr": 7750.0,
+          "realized_net_value_inr": -5969270.2,
+          "realized_net_value_lakh": -59.6927
+        },
+        {
+          "penalty_inr": 8000.0,
+          "realized_net_value_inr": -6513270.2,
+          "realized_net_value_lakh": -65.1327
+        },
+        {
+          "penalty_inr": 8250.0,
+          "realized_net_value_inr": -7057270.2,
+          "realized_net_value_lakh": -70.5727
+        },
+        {
+          "penalty_inr": 8500.0,
+          "realized_net_value_inr": -7601270.2,
+          "realized_net_value_lakh": -76.0127
+        },
+        {
+          "penalty_inr": 8750.0,
+          "realized_net_value_inr": -8145270.2,
+          "realized_net_value_lakh": -81.4527
+        },
+        {
+          "penalty_inr": 9000.0,
+          "realized_net_value_inr": -8689270.2,
+          "realized_net_value_lakh": -86.8927
+        },
+        {
+          "penalty_inr": 9250.0,
+          "realized_net_value_inr": -9233270.2,
+          "realized_net_value_lakh": -92.3327
+        },
+        {
+          "penalty_inr": 9500.0,
+          "realized_net_value_inr": -9777270.2,
+          "realized_net_value_lakh": -97.7727
+        },
+        {
+          "penalty_inr": 9750.0,
+          "realized_net_value_inr": -10321270.2,
+          "realized_net_value_lakh": -103.2127
+        },
+        {
+          "penalty_inr": 10000.0,
+          "realized_net_value_inr": -10865270.2,
+          "realized_net_value_lakh": -108.6527
+        },
+        {
+          "penalty_inr": 10250.0,
+          "realized_net_value_inr": -11409270.2,
+          "realized_net_value_lakh": -114.0927
+        },
+        {
+          "penalty_inr": 10500.0,
+          "realized_net_value_inr": -11953270.2,
+          "realized_net_value_lakh": -119.5327
+        },
+        {
+          "penalty_inr": 10750.0,
+          "realized_net_value_inr": -12497270.2,
+          "realized_net_value_lakh": -124.9727
+        },
+        {
+          "penalty_inr": 11000.0,
+          "realized_net_value_inr": -13041270.2,
+          "realized_net_value_lakh": -130.4127
+        },
+        {
+          "penalty_inr": 11250.0,
+          "realized_net_value_inr": -13585270.2,
+          "realized_net_value_lakh": -135.8527
+        },
+        {
+          "penalty_inr": 11500.0,
+          "realized_net_value_inr": -14129270.2,
+          "realized_net_value_lakh": -141.2927
+        },
+        {
+          "penalty_inr": 11750.0,
+          "realized_net_value_inr": -14673270.2,
+          "realized_net_value_lakh": -146.7327
+        },
+        {
+          "penalty_inr": 12000.0,
+          "realized_net_value_inr": -15217270.2,
+          "realized_net_value_lakh": -152.1727
+        },
+        {
+          "penalty_inr": 12250.0,
+          "realized_net_value_inr": -15761270.2,
+          "realized_net_value_lakh": -157.6127
+        },
+        {
+          "penalty_inr": 12500.0,
+          "realized_net_value_inr": -16305270.2,
+          "realized_net_value_lakh": -163.0527
+        },
+        {
+          "penalty_inr": 12750.0,
+          "realized_net_value_inr": -16849270.2,
+          "realized_net_value_lakh": -168.4927
+        },
+        {
+          "penalty_inr": 13000.0,
+          "realized_net_value_inr": -17393270.2,
+          "realized_net_value_lakh": -173.9327
+        },
+        {
+          "penalty_inr": 13250.0,
+          "realized_net_value_inr": -17937270.2,
+          "realized_net_value_lakh": -179.3727
+        },
+        {
+          "penalty_inr": 13500.0,
+          "realized_net_value_inr": -18481270.2,
+          "realized_net_value_lakh": -184.8127
+        },
+        {
+          "penalty_inr": 13750.0,
+          "realized_net_value_inr": -19025270.2,
+          "realized_net_value_lakh": -190.2527
+        },
+        {
+          "penalty_inr": 14000.0,
+          "realized_net_value_inr": -19569270.2,
+          "realized_net_value_lakh": -195.6927
+        },
+        {
+          "penalty_inr": 14250.0,
+          "realized_net_value_inr": -20113270.2,
+          "realized_net_value_lakh": -201.1327
+        },
+        {
+          "penalty_inr": 14500.0,
+          "realized_net_value_inr": -20657270.2,
+          "realized_net_value_lakh": -206.5727
+        },
+        {
+          "penalty_inr": 14750.0,
+          "realized_net_value_inr": -21201270.2,
+          "realized_net_value_lakh": -212.0127
+        },
+        {
+          "penalty_inr": 15000.0,
+          "realized_net_value_inr": -21745270.2,
+          "realized_net_value_lakh": -217.4527
+        }
+      ],
+      "realized_net_value_p0": 10894729.8
+    },
+    "Live Policy (Automated-Only)": {
+      "contested_count": 1657,
+      "lost_contest_count": 417.0,
+      "points": [
+        {
+          "penalty_inr": 0.0,
+          "realized_net_value_inr": 4972892.86,
+          "realized_net_value_lakh": 49.7289
+        },
+        {
+          "penalty_inr": 250.0,
+          "realized_net_value_inr": 4868642.86,
+          "realized_net_value_lakh": 48.6864
+        },
+        {
+          "penalty_inr": 500.0,
+          "realized_net_value_inr": 4764392.86,
+          "realized_net_value_lakh": 47.6439
+        },
+        {
+          "penalty_inr": 750.0,
+          "realized_net_value_inr": 4660142.86,
+          "realized_net_value_lakh": 46.6014
+        },
+        {
+          "penalty_inr": 1000.0,
+          "realized_net_value_inr": 4555892.86,
+          "realized_net_value_lakh": 45.5589
+        },
+        {
+          "penalty_inr": 1250.0,
+          "realized_net_value_inr": 4451642.86,
+          "realized_net_value_lakh": 44.5164
+        },
+        {
+          "penalty_inr": 1500.0,
+          "realized_net_value_inr": 4347392.86,
+          "realized_net_value_lakh": 43.4739
+        },
+        {
+          "penalty_inr": 1750.0,
+          "realized_net_value_inr": 4243142.86,
+          "realized_net_value_lakh": 42.4314
+        },
+        {
+          "penalty_inr": 2000.0,
+          "realized_net_value_inr": 4138892.86,
+          "realized_net_value_lakh": 41.3889
+        },
+        {
+          "penalty_inr": 2250.0,
+          "realized_net_value_inr": 4034642.86,
+          "realized_net_value_lakh": 40.3464
+        },
+        {
+          "penalty_inr": 2500.0,
+          "realized_net_value_inr": 3930392.86,
+          "realized_net_value_lakh": 39.3039
+        },
+        {
+          "penalty_inr": 2750.0,
+          "realized_net_value_inr": 3826142.86,
+          "realized_net_value_lakh": 38.2614
+        },
+        {
+          "penalty_inr": 3000.0,
+          "realized_net_value_inr": 3721892.86,
+          "realized_net_value_lakh": 37.2189
+        },
+        {
+          "penalty_inr": 3250.0,
+          "realized_net_value_inr": 3617642.86,
+          "realized_net_value_lakh": 36.1764
+        },
+        {
+          "penalty_inr": 3500.0,
+          "realized_net_value_inr": 3513392.86,
+          "realized_net_value_lakh": 35.1339
+        },
+        {
+          "penalty_inr": 3750.0,
+          "realized_net_value_inr": 3409142.86,
+          "realized_net_value_lakh": 34.0914
+        },
+        {
+          "penalty_inr": 4000.0,
+          "realized_net_value_inr": 3304892.86,
+          "realized_net_value_lakh": 33.0489
+        },
+        {
+          "penalty_inr": 4250.0,
+          "realized_net_value_inr": 3200642.86,
+          "realized_net_value_lakh": 32.0064
+        },
+        {
+          "penalty_inr": 4500.0,
+          "realized_net_value_inr": 3096392.86,
+          "realized_net_value_lakh": 30.9639
+        },
+        {
+          "penalty_inr": 4750.0,
+          "realized_net_value_inr": 2992142.86,
+          "realized_net_value_lakh": 29.9214
+        },
+        {
+          "penalty_inr": 5000.0,
+          "realized_net_value_inr": 2887892.86,
+          "realized_net_value_lakh": 28.8789
+        },
+        {
+          "penalty_inr": 5250.0,
+          "realized_net_value_inr": 2783642.86,
+          "realized_net_value_lakh": 27.8364
+        },
+        {
+          "penalty_inr": 5500.0,
+          "realized_net_value_inr": 2679392.86,
+          "realized_net_value_lakh": 26.7939
+        },
+        {
+          "penalty_inr": 5750.0,
+          "realized_net_value_inr": 2575142.86,
+          "realized_net_value_lakh": 25.7514
+        },
+        {
+          "penalty_inr": 6000.0,
+          "realized_net_value_inr": 2470892.86,
+          "realized_net_value_lakh": 24.7089
+        },
+        {
+          "penalty_inr": 6250.0,
+          "realized_net_value_inr": 2366642.86,
+          "realized_net_value_lakh": 23.6664
+        },
+        {
+          "penalty_inr": 6500.0,
+          "realized_net_value_inr": 2262392.86,
+          "realized_net_value_lakh": 22.6239
+        },
+        {
+          "penalty_inr": 6750.0,
+          "realized_net_value_inr": 2158142.86,
+          "realized_net_value_lakh": 21.5814
+        },
+        {
+          "penalty_inr": 7000.0,
+          "realized_net_value_inr": 2053892.86,
+          "realized_net_value_lakh": 20.5389
+        },
+        {
+          "penalty_inr": 7250.0,
+          "realized_net_value_inr": 1949642.86,
+          "realized_net_value_lakh": 19.4964
+        },
+        {
+          "penalty_inr": 7500.0,
+          "realized_net_value_inr": 1845392.86,
+          "realized_net_value_lakh": 18.4539
+        },
+        {
+          "penalty_inr": 7750.0,
+          "realized_net_value_inr": 1741142.86,
+          "realized_net_value_lakh": 17.4114
+        },
+        {
+          "penalty_inr": 8000.0,
+          "realized_net_value_inr": 1636892.86,
+          "realized_net_value_lakh": 16.3689
+        },
+        {
+          "penalty_inr": 8250.0,
+          "realized_net_value_inr": 1532642.86,
+          "realized_net_value_lakh": 15.3264
+        },
+        {
+          "penalty_inr": 8500.0,
+          "realized_net_value_inr": 1428392.86,
+          "realized_net_value_lakh": 14.2839
+        },
+        {
+          "penalty_inr": 8750.0,
+          "realized_net_value_inr": 1324142.86,
+          "realized_net_value_lakh": 13.2414
+        },
+        {
+          "penalty_inr": 9000.0,
+          "realized_net_value_inr": 1219892.86,
+          "realized_net_value_lakh": 12.1989
+        },
+        {
+          "penalty_inr": 9250.0,
+          "realized_net_value_inr": 1115642.86,
+          "realized_net_value_lakh": 11.1564
+        },
+        {
+          "penalty_inr": 9500.0,
+          "realized_net_value_inr": 1011392.86,
+          "realized_net_value_lakh": 10.1139
+        },
+        {
+          "penalty_inr": 9750.0,
+          "realized_net_value_inr": 907142.86,
+          "realized_net_value_lakh": 9.0714
+        },
+        {
+          "penalty_inr": 10000.0,
+          "realized_net_value_inr": 802892.86,
+          "realized_net_value_lakh": 8.0289
+        },
+        {
+          "penalty_inr": 10250.0,
+          "realized_net_value_inr": 698642.86,
+          "realized_net_value_lakh": 6.9864
+        },
+        {
+          "penalty_inr": 10500.0,
+          "realized_net_value_inr": 594392.86,
+          "realized_net_value_lakh": 5.9439
+        },
+        {
+          "penalty_inr": 10750.0,
+          "realized_net_value_inr": 490142.86,
+          "realized_net_value_lakh": 4.9014
+        },
+        {
+          "penalty_inr": 11000.0,
+          "realized_net_value_inr": 385892.86,
+          "realized_net_value_lakh": 3.8589
+        },
+        {
+          "penalty_inr": 11250.0,
+          "realized_net_value_inr": 281642.86,
+          "realized_net_value_lakh": 2.8164
+        },
+        {
+          "penalty_inr": 11500.0,
+          "realized_net_value_inr": 177392.86,
+          "realized_net_value_lakh": 1.7739
+        },
+        {
+          "penalty_inr": 11750.0,
+          "realized_net_value_inr": 73142.86,
+          "realized_net_value_lakh": 0.7314
+        },
+        {
+          "penalty_inr": 12000.0,
+          "realized_net_value_inr": -31107.14,
+          "realized_net_value_lakh": -0.3111
+        },
+        {
+          "penalty_inr": 12250.0,
+          "realized_net_value_inr": -135357.14,
+          "realized_net_value_lakh": -1.3536
+        },
+        {
+          "penalty_inr": 12500.0,
+          "realized_net_value_inr": -239607.14,
+          "realized_net_value_lakh": -2.3961
+        },
+        {
+          "penalty_inr": 12750.0,
+          "realized_net_value_inr": -343857.14,
+          "realized_net_value_lakh": -3.4386
+        },
+        {
+          "penalty_inr": 13000.0,
+          "realized_net_value_inr": -448107.14,
+          "realized_net_value_lakh": -4.4811
+        },
+        {
+          "penalty_inr": 13250.0,
+          "realized_net_value_inr": -552357.14,
+          "realized_net_value_lakh": -5.5236
+        },
+        {
+          "penalty_inr": 13500.0,
+          "realized_net_value_inr": -656607.14,
+          "realized_net_value_lakh": -6.5661
+        },
+        {
+          "penalty_inr": 13750.0,
+          "realized_net_value_inr": -760857.14,
+          "realized_net_value_lakh": -7.6086
+        },
+        {
+          "penalty_inr": 14000.0,
+          "realized_net_value_inr": -865107.14,
+          "realized_net_value_lakh": -8.6511
+        },
+        {
+          "penalty_inr": 14250.0,
+          "realized_net_value_inr": -969357.14,
+          "realized_net_value_lakh": -9.6936
+        },
+        {
+          "penalty_inr": 14500.0,
+          "realized_net_value_inr": -1073607.14,
+          "realized_net_value_lakh": -10.7361
+        },
+        {
+          "penalty_inr": 14750.0,
+          "realized_net_value_inr": -1177857.14,
+          "realized_net_value_lakh": -11.7786
+        },
+        {
+          "penalty_inr": 15000.0,
+          "realized_net_value_inr": -1282107.14,
+          "realized_net_value_lakh": -12.8211
+        }
+      ],
+      "realized_net_value_p0": 4972892.86
+    },
+    "Live Policy + Human Review (Scenario a: Model Rate)": {
+      "contested_count": 4984,
+      "lost_contest_count": 2170.3879526708974,
+      "points": [
+        {
+          "penalty_inr": 0.0,
+          "realized_net_value_inr": 10809134.23,
+          "realized_net_value_lakh": 108.0913
+        },
+        {
+          "penalty_inr": 250.0,
+          "realized_net_value_inr": 10266537.25,
+          "realized_net_value_lakh": 102.6654
+        },
+        {
+          "penalty_inr": 500.0,
+          "realized_net_value_inr": 9723940.26,
+          "realized_net_value_lakh": 97.2394
+        },
+        {
+          "penalty_inr": 750.0,
+          "realized_net_value_inr": 9181343.27,
+          "realized_net_value_lakh": 91.8134
+        },
+        {
+          "penalty_inr": 1000.0,
+          "realized_net_value_inr": 8638746.28,
+          "realized_net_value_lakh": 86.3875
+        },
+        {
+          "penalty_inr": 1250.0,
+          "realized_net_value_inr": 8096149.29,
+          "realized_net_value_lakh": 80.9615
+        },
+        {
+          "penalty_inr": 1500.0,
+          "realized_net_value_inr": 7553552.3,
+          "realized_net_value_lakh": 75.5355
+        },
+        {
+          "penalty_inr": 1750.0,
+          "realized_net_value_inr": 7010955.32,
+          "realized_net_value_lakh": 70.1096
+        },
+        {
+          "penalty_inr": 2000.0,
+          "realized_net_value_inr": 6468358.33,
+          "realized_net_value_lakh": 64.6836
+        },
+        {
+          "penalty_inr": 2250.0,
+          "realized_net_value_inr": 5925761.34,
+          "realized_net_value_lakh": 59.2576
+        },
+        {
+          "penalty_inr": 2500.0,
+          "realized_net_value_inr": 5383164.35,
+          "realized_net_value_lakh": 53.8316
+        },
+        {
+          "penalty_inr": 2750.0,
+          "realized_net_value_inr": 4840567.36,
+          "realized_net_value_lakh": 48.4057
+        },
+        {
+          "penalty_inr": 3000.0,
+          "realized_net_value_inr": 4297970.38,
+          "realized_net_value_lakh": 42.9797
+        },
+        {
+          "penalty_inr": 3250.0,
+          "realized_net_value_inr": 3755373.39,
+          "realized_net_value_lakh": 37.5537
+        },
+        {
+          "penalty_inr": 3500.0,
+          "realized_net_value_inr": 3212776.4,
+          "realized_net_value_lakh": 32.1278
+        },
+        {
+          "penalty_inr": 3750.0,
+          "realized_net_value_inr": 2670179.41,
+          "realized_net_value_lakh": 26.7018
+        },
+        {
+          "penalty_inr": 4000.0,
+          "realized_net_value_inr": 2127582.42,
+          "realized_net_value_lakh": 21.2758
+        },
+        {
+          "penalty_inr": 4250.0,
+          "realized_net_value_inr": 1584985.43,
+          "realized_net_value_lakh": 15.8499
+        },
+        {
+          "penalty_inr": 4500.0,
+          "realized_net_value_inr": 1042388.45,
+          "realized_net_value_lakh": 10.4239
+        },
+        {
+          "penalty_inr": 4750.0,
+          "realized_net_value_inr": 499791.46,
+          "realized_net_value_lakh": 4.9979
+        },
+        {
+          "penalty_inr": 5000.0,
+          "realized_net_value_inr": -42805.53,
+          "realized_net_value_lakh": -0.4281
+        },
+        {
+          "penalty_inr": 5250.0,
+          "realized_net_value_inr": -585402.52,
+          "realized_net_value_lakh": -5.854
+        },
+        {
+          "penalty_inr": 5500.0,
+          "realized_net_value_inr": -1127999.51,
+          "realized_net_value_lakh": -11.28
+        },
+        {
+          "penalty_inr": 5750.0,
+          "realized_net_value_inr": -1670596.49,
+          "realized_net_value_lakh": -16.706
+        },
+        {
+          "penalty_inr": 6000.0,
+          "realized_net_value_inr": -2213193.48,
+          "realized_net_value_lakh": -22.1319
+        },
+        {
+          "penalty_inr": 6250.0,
+          "realized_net_value_inr": -2755790.47,
+          "realized_net_value_lakh": -27.5579
+        },
+        {
+          "penalty_inr": 6500.0,
+          "realized_net_value_inr": -3298387.46,
+          "realized_net_value_lakh": -32.9839
+        },
+        {
+          "penalty_inr": 6750.0,
+          "realized_net_value_inr": -3840984.45,
+          "realized_net_value_lakh": -38.4098
+        },
+        {
+          "penalty_inr": 7000.0,
+          "realized_net_value_inr": -4383581.44,
+          "realized_net_value_lakh": -43.8358
+        },
+        {
+          "penalty_inr": 7250.0,
+          "realized_net_value_inr": -4926178.42,
+          "realized_net_value_lakh": -49.2618
+        },
+        {
+          "penalty_inr": 7500.0,
+          "realized_net_value_inr": -5468775.41,
+          "realized_net_value_lakh": -54.6878
+        },
+        {
+          "penalty_inr": 7750.0,
+          "realized_net_value_inr": -6011372.4,
+          "realized_net_value_lakh": -60.1137
+        },
+        {
+          "penalty_inr": 8000.0,
+          "realized_net_value_inr": -6553969.39,
+          "realized_net_value_lakh": -65.5397
+        },
+        {
+          "penalty_inr": 8250.0,
+          "realized_net_value_inr": -7096566.38,
+          "realized_net_value_lakh": -70.9657
+        },
+        {
+          "penalty_inr": 8500.0,
+          "realized_net_value_inr": -7639163.36,
+          "realized_net_value_lakh": -76.3916
+        },
+        {
+          "penalty_inr": 8750.0,
+          "realized_net_value_inr": -8181760.35,
+          "realized_net_value_lakh": -81.8176
+        },
+        {
+          "penalty_inr": 9000.0,
+          "realized_net_value_inr": -8724357.34,
+          "realized_net_value_lakh": -87.2436
+        },
+        {
+          "penalty_inr": 9250.0,
+          "realized_net_value_inr": -9266954.33,
+          "realized_net_value_lakh": -92.6695
+        },
+        {
+          "penalty_inr": 9500.0,
+          "realized_net_value_inr": -9809551.32,
+          "realized_net_value_lakh": -98.0955
+        },
+        {
+          "penalty_inr": 9750.0,
+          "realized_net_value_inr": -10352148.3,
+          "realized_net_value_lakh": -103.5215
+        },
+        {
+          "penalty_inr": 10000.0,
+          "realized_net_value_inr": -10894745.29,
+          "realized_net_value_lakh": -108.9475
+        },
+        {
+          "penalty_inr": 10250.0,
+          "realized_net_value_inr": -11437342.28,
+          "realized_net_value_lakh": -114.3734
+        },
+        {
+          "penalty_inr": 10500.0,
+          "realized_net_value_inr": -11979939.27,
+          "realized_net_value_lakh": -119.7994
+        },
+        {
+          "penalty_inr": 10750.0,
+          "realized_net_value_inr": -12522536.26,
+          "realized_net_value_lakh": -125.2254
+        },
+        {
+          "penalty_inr": 11000.0,
+          "realized_net_value_inr": -13065133.25,
+          "realized_net_value_lakh": -130.6513
+        },
+        {
+          "penalty_inr": 11250.0,
+          "realized_net_value_inr": -13607730.23,
+          "realized_net_value_lakh": -136.0773
+        },
+        {
+          "penalty_inr": 11500.0,
+          "realized_net_value_inr": -14150327.22,
+          "realized_net_value_lakh": -141.5033
+        },
+        {
+          "penalty_inr": 11750.0,
+          "realized_net_value_inr": -14692924.21,
+          "realized_net_value_lakh": -146.9292
+        },
+        {
+          "penalty_inr": 12000.0,
+          "realized_net_value_inr": -15235521.2,
+          "realized_net_value_lakh": -152.3552
+        },
+        {
+          "penalty_inr": 12250.0,
+          "realized_net_value_inr": -15778118.19,
+          "realized_net_value_lakh": -157.7812
+        },
+        {
+          "penalty_inr": 12500.0,
+          "realized_net_value_inr": -16320715.17,
+          "realized_net_value_lakh": -163.2072
+        },
+        {
+          "penalty_inr": 12750.0,
+          "realized_net_value_inr": -16863312.16,
+          "realized_net_value_lakh": -168.6331
+        },
+        {
+          "penalty_inr": 13000.0,
+          "realized_net_value_inr": -17405909.15,
+          "realized_net_value_lakh": -174.0591
+        },
+        {
+          "penalty_inr": 13250.0,
+          "realized_net_value_inr": -17948506.14,
+          "realized_net_value_lakh": -179.4851
+        },
+        {
+          "penalty_inr": 13500.0,
+          "realized_net_value_inr": -18491103.13,
+          "realized_net_value_lakh": -184.911
+        },
+        {
+          "penalty_inr": 13750.0,
+          "realized_net_value_inr": -19033700.12,
+          "realized_net_value_lakh": -190.337
+        },
+        {
+          "penalty_inr": 14000.0,
+          "realized_net_value_inr": -19576297.1,
+          "realized_net_value_lakh": -195.763
+        },
+        {
+          "penalty_inr": 14250.0,
+          "realized_net_value_inr": -20118894.09,
+          "realized_net_value_lakh": -201.1889
+        },
+        {
+          "penalty_inr": 14500.0,
+          "realized_net_value_inr": -20661491.08,
+          "realized_net_value_lakh": -206.6149
+        },
+        {
+          "penalty_inr": 14750.0,
+          "realized_net_value_inr": -21204088.07,
+          "realized_net_value_lakh": -212.0409
+        },
+        {
+          "penalty_inr": 15000.0,
+          "realized_net_value_inr": -21746685.06,
+          "realized_net_value_lakh": -217.4669
+        }
+      ],
+      "realized_net_value_p0": 10809134.23
+    },
+    "Live Policy + Human Review (Scenario b: Observed Rate)": {
+      "contested_count": 4984,
+      "lost_contest_count": 2164.0,
+      "points": [
+        {
+          "penalty_inr": 0.0,
+          "realized_net_value_inr": 10729107.09,
+          "realized_net_value_lakh": 107.2911
+        },
+        {
+          "penalty_inr": 250.0,
+          "realized_net_value_inr": 10188107.09,
+          "realized_net_value_lakh": 101.8811
+        },
+        {
+          "penalty_inr": 500.0,
+          "realized_net_value_inr": 9647107.09,
+          "realized_net_value_lakh": 96.4711
+        },
+        {
+          "penalty_inr": 750.0,
+          "realized_net_value_inr": 9106107.09,
+          "realized_net_value_lakh": 91.0611
+        },
+        {
+          "penalty_inr": 1000.0,
+          "realized_net_value_inr": 8565107.09,
+          "realized_net_value_lakh": 85.6511
+        },
+        {
+          "penalty_inr": 1250.0,
+          "realized_net_value_inr": 8024107.09,
+          "realized_net_value_lakh": 80.2411
+        },
+        {
+          "penalty_inr": 1500.0,
+          "realized_net_value_inr": 7483107.09,
+          "realized_net_value_lakh": 74.8311
+        },
+        {
+          "penalty_inr": 1750.0,
+          "realized_net_value_inr": 6942107.09,
+          "realized_net_value_lakh": 69.4211
+        },
+        {
+          "penalty_inr": 2000.0,
+          "realized_net_value_inr": 6401107.09,
+          "realized_net_value_lakh": 64.0111
+        },
+        {
+          "penalty_inr": 2250.0,
+          "realized_net_value_inr": 5860107.09,
+          "realized_net_value_lakh": 58.6011
+        },
+        {
+          "penalty_inr": 2500.0,
+          "realized_net_value_inr": 5319107.09,
+          "realized_net_value_lakh": 53.1911
+        },
+        {
+          "penalty_inr": 2750.0,
+          "realized_net_value_inr": 4778107.09,
+          "realized_net_value_lakh": 47.7811
+        },
+        {
+          "penalty_inr": 3000.0,
+          "realized_net_value_inr": 4237107.09,
+          "realized_net_value_lakh": 42.3711
+        },
+        {
+          "penalty_inr": 3250.0,
+          "realized_net_value_inr": 3696107.09,
+          "realized_net_value_lakh": 36.9611
+        },
+        {
+          "penalty_inr": 3500.0,
+          "realized_net_value_inr": 3155107.09,
+          "realized_net_value_lakh": 31.5511
+        },
+        {
+          "penalty_inr": 3750.0,
+          "realized_net_value_inr": 2614107.09,
+          "realized_net_value_lakh": 26.1411
+        },
+        {
+          "penalty_inr": 4000.0,
+          "realized_net_value_inr": 2073107.09,
+          "realized_net_value_lakh": 20.7311
+        },
+        {
+          "penalty_inr": 4250.0,
+          "realized_net_value_inr": 1532107.09,
+          "realized_net_value_lakh": 15.3211
+        },
+        {
+          "penalty_inr": 4500.0,
+          "realized_net_value_inr": 991107.09,
+          "realized_net_value_lakh": 9.9111
+        },
+        {
+          "penalty_inr": 4750.0,
+          "realized_net_value_inr": 450107.09,
+          "realized_net_value_lakh": 4.5011
+        },
+        {
+          "penalty_inr": 5000.0,
+          "realized_net_value_inr": -90892.91,
+          "realized_net_value_lakh": -0.9089
+        },
+        {
+          "penalty_inr": 5250.0,
+          "realized_net_value_inr": -631892.91,
+          "realized_net_value_lakh": -6.3189
+        },
+        {
+          "penalty_inr": 5500.0,
+          "realized_net_value_inr": -1172892.91,
+          "realized_net_value_lakh": -11.7289
+        },
+        {
+          "penalty_inr": 5750.0,
+          "realized_net_value_inr": -1713892.91,
+          "realized_net_value_lakh": -17.1389
+        },
+        {
+          "penalty_inr": 6000.0,
+          "realized_net_value_inr": -2254892.91,
+          "realized_net_value_lakh": -22.5489
+        },
+        {
+          "penalty_inr": 6250.0,
+          "realized_net_value_inr": -2795892.91,
+          "realized_net_value_lakh": -27.9589
+        },
+        {
+          "penalty_inr": 6500.0,
+          "realized_net_value_inr": -3336892.91,
+          "realized_net_value_lakh": -33.3689
+        },
+        {
+          "penalty_inr": 6750.0,
+          "realized_net_value_inr": -3877892.91,
+          "realized_net_value_lakh": -38.7789
+        },
+        {
+          "penalty_inr": 7000.0,
+          "realized_net_value_inr": -4418892.91,
+          "realized_net_value_lakh": -44.1889
+        },
+        {
+          "penalty_inr": 7250.0,
+          "realized_net_value_inr": -4959892.91,
+          "realized_net_value_lakh": -49.5989
+        },
+        {
+          "penalty_inr": 7500.0,
+          "realized_net_value_inr": -5500892.91,
+          "realized_net_value_lakh": -55.0089
+        },
+        {
+          "penalty_inr": 7750.0,
+          "realized_net_value_inr": -6041892.91,
+          "realized_net_value_lakh": -60.4189
+        },
+        {
+          "penalty_inr": 8000.0,
+          "realized_net_value_inr": -6582892.91,
+          "realized_net_value_lakh": -65.8289
+        },
+        {
+          "penalty_inr": 8250.0,
+          "realized_net_value_inr": -7123892.91,
+          "realized_net_value_lakh": -71.2389
+        },
+        {
+          "penalty_inr": 8500.0,
+          "realized_net_value_inr": -7664892.91,
+          "realized_net_value_lakh": -76.6489
+        },
+        {
+          "penalty_inr": 8750.0,
+          "realized_net_value_inr": -8205892.91,
+          "realized_net_value_lakh": -82.0589
+        },
+        {
+          "penalty_inr": 9000.0,
+          "realized_net_value_inr": -8746892.91,
+          "realized_net_value_lakh": -87.4689
+        },
+        {
+          "penalty_inr": 9250.0,
+          "realized_net_value_inr": -9287892.91,
+          "realized_net_value_lakh": -92.8789
+        },
+        {
+          "penalty_inr": 9500.0,
+          "realized_net_value_inr": -9828892.91,
+          "realized_net_value_lakh": -98.2889
+        },
+        {
+          "penalty_inr": 9750.0,
+          "realized_net_value_inr": -10369892.91,
+          "realized_net_value_lakh": -103.6989
+        },
+        {
+          "penalty_inr": 10000.0,
+          "realized_net_value_inr": -10910892.91,
+          "realized_net_value_lakh": -109.1089
+        },
+        {
+          "penalty_inr": 10250.0,
+          "realized_net_value_inr": -11451892.91,
+          "realized_net_value_lakh": -114.5189
+        },
+        {
+          "penalty_inr": 10500.0,
+          "realized_net_value_inr": -11992892.91,
+          "realized_net_value_lakh": -119.9289
+        },
+        {
+          "penalty_inr": 10750.0,
+          "realized_net_value_inr": -12533892.91,
+          "realized_net_value_lakh": -125.3389
+        },
+        {
+          "penalty_inr": 11000.0,
+          "realized_net_value_inr": -13074892.91,
+          "realized_net_value_lakh": -130.7489
+        },
+        {
+          "penalty_inr": 11250.0,
+          "realized_net_value_inr": -13615892.91,
+          "realized_net_value_lakh": -136.1589
+        },
+        {
+          "penalty_inr": 11500.0,
+          "realized_net_value_inr": -14156892.91,
+          "realized_net_value_lakh": -141.5689
+        },
+        {
+          "penalty_inr": 11750.0,
+          "realized_net_value_inr": -14697892.91,
+          "realized_net_value_lakh": -146.9789
+        },
+        {
+          "penalty_inr": 12000.0,
+          "realized_net_value_inr": -15238892.91,
+          "realized_net_value_lakh": -152.3889
+        },
+        {
+          "penalty_inr": 12250.0,
+          "realized_net_value_inr": -15779892.91,
+          "realized_net_value_lakh": -157.7989
+        },
+        {
+          "penalty_inr": 12500.0,
+          "realized_net_value_inr": -16320892.91,
+          "realized_net_value_lakh": -163.2089
+        },
+        {
+          "penalty_inr": 12750.0,
+          "realized_net_value_inr": -16861892.91,
+          "realized_net_value_lakh": -168.6189
+        },
+        {
+          "penalty_inr": 13000.0,
+          "realized_net_value_inr": -17402892.91,
+          "realized_net_value_lakh": -174.0289
+        },
+        {
+          "penalty_inr": 13250.0,
+          "realized_net_value_inr": -17943892.91,
+          "realized_net_value_lakh": -179.4389
+        },
+        {
+          "penalty_inr": 13500.0,
+          "realized_net_value_inr": -18484892.91,
+          "realized_net_value_lakh": -184.8489
+        },
+        {
+          "penalty_inr": 13750.0,
+          "realized_net_value_inr": -19025892.91,
+          "realized_net_value_lakh": -190.2589
+        },
+        {
+          "penalty_inr": 14000.0,
+          "realized_net_value_inr": -19566892.91,
+          "realized_net_value_lakh": -195.6689
+        },
+        {
+          "penalty_inr": 14250.0,
+          "realized_net_value_inr": -20107892.91,
+          "realized_net_value_lakh": -201.0789
+        },
+        {
+          "penalty_inr": 14500.0,
+          "realized_net_value_inr": -20648892.91,
+          "realized_net_value_lakh": -206.4889
+        },
+        {
+          "penalty_inr": 14750.0,
+          "realized_net_value_inr": -21189892.91,
+          "realized_net_value_lakh": -211.8989
+        },
+        {
+          "penalty_inr": 15000.0,
+          "realized_net_value_inr": -21730892.91,
+          "realized_net_value_lakh": -217.3089
+        }
+      ],
+      "realized_net_value_p0": 10729107.09
+    },
+    "Theoretical Oracle Ceiling": {
+      "contested_count": 4861,
+      "lost_contest_count": 2065.0,
+      "points": [
+        {
+          "penalty_inr": 0.0,
+          "realized_net_value_inr": 10900220.35,
+          "realized_net_value_lakh": 109.0022
+        },
+        {
+          "penalty_inr": 250.0,
+          "realized_net_value_inr": 10383970.35,
+          "realized_net_value_lakh": 103.8397
+        },
+        {
+          "penalty_inr": 500.0,
+          "realized_net_value_inr": 9867720.35,
+          "realized_net_value_lakh": 98.6772
+        },
+        {
+          "penalty_inr": 750.0,
+          "realized_net_value_inr": 9351470.35,
+          "realized_net_value_lakh": 93.5147
+        },
+        {
+          "penalty_inr": 1000.0,
+          "realized_net_value_inr": 8835220.35,
+          "realized_net_value_lakh": 88.3522
+        },
+        {
+          "penalty_inr": 1250.0,
+          "realized_net_value_inr": 8318970.35,
+          "realized_net_value_lakh": 83.1897
+        },
+        {
+          "penalty_inr": 1500.0,
+          "realized_net_value_inr": 7802720.35,
+          "realized_net_value_lakh": 78.0272
+        },
+        {
+          "penalty_inr": 1750.0,
+          "realized_net_value_inr": 7286470.35,
+          "realized_net_value_lakh": 72.8647
+        },
+        {
+          "penalty_inr": 2000.0,
+          "realized_net_value_inr": 6770220.35,
+          "realized_net_value_lakh": 67.7022
+        },
+        {
+          "penalty_inr": 2250.0,
+          "realized_net_value_inr": 6253970.35,
+          "realized_net_value_lakh": 62.5397
+        },
+        {
+          "penalty_inr": 2500.0,
+          "realized_net_value_inr": 5737720.35,
+          "realized_net_value_lakh": 57.3772
+        },
+        {
+          "penalty_inr": 2750.0,
+          "realized_net_value_inr": 5221470.35,
+          "realized_net_value_lakh": 52.2147
+        },
+        {
+          "penalty_inr": 3000.0,
+          "realized_net_value_inr": 4705220.35,
+          "realized_net_value_lakh": 47.0522
+        },
+        {
+          "penalty_inr": 3250.0,
+          "realized_net_value_inr": 4188970.35,
+          "realized_net_value_lakh": 41.8897
+        },
+        {
+          "penalty_inr": 3500.0,
+          "realized_net_value_inr": 3672720.35,
+          "realized_net_value_lakh": 36.7272
+        },
+        {
+          "penalty_inr": 3750.0,
+          "realized_net_value_inr": 3156470.35,
+          "realized_net_value_lakh": 31.5647
+        },
+        {
+          "penalty_inr": 4000.0,
+          "realized_net_value_inr": 2640220.35,
+          "realized_net_value_lakh": 26.4022
+        },
+        {
+          "penalty_inr": 4250.0,
+          "realized_net_value_inr": 2123970.35,
+          "realized_net_value_lakh": 21.2397
+        },
+        {
+          "penalty_inr": 4500.0,
+          "realized_net_value_inr": 1607720.35,
+          "realized_net_value_lakh": 16.0772
+        },
+        {
+          "penalty_inr": 4750.0,
+          "realized_net_value_inr": 1091470.35,
+          "realized_net_value_lakh": 10.9147
+        },
+        {
+          "penalty_inr": 5000.0,
+          "realized_net_value_inr": 575220.35,
+          "realized_net_value_lakh": 5.7522
+        },
+        {
+          "penalty_inr": 5250.0,
+          "realized_net_value_inr": 58970.35,
+          "realized_net_value_lakh": 0.5897
+        },
+        {
+          "penalty_inr": 5500.0,
+          "realized_net_value_inr": -457279.65,
+          "realized_net_value_lakh": -4.5728
+        },
+        {
+          "penalty_inr": 5750.0,
+          "realized_net_value_inr": -973529.65,
+          "realized_net_value_lakh": -9.7353
+        },
+        {
+          "penalty_inr": 6000.0,
+          "realized_net_value_inr": -1489779.65,
+          "realized_net_value_lakh": -14.8978
+        },
+        {
+          "penalty_inr": 6250.0,
+          "realized_net_value_inr": -2006029.65,
+          "realized_net_value_lakh": -20.0603
+        },
+        {
+          "penalty_inr": 6500.0,
+          "realized_net_value_inr": -2522279.65,
+          "realized_net_value_lakh": -25.2228
+        },
+        {
+          "penalty_inr": 6750.0,
+          "realized_net_value_inr": -3038529.65,
+          "realized_net_value_lakh": -30.3853
+        },
+        {
+          "penalty_inr": 7000.0,
+          "realized_net_value_inr": -3554779.65,
+          "realized_net_value_lakh": -35.5478
+        },
+        {
+          "penalty_inr": 7250.0,
+          "realized_net_value_inr": -4071029.65,
+          "realized_net_value_lakh": -40.7103
+        },
+        {
+          "penalty_inr": 7500.0,
+          "realized_net_value_inr": -4587279.65,
+          "realized_net_value_lakh": -45.8728
+        },
+        {
+          "penalty_inr": 7750.0,
+          "realized_net_value_inr": -5103529.65,
+          "realized_net_value_lakh": -51.0353
+        },
+        {
+          "penalty_inr": 8000.0,
+          "realized_net_value_inr": -5619779.65,
+          "realized_net_value_lakh": -56.1978
+        },
+        {
+          "penalty_inr": 8250.0,
+          "realized_net_value_inr": -6136029.65,
+          "realized_net_value_lakh": -61.3603
+        },
+        {
+          "penalty_inr": 8500.0,
+          "realized_net_value_inr": -6652279.65,
+          "realized_net_value_lakh": -66.5228
+        },
+        {
+          "penalty_inr": 8750.0,
+          "realized_net_value_inr": -7168529.65,
+          "realized_net_value_lakh": -71.6853
+        },
+        {
+          "penalty_inr": 9000.0,
+          "realized_net_value_inr": -7684779.65,
+          "realized_net_value_lakh": -76.8478
+        },
+        {
+          "penalty_inr": 9250.0,
+          "realized_net_value_inr": -8201029.65,
+          "realized_net_value_lakh": -82.0103
+        },
+        {
+          "penalty_inr": 9500.0,
+          "realized_net_value_inr": -8717279.65,
+          "realized_net_value_lakh": -87.1728
+        },
+        {
+          "penalty_inr": 9750.0,
+          "realized_net_value_inr": -9233529.65,
+          "realized_net_value_lakh": -92.3353
+        },
+        {
+          "penalty_inr": 10000.0,
+          "realized_net_value_inr": -9749779.65,
+          "realized_net_value_lakh": -97.4978
+        },
+        {
+          "penalty_inr": 10250.0,
+          "realized_net_value_inr": -10266029.65,
+          "realized_net_value_lakh": -102.6603
+        },
+        {
+          "penalty_inr": 10500.0,
+          "realized_net_value_inr": -10782279.65,
+          "realized_net_value_lakh": -107.8228
+        },
+        {
+          "penalty_inr": 10750.0,
+          "realized_net_value_inr": -11298529.65,
+          "realized_net_value_lakh": -112.9853
+        },
+        {
+          "penalty_inr": 11000.0,
+          "realized_net_value_inr": -11814779.65,
+          "realized_net_value_lakh": -118.1478
+        },
+        {
+          "penalty_inr": 11250.0,
+          "realized_net_value_inr": -12331029.65,
+          "realized_net_value_lakh": -123.3103
+        },
+        {
+          "penalty_inr": 11500.0,
+          "realized_net_value_inr": -12847279.65,
+          "realized_net_value_lakh": -128.4728
+        },
+        {
+          "penalty_inr": 11750.0,
+          "realized_net_value_inr": -13363529.65,
+          "realized_net_value_lakh": -133.6353
+        },
+        {
+          "penalty_inr": 12000.0,
+          "realized_net_value_inr": -13879779.65,
+          "realized_net_value_lakh": -138.7978
+        },
+        {
+          "penalty_inr": 12250.0,
+          "realized_net_value_inr": -14396029.65,
+          "realized_net_value_lakh": -143.9603
+        },
+        {
+          "penalty_inr": 12500.0,
+          "realized_net_value_inr": -14912279.65,
+          "realized_net_value_lakh": -149.1228
+        },
+        {
+          "penalty_inr": 12750.0,
+          "realized_net_value_inr": -15428529.65,
+          "realized_net_value_lakh": -154.2853
+        },
+        {
+          "penalty_inr": 13000.0,
+          "realized_net_value_inr": -15944779.65,
+          "realized_net_value_lakh": -159.4478
+        },
+        {
+          "penalty_inr": 13250.0,
+          "realized_net_value_inr": -16461029.65,
+          "realized_net_value_lakh": -164.6103
+        },
+        {
+          "penalty_inr": 13500.0,
+          "realized_net_value_inr": -16977279.65,
+          "realized_net_value_lakh": -169.7728
+        },
+        {
+          "penalty_inr": 13750.0,
+          "realized_net_value_inr": -17493529.65,
+          "realized_net_value_lakh": -174.9353
+        },
+        {
+          "penalty_inr": 14000.0,
+          "realized_net_value_inr": -18009779.65,
+          "realized_net_value_lakh": -180.0978
+        },
+        {
+          "penalty_inr": 14250.0,
+          "realized_net_value_inr": -18526029.65,
+          "realized_net_value_lakh": -185.2603
+        },
+        {
+          "penalty_inr": 14500.0,
+          "realized_net_value_inr": -19042279.65,
+          "realized_net_value_lakh": -190.4228
+        },
+        {
+          "penalty_inr": 14750.0,
+          "realized_net_value_inr": -19558529.65,
+          "realized_net_value_lakh": -195.5853
+        },
+        {
+          "penalty_inr": 15000.0,
+          "realized_net_value_inr": -20074779.65,
+          "realized_net_value_lakh": -200.7478
+        }
+      ],
+      "realized_net_value_p0": 10900220.35
+    }
+  },
+  "sweep_findings": {
+    "human_review_bounds_note": "Scenarios a and b are theoretical upper bounds because reviewers are assumed to contest 100% of reviewed cases. At base-case p=\u20b94,150, Scenario b nets \u20b917.49L, falling below Contest Everything (\u20b918.64L) because contesting virtually all cases incurs \u20b9166,350 in review fees while avoiding only 12 losses.",
+    "policy_beats_contest_everything_threshold_inr": 3366.59,
+    "winner_at_base_p": "Live Policy (Automated-Only) achieves \u20b932.42L, beating Contest Everything (\u20b918.64L) by +\u20b913.78L at base-case penalty p=\u20b94,150.00.",
+    "winner_at_p0": "Contest Everything (Unconstrained) achieves the highest unpenalized recovery (\u20b9108.95L) because filing cost (\u20b9150) is trivial relative to dispute size (~\u20b94,000)."
+  }
+}

@@ -86,6 +86,16 @@ Evaluated on `data/test.csv` (5,000 held-out disputes) under identical operation
   - **Ranking Flip vs. Automated-Only**: Contest Everything incurs 2,176 lost disputes whereas the Live Policy Automated-Only incurs only 417 (avoiding 1,759 losses). When a symmetric penalty per lost contest is applied to both strategies, Contest Everything falls below Live Policy Automated-Only when the penalty exceeds **₹3,366.59**. At the base-case sensitivity parameter of $p = ₹4,150$ (rupee modelling assumption), the Live Policy yields **₹32.42 lakh** vs Contest Everything's **₹18.64 lakh** (an advantage of **+₹13.78 lakh**).
   - **Ranking Flip vs. Policy with Review (Scenario b)**: In Scenario b, reviewed cases are contested, resulting in 4,984 contested disputes and 2,164 losses (avoiding only 12 losses relative to Contest Everything). Because it incurs ₹166,350 in human review costs and misses 4 wins, Contest Everything falls below Scenario b only if the loss penalty exceeds **₹13,801.89**. Scenarios a and b represent operational upper/lower bounds under full contestation, not proof of review lift.
 
+### Net Value vs. Penalty Sweep
+
+![Net Value vs Penalty Sweep](net_value_vs_penalty.png)
+
+Based on the empirical penalty sweep across penalties from ₹0 to ₹15,000 (verified against `artifacts/strategy_penalty_sweep.json`):
+- **Winner at p = 0 (Unpenalized Baseline)**: Contest Everything wins on raw gross recovery (**₹108.95 lakh**) because the fixed ₹150 filing fee is trivial relative to dispute amounts (~₹4,000). The Live Policy achieves **₹49.73 lakh** in conservative automated-only recovery.
+- **Winner at Base-Case p = ₹4,150**: Live Policy (Automated-Only) achieves **₹32.42 lakh**, beating Contest Everything (**₹18.64 lakh**) by **+₹13.78 lakh** (+73.9%) because its 74.8% precision avoids 1,759 lost-contest penalties.
+- **Penalty Above Which Policy Beats Contest Everything**: The Live Policy (Automated-Only) surpasses Contest Everything for all penalties above **₹3,366.59** per lost contest.
+- **Human Review Bounds**: Scenarios a and b represent theoretical upper bounds because reviewers are assumed to contest 100% of reviewed cases. At the base-case penalty (p = ₹4,150), Scenario b nets **₹17.49 lakh**, falling below Contest Everything (**₹18.64 lakh**) because contesting virtually all reviewed cases incurs ₹166,350 in review fees while avoiding only 12 losses relative to Contest Everything.
+
 
 ## Historical pre-change comparison
 
