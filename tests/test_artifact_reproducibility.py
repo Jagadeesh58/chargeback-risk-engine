@@ -41,3 +41,15 @@ def test_strategy_comparison_reproducibility():
     generated = gr.compute_strategy_comparison(bm_data["case_results"], oracle_data)
     committed = json.loads((ARTIFACTS_DIR / "strategy_comparison.json").read_text(encoding="utf-8"))
     assert generated == committed
+
+
+def test_strategy_penalty_sweep_reproducibility(tmp_path):
+    import scripts.generate_report as gr
+    oracle_data = json.loads((ARTIFACTS_DIR / "oracle_ceiling.json").read_text(encoding="utf-8"))
+    bm_data = json.loads((ARTIFACTS_DIR / "candidate_benchmark.json").read_text(encoding="utf-8"))
+    gr.compute_penalty_sweep(bm_data["case_results"], oracle_data, output_dir=tmp_path)
+
+    generated = json.loads((tmp_path / "strategy_penalty_sweep.json").read_text(encoding="utf-8"))
+    committed = json.loads((ARTIFACTS_DIR / "strategy_penalty_sweep.json").read_text(encoding="utf-8"))
+    assert generated == committed
+    assert (tmp_path / "net_value_vs_penalty.png").exists()
