@@ -9,16 +9,25 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Run test suite
-        run: python -m pytest -q
+        run: |
+          pip install -r requirements.txt
+          pip install ruff pip-audit
+      - name: Lint with ruff
+        run: ruff check .
+      - name: Security audit with pip-audit
+        run: pip-audit || echo "::warning::pip-audit found potential vulnerabilities"
+      - name: Run verification workflow
+        run: make verify
       - name: Verify documentation and artifact drift
         run: |
           python scripts/generate_report.py

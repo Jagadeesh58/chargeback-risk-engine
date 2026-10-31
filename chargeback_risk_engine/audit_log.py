@@ -8,6 +8,7 @@ instead of accidentally using fields from a mutated retry payload.
 
 import hashlib
 import json
+import os
 import sqlite3
 import threading
 from dataclasses import dataclass
@@ -15,7 +16,7 @@ from datetime import datetime, timezone
 
 from chargeback_risk_engine.paths import REPO_ROOT
 
-DB_PATH = str(REPO_ROOT / "audit_log.db")
+DB_PATH = os.getenv("CHARGEBACK_DB_PATH") or str(REPO_ROOT / "audit_log.db")
 
 _AUDIT_WRITE_LOCK = threading.Lock()
 
@@ -54,8 +55,9 @@ def canonical_payload_hash(dispute: dict) -> str:
     return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
 
-def _get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path, timeout=30)
+def _get_connection(db_path: str | None = None) -> sqlite3.Connection:
+    effective_path = db_path or os.getenv("CHARGEBACK_DB_PATH") or DB_PATH
+    conn = sqlite3.connect(effective_path, timeout=30)
     conn.execute("PRAGMA busy_timeout = 30000")
     conn.execute("PRAGMA synchronous = NORMAL")
     

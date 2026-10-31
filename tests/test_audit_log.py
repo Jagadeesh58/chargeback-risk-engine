@@ -155,3 +155,23 @@ def test_idempotency_conflict_raises_payload_conflict_error():
     audit_status = verify_audit_integrity(db_path=TEST_DB)
     assert audit_status["valid"] is True
     assert audit_status["checked"] == 1
+
+
+def test_chargeback_db_path_environment_variable(monkeypatch, tmp_path):
+    """When CHARGEBACK_DB_PATH is set, decisions default to that database path."""
+    env_db = str(tmp_path / "custom_audit.db")
+    monkeypatch.setenv("CHARGEBACK_DB_PATH", env_db)
+
+    calls = []
+    decision = get_or_create_decision(
+        "D_ENV_DB_1",
+        "item_not_received",
+        1500.0,
+        _fake_compute(calls),
+        db_path=None,
+    )
+    assert os.path.exists(env_db)
+    assert decision.dispute_id == "D_ENV_DB_1"
+    status = verify_audit_integrity(db_path=None)
+    assert status["valid"] is True
+    assert status["checked"] == 1
