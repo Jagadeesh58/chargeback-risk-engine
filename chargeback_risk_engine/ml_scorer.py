@@ -148,9 +148,10 @@ def load_or_fit_ml_scorer(path: str = MODEL_PATH, train_csv: str | None = None) 
                 f"Expected {expected_hash}, got {actual_hash}."
             )
     else:
-        if env == "production":
-            raise RuntimeError(
-                f"Model integrity failure: missing required SHA-256 integrity hash for {effective_path} in production mode."
+        require_hash = os.getenv("CHARGEBACK_REQUIRE_MODEL_HASH", "0").lower() in ("1", "true")
+        if env == "production" or require_hash:
+            raise ValueError(
+                f"Model integrity failure: missing required sidecar hash for {effective_path}."
             )
         logger.warning("SECURITY WARNING: Missing integrity sidecar hash for %s", effective_path)
 
