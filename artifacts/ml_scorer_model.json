@@ -1,0 +1,81 @@
+{
+  "feature_version": "features-v3",
+  "model_version": "logreg-v1",
+  "models": {
+    "duplicate_charge": {
+      "classes": [
+        0,
+        1
+      ],
+      "coef": [
+        0.9089462515993827,
+        1.0212727001095603
+      ],
+      "feature_order": [
+        "has_duplicate_transaction_proof",
+        "has_refund_already_issued"
+      ],
+      "intercept": [
+        -0.8199440423314301
+      ]
+    },
+    "item_not_as_described": {
+      "classes": [
+        0,
+        1
+      ],
+      "coef": [
+        0.9022388927468609,
+        0.7807964151803776,
+        1.060735493761583
+      ],
+      "feature_order": [
+        "has_product_photos",
+        "has_item_description_match",
+        "has_return_communication"
+      ],
+      "intercept": [
+        -1.2965963289401314
+      ]
+    },
+    "item_not_received": {
+      "classes": [
+        0,
+        1
+      ],
+      "coef": [
+        0.844904533553543,
+        0.8710238217026178,
+        0.9517770534490014
+      ],
+      "feature_order": [
+        "has_tracking_number",
+        "has_delivery_confirmation",
+        "has_signature_confirmation"
+      ],
+      "intercept": [
+        -1.209047560363902
+      ]
+    },
+    "unauthorized_transaction": {
+      "classes": [
+        0,
+        1
+      ],
+      "coef": [
+        0.8489217396151244,
+        0.9309496418714116,
+        0.9005070220779735
+      ],
+      "feature_order": [
+        "has_avs_match",
+        "has_cvv_match",
+        "has_device_fingerprint_match"
+      ],
+      "intercept": [
+        -1.1610450097767082
+      ]
+    }
+  },
+  "sklearn_version": "1.8.0"
+}

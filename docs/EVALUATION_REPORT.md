@@ -171,3 +171,28 @@ Evaluated against the bounded adversarial test suite in `tests/test_ai_analyst_e
 - Fallback rate on malformed/unreachable API: 100%
 - Hallucination-catch rate (invented/contradictory evidence): 100%
 - Safety Invariant: The AI analyst can never alter final financial actions, routing scores, or policy decisions.
+
+## Robustness and Perturbation Evaluation
+
+> **Methodology Disclaimer: Synthetic, Circular by Construction**
+>
+> All evaluation data and scenarios below are **synthetic and circular by construction**. The ground-truth `would_win` label is generated from hidden parameter distributions that the scoring model partially recovers. This benchmark measures the heuristic decision policy's numerical stability and graceful degradation under artificial distributional shifts, label corruption, and missingness; it does **not** represent verified empirical performance on real production payment-gateway chargebacks.
+
+Computed via `scripts/robustness_benchmark.py` across 500 cases per scenario:
+
+| Perturbation Scenario | Auto-Contest Rate | Auto Precision | Recall | Human-Review Rate |
+|---|---:|---:|---:|---:|
+| **Baseline** | **28.4%** | **78.2%** | **37.6%** | **71.6%** |
+| Missingness Low (5%) | 29.8% | 79.9% | 40.3% | 70.2% |
+| Missingness High (35%) | 22.2% | 73.9% | 27.8% | 77.8% |
+| Contradiction Low (2%) | 31.0% | 78.7% | 41.4% | 69.0% |
+| Contradiction High (20%) | 22.0% | 74.5% | 27.8% | 78.0% |
+| Legit Field Rate Low (65%) | 18.8% | 76.6% | 24.4% | 81.2% |
+| Legit Field Rate High (90%) | 36.4% | 78.6% | 48.5% | 63.6% |
+| Legit Base Rate Low (45%) | 22.8% | 71.9% | 33.2% | 77.2% |
+| Legit Base Rate High (75%) | 32.4% | 80.3% | 37.9% | 67.6% |
+| Label Noise (5% flipped) | 28.4% | 73.9% | 35.1% | 71.6% |
+| Label Noise (10% flipped) | 28.4% | 72.5% | 36.4% | 71.6% |
+| Label Noise (20% flipped) | 28.4% | 66.9% | 35.3% | 71.6% |
+| Covariate Shift: Dispute Amount | 26.6% | 77.4% | 35.4% | 73.4% |
+| Covariate Shift: Reason Codes | 27.4% | 74.5% | 37.4% | 72.6% |

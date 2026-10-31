@@ -37,6 +37,9 @@ audit_log.db
 !artifacts/baseline_model_evaluation.json
 !artifacts/baseline_temporal_evaluation.json
 !artifacts/ml_scorer_model.pkl.sha256
+!artifacts/ml_scorer_model.json
+!artifacts/ml_scorer_model.json.sha256
 !artifacts/oracle_ceiling.json
 !artifacts/strategy_comparison.json
 !artifacts/strategy_penalty_sweep.json
+!artifacts/robustness_report.json
