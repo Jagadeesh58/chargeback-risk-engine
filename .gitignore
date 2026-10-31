@@ -24,6 +24,7 @@ env/
 Thumbs.db
 .vscode/
 .idea/
+*.zip
 
 # Generated verification output
 artifacts/*

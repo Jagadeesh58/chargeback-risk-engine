@@ -34,3 +34,7 @@ api:
 
 dashboard:
 	streamlit run apps/app_deployed.py
+
+release-zip:
+	git archive --format=zip --output=chargeback-risk-engine.zip HEAD
+
