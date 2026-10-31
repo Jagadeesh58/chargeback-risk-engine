@@ -690,35 +690,35 @@ For the complete security contract, see [`SECURITY.md`](SECURITY.md).
 
 ---
 
-## Limitations
+## Known Limitations
 
-### Synthetic benchmark
+### Synthetic evaluation data (circular by construction)
 
-The bundled dataset is synthetic.
+The bundled dataset is synthetic, generated from noisy rules over hidden legitimacy variables. The evaluation benchmarks measure the heuristic decision policy's numerical stability and degradation characteristics; they must not be interpreted as empirical performance guarantees on real production payment traffic.
 
-It should not be interpreted as a representation of production payment traffic or chargeback distribution.
+### Internal risk ceiling (not statutory)
+
+The default ₹50,000 ceiling on automatic contesting is an internal risk policy limit designed to force human oversight on high-value exposure. It is not a statutory, regulatory, or legal threshold.
+
+### Audit chain scope and external anchoring
+
+The durable SQLite hash chain (`audit_log.db`) guarantees local tamper-evidence across sequential writes. To provide cryptographic non-repudiation across distributed infrastructure, the head hash must be periodically anchored to an external verifiable ledger using `scripts/export_audit_head.py`.
 
 ### Predictive-performance claims
 
-The published metrics are evaluation-snapshot results.
+The published metrics are evaluation-snapshot results. They are not guarantees of production precision, recall, recovery, or financial savings.
 
-They are not guarantees of production precision, recall, recovery, or financial savings.
-
-### Graph validation
+### Graph validation context
 
 Relationship context is validated separately from the tabular benchmark because the required historical relationship features are not present in the bundled evaluation data.
 
-### AI dependency
+### AI analyst boundaries
 
-The AI analyst is optional.
-
-When no external AI service is configured, the core decision flow can continue using deterministic fallback behavior.
+The AI analyst is advisory and optional. It provides natural-language summaries and counterfactual explanations, but has zero financial authority. When no external AI service is configured, the core decision flow continues using deterministic fallback behavior.
 
 ### Production status
 
-This repository is a buildathon/research prototype.
-
-A production deployment would require additional:
+This repository is an engineered portfolio prototype demonstrating verifiable decision runtime design. A production deployment would require additional:
 
 - security review
 - operational monitoring

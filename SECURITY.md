@@ -62,7 +62,7 @@ Data principals have statutory rights to request erasure of personal data. Howev
 **Architectural Remediation**:
 1. **Identifier Pseudonymization**: In production, buyer identifiers (`customer_id`, `ip_address`, `card_fingerprint`) should be passed through a keyed HMAC or salted cryptographic hash before entering the audit log.
 2. **Cryptographic Erasure (Crypto-Shredding)**: Sensitive fields can be encrypted with a per-customer key. To fulfill a "Right to Erasure" request, deleting the customer's encryption key renders the ciphertext permanently unrecoverable without modifying historical database rows or breaking audit chain integrity.
-3. **Retention Windows**: Audit databases should be partitioned and pruned after the statutory chargeback dispute window (typically 180 to 540 days under card network operating regulations).
+3. **Retention Windows**: Audit databases should be partitioned and pruned after the applicable card brand chargeback representment window (typically 180 to 540 days under card network operating rules).
 
 ## Privacy & third-party AI disclosure
 

@@ -104,7 +104,7 @@ The economics module exposes `economically_viable`; it does not return an action
 `policy.py` is the only action authority. The meaningful safety order is:
 
 1. input validity
-2. monetary ceiling
+2. monetary ceiling (configurable internal risk threshold, default ₹50,000)
 3. evidence validity, contradiction and completeness
 4. graph escalation
 5. contest/retry limit
