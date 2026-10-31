@@ -24,7 +24,7 @@ In automated financial decision systems, machine learning models (e.g., Logistic
 ## Decision 2: Isotonic Calibration Over Platt Scaling and Raw Probabilities
 
 ### Context
-Raw classification scores from Logistic Regression or rules baselines reflect uncalibrated ranking signals rather than true empirical probabilities. Accurate expected value calculations ($\text{EV} = p \times \text{amount} - \text{cost}$) require that when the model predicts $0.70$, exactly $70\%$ of those disputes are won in reality.
+Raw classification scores from Logistic Regression or rules baselines reflect uncalibrated ranking signals rather than true empirical probabilities. Accurate expected value calculations ($\text{EV} = p \times \text{amount} - \text{cost}$) require that when the model predicts 0.70, exactly 70% of those disputes are won in reality.
 
 ### Alternatives Considered
 1. **Raw Scorer Probabilities:** Use logistic sigmoid outputs directly without calibration.
@@ -78,7 +78,7 @@ Dispute operations require durable recordkeeping for dispute replays, acquirer i
 When a dispute is routed to `HUMAN-REVIEW` or `ACCEPT-LOSS`, merchants need actionable explanations answering: *"What specific evidence would reverse this decision to `AUTO-CONTEST`?"*
 
 ### Alternatives Considered
-1. **Combinatorial Multi-Feature Search:** Search all $2^N$ combinations of missing or failed evidence to find the global minimum distance decision boundary.
+1. **Combinatorial Multi-Feature Search:** Search all `2^N` combinations of missing or failed evidence to find the global minimum distance decision boundary.
 2. **Bidirectional Permutation Testing:** Flip evidence in both directions ($True \to False$ and $False \to True$) across all fields.
 3. **Isolated Single-Change Merchant-Actionable Reversals (Selected):** Simulate only realistic, merchant-obtainable flips (missing or unconfirmed evidence changed from $None/False \to True$) on an isolated, deep-copied graph instance.
 

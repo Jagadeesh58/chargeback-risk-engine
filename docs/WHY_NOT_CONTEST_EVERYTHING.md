@@ -32,18 +32,18 @@ Both major card networks operate formal dispute monitoring programs that track m
 ```
 
 ### Visa Acquiring Monitoring Program (VAMP)
-- **Standard Threshold:** $0.9\%$ dispute-to-transaction ratio and 100 disputes/month.
-- **Excessive Threshold:** $1.8\%$ dispute-to-transaction ratio and 1,000 disputes/month.
+- **Standard Threshold:** 0.9% dispute-to-transaction ratio and 100 disputes/month.
+- **Excessive Threshold:** 1.8% dispute-to-transaction ratio and 1,000 disputes/month.
 
 ### Mastercard Excessive Dispute Program (EDP / VFMP)
-- **Tier 1 Threshold:** $1.0\%$ dispute ratio and 100 disputes/month.
-- **Tier 2 (Excessive):** $1.5\%$ to $2.0\%$ dispute ratio.
+- **Tier 1 Threshold:** 1.0% dispute ratio and 100 disputes/month.
+- **Tier 2 (Excessive):** 1.5% to 2.0% dispute ratio.
 
 ### The Consequences of "Blind Contesting"
 When a merchant contests disputes indiscriminately without compelling, verified evidence:
 1. **Representment Loss Escalation:** Card issuers reject ungrounded representments. A low representment win rate signals to the card networks that the merchant is submitting frivolous or deceptive counter-claims.
-2. **Program Penalties:** Entering VAMP or VFMP triggers mandatory monitoring fines of **\$50 to \$100 per dispute** on *all* subsequent chargebacks, regardless of representment outcome.
-3. **Card Network Arbitration Fees:** If a merchant pushes a contested chargeback to secondary representment or arbitration without hard evidence (e.g., contesting an Item-Not-Received claim without verifiable courier delivery confirmation), card networks assess a non-refundable **\$500 arbitration filing fee** (Visa/Mastercard network fee). A single lost arbitration wipes out the recovery from dozens of successful disputes.
+2. **Dispute Monitoring Programs:** Card networks operate dispute-ratio monitoring programs (such as Visa VAMP and Mastercard dispute monitoring). When a merchant's monthly dispute-to-transaction ratio breaches standard thresholds, processors may impose monitoring assessments, operational surcharges, and mandatory remediation plans; amounts vary by network and acquiring contract.
+3. **Card Network Arbitration Fees:** If a merchant escalates a lost chargeback to formal arbitration without compelling documentation, card networks assess non-refundable network arbitration filing fees that easily exceed typical dispute values.
 4. **MATCH List / TMF Processing Termination:** Continued placement in excessive dispute programs results in payment processing termination. The merchant is placed on the **Mastercard MATCH list** (Member Alert to Control High-risk Merchants), effectively banning the business and its directors from accepting credit cards globally for up to 5 years.
 
 ---
@@ -51,11 +51,11 @@ When a merchant contests disputes indiscriminately without compelling, verified 
 ## 3. Acquirer Relationships & Rolling Reserves
 
 Acquiring banks (merchant processors) carry downstream liability for cardholder chargebacks. Acquirers evaluate merchants on:
-- **Dispute win rate:** Production baseline is typically $40\%\text{--}45\%$. The Chargeback Risk Engine maintains **$74.8\%$ precision** on automated representments.
+- **Dispute win rate:** Production baseline is typically 40%–45%. The Chargeback Risk Engine maintains **74.8% precision** on automated representments.
 - **Representment hygiene:** Submitting fabricated, invalid, or contradictory evidence burns trust with the acquirer's dispute operations desk.
 
 When a merchant's dispute hygiene degrades:
-- **Rolling Reserves:** Acquirers freeze $10\%\text{--}20\%$ of the merchant's gross daily processing volume in an escrow account for 180 days to cover potential chargeback losses, causing acute cash-flow starvation.
+- **Rolling Reserves:** Acquirers freeze 10%–20% of the merchant's gross daily processing volume in an escrow account for 180 days to cover potential chargeback losses, causing acute cash-flow starvation.
 - **Processing Surcharges:** Dispute processing fees increase from $₹150$ up to $₹1,500$ per filing.
 
 ---
@@ -85,7 +85,7 @@ In a real enterprise, a fraud operations team has finite daily capacity (e.g., 2
 | **Contest Automation** | 100% automated | 33.3% automated, 59.9% human review, 6.8% accept loss |
 | **Representment Precision** | ~50.2% (noisy coin-flip) | **74.8% verified win rate** |
 | **Card Network Standing** | High risk of Visa VAMP / Mastercard VFMP | Protected (well below monitoring thresholds) |
-| **Frivolous Representation Risk** | Extreme (\$500 arbitration exposure) | Zero (enforces strict evidence checklist gates) |
+| **Frivolous Representation Risk** | High (risk of card-network arbitration filing fees on weak claims) | Zero (enforces strict evidence checklist gates) |
 | **Acquirer Trust** | Fines, rolling reserves, or termination | Clean merchant tier, lowest dispute fee tier |
 | **Realized Safe Value** | Unstable (gross recovery offset by network fines) | **₹49.73L high-confidence automation** |
 

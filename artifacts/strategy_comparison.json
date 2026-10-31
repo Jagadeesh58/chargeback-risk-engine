@@ -1,6 +1,6 @@
 {
   "assumed_loss_penalty_inr": 4150.0,
-  "penalty_modelling_assumption_note": "Sensitivity parameter / modelling assumption (~$50 per lost contest); not an official card-network fee. Card-brand monitoring programmes (Visa VAMP, Mastercard VFMP) track dispute ratios rather than assessing flat per-loss fines.",
+  "penalty_modelling_assumption_note": "Sensitivity parameter / rupee modelling assumption (\u20b94,150 per lost contest); not an official card-network fee. Card-brand monitoring programmes (Visa VAMP, Mastercard VFMP) track dispute ratios rather than assessing flat per-loss fines.",
   "strategy_table": [
     {
       "strategy": "Contest Everything",

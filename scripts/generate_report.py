@@ -196,7 +196,7 @@ def _latency():
 
 # Base-case per-lost-contest loss penalty parameter (modelling assumption, not an official card-network fee).
 # Card-brand monitoring programmes (e.g. Visa VAMP, Mastercard VFMP) operate on aggregate dispute ratios
-# rather than known flat per-lost-contest fees. Rs 4,150 (~$50) is used as an illustrative sensitivity assumption.
+# rather than known flat per-lost-contest fees. ₹4,150 is used as an illustrative rupee sensitivity assumption.
 ASSUMED_LOSS_PENALTY_INR = 4150.0
 
 
@@ -410,7 +410,7 @@ def compute_strategy_comparison(cases: list[dict], oracle_data: dict, seed: int 
     return {
         "assumed_loss_penalty_inr": base_p,
         "penalty_modelling_assumption_note": (
-            "Sensitivity parameter / modelling assumption (~$50 per lost contest); not an official card-network fee. "
+            "Sensitivity parameter / rupee modelling assumption (₹4,150 per lost contest); not an official card-network fee. "
             "Card-brand monitoring programmes (Visa VAMP, Mastercard VFMP) track dispute ratios rather than assessing flat per-loss fines."
         ),
         "strategy_table": table,
@@ -495,7 +495,7 @@ def format_strategy_analysis_markdown(strat_comp: dict) -> str:
      - At base-case $p = ₹4,150$: difference is **{diff_scenb_p}** with 95% CI **{ci_scenb_p}**.
 
 - **Symmetric Break-Even Loss Penalty Level**:
-  - **Ranking Flip vs. Automated-Only**: Contest Everything incurs 2,176 lost disputes whereas the Live Policy Automated-Only incurs only 417 (avoiding 1,759 losses). When a symmetric penalty per lost contest is applied to both strategies, Contest Everything falls below Live Policy Automated-Only when the penalty exceeds **{thresh_auto}**. At the base-case sensitivity parameter of $p = ₹4,150$ (~$50 modelling assumption), the Live Policy yields **₹32.42 lakh** vs Contest Everything's **₹18.64 lakh** (an advantage of **+₹13.78 lakh**).
+  - **Ranking Flip vs. Automated-Only**: Contest Everything incurs 2,176 lost disputes whereas the Live Policy Automated-Only incurs only 417 (avoiding 1,759 losses). When a symmetric penalty per lost contest is applied to both strategies, Contest Everything falls below Live Policy Automated-Only when the penalty exceeds **{thresh_auto}**. At the base-case sensitivity parameter of $p = ₹4,150$ (rupee modelling assumption), the Live Policy yields **₹32.42 lakh** vs Contest Everything's **₹18.64 lakh** (an advantage of **+₹13.78 lakh**).
   - **Ranking Flip vs. Policy with Review (Scenario b)**: In Scenario b, reviewed cases are contested, resulting in 4,984 contested disputes and 2,164 losses (avoiding only 12 losses relative to Contest Everything). Because it incurs ₹166,350 in human review costs and misses 4 wins, Contest Everything falls below Scenario b only if the loss penalty exceeds **{thresh_scenb}**. Scenarios a and b represent operational upper/lower bounds under full contestation, not proof of review lift."""
 
 

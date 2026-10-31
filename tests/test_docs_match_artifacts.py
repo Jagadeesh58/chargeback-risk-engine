@@ -157,3 +157,35 @@ def test_strategy_comparison_table_matches_docs(artifacts):
     for doc_name, doc_text in [("README.md", readme), ("EVALUATION_REPORT.md", eval_report), ("MODEL_CARD.md", model_card)]:
         assert thresh_auto in doc_text, f"Threshold {thresh_auto} missing in {doc_name}"
         assert thresh_scenb in doc_text, f"Threshold {thresh_scenb} missing in {doc_name}"
+
+
+def test_no_dollar_amounts_in_docs():
+    """Assert no line in README.md or docs/*.md contains a '$' monetary amount."""
+    doc_paths = [REPO_ROOT / "README.md", *sorted((REPO_ROOT / "docs").glob("*.md"))]
+    dollar_pattern = re.compile(r"(\$|\\\$)\s*[0-9]")
+
+    violations = []
+    for doc in doc_paths:
+        for lineno, line in enumerate(doc.read_text(encoding="utf-8").splitlines(), 1):
+            if dollar_pattern.search(line):
+                violations.append(f"{doc.name}:{lineno}: {line.strip()}")
+
+    assert not violations, "Found dollar amounts in documentation:\n" + "\n".join(violations)
+
+
+def test_fees_and_penalties_have_rupee_or_source_citation():
+    """Assert fee/fine/penalty/arbitration numbers in docs have a rupee sign or source citation."""
+    doc_paths = [REPO_ROOT / "README.md", *sorted((REPO_ROOT / "docs").glob("*.md"))]
+    pattern = re.compile(
+        r"(?:fee|fines?|penalt(?:y|ies)|arbitration)[\w\s:=-]{0,20}\b\d+([,.]\d+)?|\b\d+([,.]\d+)?[\w\s:=-]{0,20}(?:fee|fines?|penalt(?:y|ies)|arbitration)",
+        re.IGNORECASE,
+    )
+
+    violations = []
+    for doc in doc_paths:
+        for lineno, line in enumerate(doc.read_text(encoding="utf-8").splitlines(), 1):
+            if pattern.search(line):
+                if "₹" not in line and "Rs" not in line and "INR" not in line and "[source:" not in line:
+                    violations.append(f"{doc.name}:{lineno}: {line.strip()}")
+
+    assert not violations, "Found fee/penalty amounts without rupee or source citation:\n" + "\n".join(violations)
