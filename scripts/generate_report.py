@@ -20,6 +20,8 @@ if str(ROOT) not in sys.path:
 from chargeback_risk_engine.baseline import run_naive_baseline
 from chargeback_risk_engine.calibration import apply_calibration, load_or_fit_calibration_points
 from chargeback_risk_engine.engine.economic_decision import calculate_economic_value
+
+HUMAN_REVIEW_COST = 50.0
 from chargeback_risk_engine.engine.hybrid_pipeline import decide_case
 from chargeback_risk_engine.engine.evidence_score import score_evidence
 from chargeback_risk_engine.evidence import assemble
@@ -36,6 +38,10 @@ from chargeback_risk_engine.policy import (
 from chargeback_risk_engine.policy_profile import load_policy_profile
 from chargeback_risk_engine.review_budget import optimize_review_budget
 from chargeback_risk_engine.scorer import predict_win_probability
+
+
+def _write_lf(path: Path, content: str) -> None:
+    path.write_bytes(content.replace("\r\n", "\n").encode("utf-8"))
 
 
 def _row(row):
@@ -188,192 +194,243 @@ def _latency():
     return {"runs":len(samples),"p50_ms":q(.50),"p95_ms":q(.95),"p99_ms":q(.99),"max_ms":max(samples),"method":"warm local process; unique dispute IDs"}
 
 
-def compute_strategy_comparison(cases: list[dict], oracle_data: dict, seed: int = 42) -> dict:
+# Base-case per-lost-contest loss penalty parameter (modelling assumption, not an official card-network fee).
+# Card-brand monitoring programmes (e.g. Visa VAMP, Mastercard VFMP) operate on aggregate dispute ratios
+# rather than known flat per-lost-contest fees. Rs 4,150 (~$50) is used as an illustrative sensitivity assumption.
+ASSUMED_LOSS_PENALTY_INR = 4150.0
+
+
+def evaluate_strategy_outcome(
+    cases: list[dict],
+    auto_mask: np.ndarray,
+    review_mask: np.ndarray,
+    review_treatment: str = "none",  # "none", "model_expected", "observed_ground_truth"
+    contest_cost: float = CONTEST_COST,
+    review_cost: float = HUMAN_REVIEW_COST,
+    loss_penalty: float = 0.0,
+) -> dict:
+    """Evaluate any strategy outcome under unified, symmetric operational cost and loss-penalty assumptions.
+
+    Every strategy row passes through this same function without hardcoded penalties.
+    """
     amounts = np.array([float(c["amount"]) for c in cases], dtype=float)
     wins = np.array([bool(c["would_win"]) for c in cases], dtype=bool)
-    actions = np.array([str(c["action"]) for c in cases], dtype=object)
     p_wins = np.array([float(c["p_win"]) for c in cases], dtype=float)
     n_total = len(cases)
 
-    contest_cost = 150.0
-    review_cost = 50.0
-    vamp_min_fine_inr = 4150.0  # $50 minimum VAMP monitoring fine at standard conversion (~Rs 83/$)
-
-    # 1. Contest Everything (Unconstrained)
-    ce_recovery = float(np.sum(np.where(wins, amounts, 0.0)))
-    ce_contest_cost = float(n_total * contest_cost)
-    ce_net = float(ce_recovery - ce_contest_cost)
-    ce_losses = int(np.sum(~wins))
-    ce_precision = float(np.sum(wins) / n_total)
-
-    # 2. Contest Everything with Fine ($50 / Rs 4,150 per lost contest)
-    ce_fine = float(ce_losses * vamp_min_fine_inr)
-    ce_fined_net = float(ce_net - ce_fine)
-
-    # 3. Live Policy Automated Only
-    auto_mask = actions == "AUTO-CONTEST"
+    # 1. Automated contest component
     auto_count = int(np.sum(auto_mask))
     auto_wins = int(np.sum(wins[auto_mask]))
-    auto_recovery = float(np.sum(np.where(wins[auto_mask], amounts[auto_mask], 0.0)))
-    auto_cost = float(auto_count * contest_cost)
-    auto_net = float(auto_recovery - auto_cost)
-    auto_precision = float(auto_wins / auto_count) if auto_count else 0.0
     auto_losses = int(auto_count - auto_wins)
+    auto_recovery = float(np.sum(np.where(wins[auto_mask], amounts[auto_mask], 0.0)))
+    auto_contest_cost = float(auto_count * contest_cost)
+    auto_penalty = float(auto_losses * loss_penalty)
 
-    # 4. Live Policy + Human Review
-    rev_mask = actions == "HUMAN-REVIEW"
-    rev_count = int(np.sum(rev_mask))
-    rev_cost = float(rev_count * (contest_cost + review_cost))
-
-    # Scenario a: model expected win probability
-    rev_a_recovery = float(np.sum(p_wins[rev_mask] * amounts[rev_mask]))
-    rev_a_net = float(auto_net + rev_a_recovery - rev_cost)
-
-    # Scenario b: observed contest win rate on held-out data
-    rev_wins = int(np.sum(wins[rev_mask]))
-    rev_b_recovery = float(np.sum(np.where(wins[rev_mask], amounts[rev_mask], 0.0)))
-    total_rev_b_recovery = float(auto_recovery + rev_b_recovery)
-    total_policy_b_cost = float(auto_cost + rev_cost)
-    rev_b_net = float(total_rev_b_recovery - total_policy_b_cost)
-    contested_b_count = auto_count + rev_count
-    contested_b_precision = float((auto_wins + rev_wins) / contested_b_count) if contested_b_count else 0.0
-
-    # 5. Oracle Ceiling
-    orc = oracle_data.get("oracle_ceiling", {})
-    oracle_net = float(orc.get("best_achievable_net_value", 10900220.35))
-    oracle_gross = float(oracle_net + (n_total * contest_cost))
-
-    # Bootstrap 95% CI for difference: Policy (Scenario b) - Contest Everything (resampling disputes)
-    ce_case_net = np.where(wins, amounts - contest_cost, -contest_cost)
-    policy_case_net = np.where(
-        actions == "AUTO-CONTEST",
-        np.where(wins, amounts - contest_cost, -contest_cost),
-        np.where(
-            actions == "HUMAN-REVIEW",
-            np.where(wins, amounts - contest_cost - review_cost, -contest_cost - review_cost),
+    # 2. Review component
+    rev_count = int(np.sum(review_mask))
+    if review_treatment == "none":
+        rev_wins = 0.0
+        rev_losses = 0.0
+        rev_recovery = 0.0
+        rev_contest_cost = 0.0
+        rev_review_cost = 0.0
+        rev_penalty = 0.0
+        rev_case_net = np.zeros(n_total, dtype=float)
+    elif review_treatment == "model_expected":
+        rev_wins = float(np.sum(p_wins[review_mask]))
+        rev_losses = float(rev_count - rev_wins)
+        rev_recovery = float(np.sum(p_wins[review_mask] * amounts[review_mask]))
+        rev_contest_cost = float(rev_count * contest_cost)
+        rev_review_cost = float(rev_count * review_cost)
+        rev_penalty = float(rev_losses * loss_penalty)
+        rev_case_net = np.where(
+            review_mask,
+            p_wins * amounts - contest_cost - review_cost - (1.0 - p_wins) * loss_penalty,
             0.0,
-        ),
+        )
+    elif review_treatment == "observed_ground_truth":
+        rev_wins = float(np.sum(wins[review_mask]))
+        rev_losses = float(rev_count - rev_wins)
+        rev_recovery = float(np.sum(np.where(wins[review_mask], amounts[review_mask], 0.0)))
+        rev_contest_cost = float(rev_count * contest_cost)
+        rev_review_cost = float(rev_count * review_cost)
+        rev_penalty = float(rev_losses * loss_penalty)
+        rev_case_net = np.where(
+            review_mask,
+            np.where(wins, amounts - contest_cost - review_cost, -contest_cost - review_cost - loss_penalty),
+            0.0,
+        )
+    else:
+        raise ValueError(f"Unknown review_treatment: {review_treatment}")
+
+    # Total contested set
+    contested_count = auto_count + (rev_count if review_treatment != "none" else 0)
+    total_wins = auto_wins + rev_wins
+    total_losses = auto_losses + rev_losses
+    total_recovery = auto_recovery + rev_recovery
+    total_contest_cost = auto_contest_cost + rev_contest_cost
+    total_review_cost = rev_review_cost
+    total_penalty = auto_penalty + rev_penalty
+    total_net = total_recovery - total_contest_cost - total_review_cost - total_penalty
+    precision = float(total_wins / contested_count) if contested_count else 0.0
+
+    auto_case_net = np.where(
+        auto_mask,
+        np.where(wins, amounts - contest_cost, -contest_cost - loss_penalty),
+        0.0,
     )
-    diff = policy_case_net - ce_case_net
-    obs_diff = float(np.sum(diff))
-
-    rng = np.random.RandomState(seed)
-    boot_diffs = []
-    for _ in range(1000):
-        idx = rng.randint(0, n_total, size=n_total)
-        boot_diffs.append(float(np.sum(diff[idx])))
-    boot_diffs = np.array(boot_diffs)
-    ci_lower = float(np.percentile(boot_diffs, 2.5))
-    ci_upper = float(np.percentile(boot_diffs, 97.5))
-    boot_mean = float(np.mean(boot_diffs))
-
-    # Break-even loss penalty analysis
-    break_even_vs_auto_ce_only = float((ce_net - auto_net) / ce_losses) if ce_losses else 0.0
-    break_even_vs_auto_both = float((ce_net - auto_net) / (ce_losses - auto_losses)) if (ce_losses - auto_losses) else 0.0
-    break_even_vs_policy_b_ce_only = float((ce_net - rev_b_net) / ce_losses) if ce_losses else 0.0
-
-    table = [
-        {
-            "strategy": "Contest Everything (Unconstrained)",
-            "auto_contest_share": 1.0,
-            "human_review_share": 0.0,
-            "contested_precision": ce_precision,
-            "contested_count": n_total,
-            "gross_recovery": ce_recovery,
-            "contest_and_review_cost": ce_contest_cost,
-            "fine_penalty": 0.0,
-            "realized_net_value": ce_net,
-            "realized_net_value_lakh": ce_net / 100000.0,
-            "cost_assumptions": "Blind 100% contesting; ₹150 filing fee; assumes zero compliance penalties",
-        },
-        {
-            "strategy": "Contest Everything (with Loss Penalty)",
-            "auto_contest_share": 1.0,
-            "human_review_share": 0.0,
-            "contested_precision": ce_precision,
-            "contested_count": n_total,
-            "gross_recovery": ce_recovery,
-            "contest_and_review_cost": ce_contest_cost,
-            "fine_penalty": ce_fine,
-            "realized_net_value": ce_fined_net,
-            "realized_net_value_lakh": ce_fined_net / 100000.0,
-            "cost_assumptions": "Documented Visa VAMP / Mastercard VFMP fine of $50 (₹4,150) per lost contest",
-        },
-        {
-            "strategy": "Live Policy (Automated-Only)",
-            "auto_contest_share": auto_count / n_total,
-            "human_review_share": rev_count / n_total,
-            "contested_precision": auto_precision,
-            "contested_count": auto_count,
-            "gross_recovery": auto_recovery,
-            "contest_and_review_cost": auto_cost,
-            "fine_penalty": 0.0,
-            "realized_net_value": auto_net,
-            "realized_net_value_lakh": auto_net / 100000.0,
-            "cost_assumptions": "Conservative automation: only high-confidence cases automated; reviewed cases valued at ₹0",
-        },
-        {
-            "strategy": "Live Policy + Human Review (Scenario a: Model Rate)",
-            "auto_contest_share": auto_count / n_total,
-            "human_review_share": rev_count / n_total,
-            "contested_precision": float(auto_wins + int(np.round(np.sum(p_wins[rev_mask])))) / contested_b_count if contested_b_count else 0.0,
-            "contested_count": contested_b_count,
-            "gross_recovery": auto_recovery + rev_a_recovery,
-            "contest_and_review_cost": total_policy_b_cost,
-            "fine_penalty": 0.0,
-            "realized_net_value": rev_a_net,
-            "realized_net_value_lakh": rev_a_net / 100000.0,
-            "cost_assumptions": "Reviewed cases recover at model calibrated win probability with ₹50 review fee",
-        },
-        {
-            "strategy": "Live Policy + Human Review (Scenario b: Observed Rate)",
-            "auto_contest_share": auto_count / n_total,
-            "human_review_share": rev_count / n_total,
-            "contested_precision": contested_b_precision,
-            "contested_count": contested_b_count,
-            "gross_recovery": total_rev_b_recovery,
-            "contest_and_review_cost": total_policy_b_cost,
-            "fine_penalty": 0.0,
-            "realized_net_value": rev_b_net,
-            "realized_net_value_lakh": rev_b_net / 100000.0,
-            "cost_assumptions": "Reviewed cases recover at observed held-out win rate (47.5%) with ₹50 review fee",
-        },
-        {
-            "strategy": "Theoretical Oracle Ceiling",
-            "auto_contest_share": 1.0,
-            "human_review_share": 0.0,
-            "contested_precision": 1.0,
-            "contested_count": n_total,
-            "gross_recovery": oracle_gross,
-            "contest_and_review_cost": ce_contest_cost,
-            "fine_penalty": 0.0,
-            "realized_net_value": oracle_net,
-            "realized_net_value_lakh": oracle_net / 100000.0,
-            "cost_assumptions": "Bayes-optimal ceiling with hidden seller-legitimacy state access",
-        },
-    ]
+    per_case_net = auto_case_net + rev_case_net
 
     return {
+        "auto_count": auto_count,
+        "review_count": rev_count,
+        "auto_share": float(auto_count / n_total),
+        "review_share": float(rev_count / n_total),
+        "contested_count": contested_count,
+        "contested_precision": precision,
+        "lost_contest_count": total_losses,
+        "gross_recovery": total_recovery,
+        "contest_cost": total_contest_cost,
+        "review_cost": total_review_cost,
+        "loss_penalty": total_penalty,
+        "realized_net_value": total_net,
+        "realized_net_value_lakh": total_net / 100000.0,
+        "per_case_net": per_case_net,
+    }
+
+
+def compute_strategy_comparison(cases: list[dict], oracle_data: dict, seed: int = 42) -> dict:
+    from scripts.oracle_ceiling import compute_oracle_probabilities
+
+    amounts = np.array([float(c["amount"]) for c in cases], dtype=float)
+    actions = np.array([str(c["action"]) for c in cases], dtype=object)
+    n_total = len(cases)
+
+    contest_cost = CONTEST_COST
+    review_cost = HUMAN_REVIEW_COST
+    base_p = ASSUMED_LOSS_PENALTY_INR
+
+    # Strategy masks
+    all_mask = np.ones(n_total, dtype=bool)
+    no_mask = np.zeros(n_total, dtype=bool)
+    auto_mask = actions == "AUTO-CONTEST"
+    rev_mask = actions == "HUMAN-REVIEW"
+
+    # Oracle contested mask
+    oracle_probs_map = compute_oracle_probabilities(30000, seed=seed)
+    oracle_probs = np.array([oracle_probs_map.get(c["dispute_id"], 0.5) for c in cases])
+    thresh = contest_cost / np.maximum(amounts, 1.0)
+    oracle_contested_mask = oracle_probs >= thresh
+
+    strategies_spec = [
+        ("Contest Everything", all_mask, no_mask, "none", "Blind 100% contesting; ₹150 filing fee; pays penalty on lost disputes"),
+        ("Live Policy (Automated-Only)", auto_mask, rev_mask, "none", "Conservative automation: high-confidence cases only; reviewed cases valued at ₹0 recovery"),
+        ("Live Policy + Human Review (Scenario a: Model Rate)", auto_mask, rev_mask, "model_expected", "Reviewed cases contested at model expected win rate with ₹50 review fee (bound)"),
+        ("Live Policy + Human Review (Scenario b: Observed Rate)", auto_mask, rev_mask, "observed_ground_truth", "Reviewed cases contested at observed held-out win rate with ₹50 review fee (bound)"),
+        ("Theoretical Oracle Ceiling", oracle_contested_mask, no_mask, "none", "Unpenalized Bayes-optimal policy ceiling with hidden state access"),
+    ]
+
+    table = []
+    evaluations = {}
+
+    for name, c_mask, r_mask, treat, notes in strategies_spec:
+        ev_0 = evaluate_strategy_outcome(cases, c_mask, r_mask, treat, contest_cost, review_cost, loss_penalty=0.0)
+        ev_p = evaluate_strategy_outcome(cases, c_mask, r_mask, treat, contest_cost, review_cost, loss_penalty=base_p)
+        evaluations[name] = {"p0": ev_0, "base_p": ev_p}
+
+        table.append({
+            "strategy": name,
+            "auto_contest_share": ev_0["auto_share"],
+            "human_review_share": ev_0["review_share"],
+            "contested_precision": ev_0["contested_precision"],
+            "contested_count": ev_0["contested_count"],
+            "lost_contest_count": ev_0["lost_contest_count"],
+            "gross_recovery": ev_0["gross_recovery"],
+            "contest_and_review_cost": ev_0["contest_cost"] + ev_0["review_cost"],
+            "realized_net_value_p0": ev_0["realized_net_value"],
+            "realized_net_value_p0_lakh": ev_0["realized_net_value_lakh"],
+            "fine_penalty_base_p": ev_p["loss_penalty"],
+            "realized_net_value_base_p": ev_p["realized_net_value"],
+            "realized_net_value_base_p_lakh": ev_p["realized_net_value_lakh"],
+            # Backward-compatibility fields
+            "realized_net_value": ev_0["realized_net_value"],
+            "realized_net_value_lakh": ev_0["realized_net_value_lakh"],
+            "fine_penalty": ev_p["loss_penalty"],
+            "cost_assumptions": notes,
+        })
+
+    # Bootstrap resampling differences
+    rng = np.random.RandomState(seed)
+    boot_indices = [rng.randint(0, n_total, size=n_total) for _ in range(1000)]
+
+    def compute_bootstrap_diff(strat_a_net: np.ndarray, strat_b_net: np.ndarray, label: str) -> dict:
+        diff = strat_a_net - strat_b_net
+        obs = float(np.sum(diff))
+        boot_diffs = np.array([float(np.sum(diff[idx])) for idx in boot_indices])
+        return {
+            "comparison": label,
+            "observed_difference_inr": obs,
+            "observed_difference_lakh": obs / 100000.0,
+            "bootstrap_mean_inr": float(np.mean(boot_diffs)),
+            "ci_95_lower_inr": float(np.percentile(boot_diffs, 2.5)),
+            "ci_95_upper_inr": float(np.percentile(boot_diffs, 97.5)),
+            "ci_95_lower_lakh": float(np.percentile(boot_diffs, 2.5)) / 100000.0,
+            "ci_95_upper_lakh": float(np.percentile(boot_diffs, 97.5)) / 100000.0,
+        }
+
+    ce_0 = evaluations["Contest Everything"]["p0"]["per_case_net"]
+    ce_p = evaluations["Contest Everything"]["base_p"]["per_case_net"]
+
+    auto_0 = evaluations["Live Policy (Automated-Only)"]["p0"]["per_case_net"]
+    auto_p = evaluations["Live Policy (Automated-Only)"]["base_p"]["per_case_net"]
+
+    scenb_0 = evaluations["Live Policy + Human Review (Scenario b: Observed Rate)"]["p0"]["per_case_net"]
+    scenb_p = evaluations["Live Policy + Human Review (Scenario b: Observed Rate)"]["base_p"]["per_case_net"]
+
+    boot_auto_p0 = compute_bootstrap_diff(auto_0, ce_0, "Live Policy (Automated-Only) minus Contest Everything at p=0")
+    boot_auto_base_p = compute_bootstrap_diff(auto_p, ce_p, f"Live Policy (Automated-Only) minus Contest Everything at p={base_p}")
+    boot_scenb_p0 = compute_bootstrap_diff(scenb_0, ce_0, "Live Policy (Scenario b) minus Contest Everything at p=0")
+    boot_scenb_base_p = compute_bootstrap_diff(scenb_p, ce_p, f"Live Policy (Scenario b) minus Contest Everything at p={base_p}")
+
+    # Break-even threshold calculations
+    ce_net_0 = evaluations["Contest Everything"]["p0"]["realized_net_value"]
+    ce_losses = evaluations["Contest Everything"]["p0"]["lost_contest_count"]
+    auto_net_0 = evaluations["Live Policy (Automated-Only)"]["p0"]["realized_net_value"]
+    auto_losses = evaluations["Live Policy (Automated-Only)"]["p0"]["lost_contest_count"]
+
+    delta_losses_auto = ce_losses - auto_losses  # 2176 - 417 = 1759
+    break_even_vs_auto = float((ce_net_0 - auto_net_0) / delta_losses_auto) if delta_losses_auto else 0.0
+
+    scenb_net_0 = evaluations["Live Policy + Human Review (Scenario b: Observed Rate)"]["p0"]["realized_net_value"]
+    scenb_losses = evaluations["Live Policy + Human Review (Scenario b: Observed Rate)"]["p0"]["lost_contest_count"]
+
+    delta_losses_scenb = ce_losses - scenb_losses  # 2176 - 2164 = 12
+    break_even_vs_scenb = float((ce_net_0 - scenb_net_0) / delta_losses_scenb) if delta_losses_scenb else 0.0
+
+    return {
+        "assumed_loss_penalty_inr": base_p,
+        "penalty_modelling_assumption_note": (
+            "Sensitivity parameter / modelling assumption (~$50 per lost contest); not an official card-network fee. "
+            "Card-brand monitoring programmes (Visa VAMP, Mastercard VFMP) track dispute ratios rather than assessing flat per-loss fines."
+        ),
         "strategy_table": table,
-        "bootstrap_diff_vs_contest_everything": {
-            "comparison": "Live Policy (Scenario b) minus Contest Everything (Unconstrained)",
-            "observed_difference_inr": obs_diff,
-            "observed_difference_lakh": obs_diff / 100000.0,
-            "bootstrap_mean_inr": boot_mean,
-            "ci_95_lower_inr": ci_lower,
-            "ci_95_upper_inr": ci_upper,
-            "ci_95_lower_lakh": ci_lower / 100000.0,
-            "ci_95_upper_lakh": ci_upper / 100000.0,
+        "bootstrap_diff_vs_contest_everything": boot_scenb_p0,
+        "bootstrap_comparisons": {
+            "auto_only_vs_contest_everything_p0": boot_auto_p0,
+            "auto_only_vs_contest_everything_base_p": boot_auto_base_p,
+            "scenario_b_vs_contest_everything_p0": boot_scenb_p0,
+            "scenario_b_vs_contest_everything_base_p": boot_scenb_base_p,
         },
         "break_even_analysis": {
-            "raw_value_winner": "Contest Everything (Unconstrained) recovers ₹108.95L vs ₹49.73L (auto-only) and ₹107.29L (policy + review scenario b).",
-            "ranking_flip_vs_auto_only": {
-                "threshold_inr_ce_only": break_even_vs_auto_ce_only,
-                "threshold_inr_both_penalized": break_even_vs_auto_both,
-            },
-            "ranking_flip_vs_policy_scenario_b": {
-                "threshold_inr_ce_only": break_even_vs_policy_b_ce_only,
-            },
+            "raw_value_winner": "Contest Everything wins on unpenalized raw value (p=0): ₹108.95L vs ₹49.73L (auto-only) and ₹107.29L (scenario b).",
+            "ranking_flip_vs_auto_only_threshold_inr": break_even_vs_auto,
+            "ranking_flip_vs_scenario_b_threshold_inr": break_even_vs_scenb,
+            "notes": (
+                f"When both strategies pay penalty p on lost contests, Live Policy Automated-Only beats Contest Everything when p > ₹{break_even_vs_auto:,.2f}. "
+                f"At the base-case sensitivity assumption of p=₹{base_p:,.2f}, Automated-Only yields ₹{evaluations['Live Policy (Automated-Only)']['base_p']['realized_net_value_lakh']:.2f}L "
+                f"vs Contest Everything's ₹{evaluations['Contest Everything']['base_p']['realized_net_value_lakh']:.2f}L (+₹{evaluations['Live Policy (Automated-Only)']['base_p']['realized_net_value_lakh'] - evaluations['Contest Everything']['base_p']['realized_net_value_lakh']:.2f}L advantage). "
+                f"Scenario b requires an extreme penalty of >₹{break_even_vs_scenb:,.2f} because contesting virtually all reviewed cases only avoids 12 losses while incurring review fees."
+            ),
         },
     }
 
@@ -381,45 +438,65 @@ def compute_strategy_comparison(cases: list[dict], oracle_data: dict, seed: int 
 def format_strategy_table_markdown(strat_comp: dict) -> str:
     table = strat_comp["strategy_table"]
     lines = [
-        "| Strategy | Auto-Contest Share | Human-Review Share | Contested Precision | Realized Net Value | Cost & Penalty Assumptions |",
-        "|---|---:|---:|---:|---:|---|",
+        "| Strategy | Auto Share | Review Share | Contested Precision | Lost Contests | Net Value (p = 0) | Net Value (p = ₹4,150) | Strategy Notes |",
+        "|---|---:|---:|---:|---:|---:|---:|---|",
     ]
     for row in table:
         strat_name = row["strategy"]
-        if "Oracle" in strat_name:
-            name_md = f"**{strat_name}**"
-        elif "Automated-Only" in strat_name:
+        if "Oracle" in strat_name or "Automated-Only" in strat_name or strat_name == "Contest Everything":
             name_md = f"**{strat_name}**"
         else:
             name_md = strat_name
+        lost_val = float(row["lost_contest_count"])
+        lost_str = f"{int(round(lost_val)):,}" if abs(lost_val - round(lost_val)) < 1e-4 else f"{lost_val:,.1f}"
         lines.append(
             f"| {name_md} | {row['auto_contest_share']*100:.1f}% | {row['human_review_share']*100:.1f}% | "
-            f"{row['contested_precision']*100:.1f}% | **₹{row['realized_net_value_lakh']:.2f} lakh** | {row['cost_assumptions']} |"
+            f"{row['contested_precision']*100:.1f}% | {lost_str} | **₹{row['realized_net_value_p0_lakh']:.2f} lakh** | "
+            f"**₹{row['realized_net_value_base_p_lakh']:.2f} lakh** | {row['cost_assumptions']} |"
         )
     return "\n".join(lines)
 
 
 def format_strategy_analysis_markdown(strat_comp: dict) -> str:
-    b_ci = strat_comp["bootstrap_diff_vs_contest_everything"]
+    boots = strat_comp["bootstrap_comparisons"]
     b_even = strat_comp["break_even_analysis"]
-    diff_val = b_ci["observed_difference_inr"]
-    diff_lakh = b_ci["observed_difference_lakh"]
-    diff_str = f"-₹{abs(diff_lakh):.2f} lakh (-₹{abs(diff_val):,.2f})" if diff_val < 0 else f"₹{diff_lakh:.2f} lakh (₹{diff_val:,.2f})"
-    ci_l = b_ci["ci_95_lower_lakh"]
-    ci_u = b_ci["ci_95_upper_lakh"]
-    ci_str = f"[-₹{abs(ci_l):.2f} lakh, -₹{abs(ci_u):.2f} lakh]" if ci_l < 0 and ci_u < 0 else f"[{ci_l:.2f}, {ci_u:.2f}]"
-    ci_raw_str = f"[-₹{abs(b_ci['ci_95_lower_inr']):,.2f}, -₹{abs(b_ci['ci_95_upper_inr']):,.2f}]" if b_ci["ci_95_lower_inr"] < 0 else f"[{b_ci['ci_95_lower_inr']:,.2f}, {b_ci['ci_95_upper_inr']:,.2f}]"
+
+    b_auto_0 = boots["auto_only_vs_contest_everything_p0"]
+    b_auto_p = boots["auto_only_vs_contest_everything_base_p"]
+    b_scenb_0 = boots["scenario_b_vs_contest_everything_p0"]
+    b_scenb_p = boots["scenario_b_vs_contest_everything_base_p"]
+
+    diff_scenb_0 = f"-₹{abs(b_scenb_0['observed_difference_lakh']):.2f} lakh (-₹{abs(b_scenb_0['observed_difference_inr']):,.2f})"
+    ci_scenb_0 = f"[-₹{abs(b_scenb_0['ci_95_lower_lakh']):.2f} lakh, -₹{abs(b_scenb_0['ci_95_upper_lakh']):.2f} lakh]"
+
+    diff_scenb_p = f"-₹{abs(b_scenb_p['observed_difference_lakh']):.2f} lakh (-₹{abs(b_scenb_p['observed_difference_inr']):,.2f})"
+    ci_scenb_p = f"[-₹{abs(b_scenb_p['ci_95_lower_lakh']):.2f} lakh, -₹{abs(b_scenb_p['ci_95_upper_lakh']):.2f} lakh]"
+
+    diff_auto_0 = f"-₹{abs(b_auto_0['observed_difference_lakh']):.2f} lakh (-₹{abs(b_auto_0['observed_difference_inr']):,.2f})"
+    ci_auto_0 = f"[-₹{abs(b_auto_0['ci_95_lower_lakh']):.2f} lakh, -₹{abs(b_auto_0['ci_95_upper_lakh']):.2f} lakh]"
+
+    diff_auto_p = f"+₹{b_auto_p['observed_difference_lakh']:.2f} lakh (+₹{b_auto_p['observed_difference_inr']:,.2f})"
+    ci_auto_p = f"[+₹{b_auto_p['ci_95_lower_lakh']:.2f} lakh, +₹{b_auto_p['ci_95_upper_lakh']:.2f} lakh]"
+
+    thresh_auto = f"₹{b_even['ranking_flip_vs_auto_only_threshold_inr']:,.2f}"
+    thresh_scenb = f"₹{b_even['ranking_flip_vs_scenario_b_threshold_inr']:,.2f}"
 
     return f"""### Statistical Comparison & Break-Even Analysis
 
-- **Bootstrap 95% Confidence Interval**:
-  The difference between Live Policy (with review scenario b) and Contest Everything (unconstrained) is **{diff_str}** with bootstrap 95% CI **{ci_str}** ({ci_raw_str}).
-  The difference is entirely accounted for by the operational cost of human review (3,327 reviews × ₹50 = ₹166,350) minus ₹727.29 saved by accepting negative-EV disputes as losses. Even with zero review lift over raw baseline odds, the policy captures **98.48%** of Contest-Everything gross recovery while protecting merchant standing.
+- **Raw Value Comparison (Unpenalized Baseline, $p=0$)**:
+  Contest Everything (unconstrained) achieves the highest raw financial recovery (**₹108.95 lakh**) because the fixed contest cost (₹150) is very low relative to dispute amounts (~₹4,000). The Live Policy achieves **₹49.73 lakh** in conservative automated-only recovery (contesting 33.1% of cases with 74.8% precision) and **₹107.29 lakh** under review scenario b.
 
-- **Break-Even Loss Penalty Level**:
-  - **Raw Value Comparison**: Contest Everything (unconstrained) wins on raw unpenalized value (₹108.95L vs ₹49.73L automated-only, or ₹107.29L with review scenario b).
-  - **Ranking Flip vs. Automated-Only**: Contest Everything falls below the Live Policy automated-only recovery (₹49.73L) when the penalty per lost contest exceeds **₹{b_even['ranking_flip_vs_auto_only']['threshold_inr_ce_only']:,.2f}** (if penalty applies to Contest Everything for entering monitoring) or **₹{b_even['ranking_flip_vs_auto_only']['threshold_inr_both_penalized']:,.2f}** (if losing disputes in both are penalized). Both break-even thresholds are substantially below the documented minimum card-network monitoring penalty of **$50 per dispute (₹4,150)** under Visa VAMP / Mastercard VFMP.
-  - **Ranking Flip vs. Policy with Review (Scenario b)**: Contest Everything falls below the Live Policy + Human Review when the penalty per lost contest on Contest Everything exceeds just **₹{b_even['ranking_flip_vs_policy_scenario_b']['threshold_inr_ce_only']:,.2f}**."""
+- **Bootstrap 95% Confidence Intervals (Resampling Disputes, N=1,000)**:
+  1. **Live Policy (Automated-Only) vs. Contest Everything**:
+     - At $p = 0$: difference is **{diff_auto_0}** with 95% CI **{ci_auto_0}**.
+     - At base-case $p = ₹4,150$: difference is **{diff_auto_p}** with 95% CI **{ci_auto_p}**.
+  2. **Live Policy (Scenario b) vs. Contest Everything**:
+     - At $p = 0$: difference is **{diff_scenb_0}** with 95% CI **{ci_scenb_0}**.
+     - At base-case $p = ₹4,150$: difference is **{diff_scenb_p}** with 95% CI **{ci_scenb_p}**.
+
+- **Symmetric Break-Even Loss Penalty Level**:
+  - **Ranking Flip vs. Automated-Only**: Contest Everything incurs 2,176 lost disputes whereas the Live Policy Automated-Only incurs only 417 (avoiding 1,759 losses). When a symmetric penalty per lost contest is applied to both strategies, Contest Everything falls below Live Policy Automated-Only when the penalty exceeds **{thresh_auto}**. At the base-case sensitivity parameter of $p = ₹4,150$ (~$50 modelling assumption), the Live Policy yields **₹32.42 lakh** vs Contest Everything's **₹18.64 lakh** (an advantage of **+₹13.78 lakh**).
+  - **Ranking Flip vs. Policy with Review (Scenario b)**: In Scenario b, reviewed cases are contested, resulting in 4,984 contested disputes and 2,164 losses (avoiding only 12 losses relative to Contest Everything). Because it incurs ₹166,350 in human review costs and misses 4 wins, Contest Everything falls below Scenario b only if the loss penalty exceeds **{thresh_scenb}**. Scenarios a and b represent operational upper/lower bounds under full contestation, not proof of review lift."""
 
 
 def _html(report):
@@ -578,9 +655,9 @@ def main(output_dir: Path | None = None) -> dict:
 
     json_path = target_dir / "verification_report.json"
     html_path = target_dir / "verification_report.html"
-    json_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    html_path.write_text(_html(report), encoding="utf-8")
-    (target_dir / "strategy_comparison.json").write_text(json.dumps(strat_comp, indent=2), encoding="utf-8")
+    _write_lf(json_path, json.dumps(report, indent=2))
+    _write_lf(html_path, _html(report))
+    _write_lf(target_dir / "strategy_comparison.json", json.dumps(strat_comp, indent=2))
     sync_documentation(report)
 
     print(
@@ -633,7 +710,31 @@ def sync_documentation(report: dict) -> None:
             f"- Automated realized net value: **₹{net_val_lakh:.2f}L** (conservative automation with {rev_share:.1f}% held for manual review valued at ₹0)",
             mc,
         )
-        model_card_path.write_text(mc, encoding="utf-8")
+        strat_comp = report.get("strategy_comparison", {})
+        if strat_comp:
+            strat_table_md = format_strategy_table_markdown(strat_comp)
+            strat_analysis_md = format_strategy_analysis_markdown(strat_comp)
+            strat_mc_section = f"""## Strategy comparison & economic trade-offs
+
+Evaluated on `data/test.csv` (5,000 held-out disputes) under identical operational cost assumptions (`CONTEST_COST = ₹150`, `HUMAN_REVIEW_COST = ₹50`).
+
+{strat_table_md}
+
+{strat_analysis_md}
+"""
+            if "## Strategy comparison & economic trade-offs" in mc:
+                mc = re.sub(
+                    r"## Strategy comparison & economic trade-offs.*?(?=\n## |\Z)",
+                    strat_mc_section.strip() + "\n\n",
+                    mc,
+                    flags=re.DOTALL,
+                )
+            else:
+                if "## Known limitations" in mc:
+                    mc = mc.replace("## Known limitations", strat_mc_section + "\n## Known limitations")
+                else:
+                    mc += "\n" + strat_mc_section
+        _write_lf(model_card_path, mc)
 
     # 2. Update docs/EVALUATION_REPORT.md
     eval_report_path = ROOT / "docs" / "EVALUATION_REPORT.md"
@@ -714,7 +815,7 @@ Evaluated against the bounded adversarial test suite in `tests/test_ai_analyst_e
 - Safety Invariant: The AI analyst can never alter final financial actions, routing scores, or policy decisions.
 """
             er = er + oracle_section
-        eval_report_path.write_text(er, encoding="utf-8")
+        _write_lf(eval_report_path, er)
 
     # 3. Update README.md
     readme_path = ROOT / "README.md"
@@ -781,7 +882,7 @@ This repository implements safety-critical architectural controls beyond tabular
             else:
                 rm += beyond_section
 
-        readme_path.write_text(rm, encoding="utf-8")
+        _write_lf(readme_path, rm)
 
 
 if __name__ == "__main__":

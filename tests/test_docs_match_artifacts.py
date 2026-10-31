@@ -124,31 +124,36 @@ def test_strategy_comparison_table_matches_docs(artifacts):
     strat_comp = json.loads(strategy_comp_path.read_text(encoding="utf-8"))
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     eval_report = (REPO_ROOT / "docs" / "EVALUATION_REPORT.md").read_text(encoding="utf-8")
+    model_card = (REPO_ROOT / "docs" / "MODEL_CARD.md").read_text(encoding="utf-8")
 
-    # Check each strategy row's net value and precision in README and EVALUATION_REPORT
+    # Check each strategy row's net values (p=0 and base-case p), precision, and lost count in README, EVALUATION_REPORT, and MODEL_CARD
     for row in strat_comp["strategy_table"]:
-        net_str = f"₹{row['realized_net_value_lakh']:.2f} lakh"
+        net_p0_str = f"₹{row['realized_net_value_p0_lakh']:.2f} lakh"
+        net_base_p_str = f"₹{row['realized_net_value_base_p_lakh']:.2f} lakh"
         prec_str = f"{row['contested_precision']*100:.1f}%"
-        assert net_str in readme, f"Net value {net_str} for {row['strategy']} missing in README.md"
-        assert net_str in eval_report, f"Net value {net_str} for {row['strategy']} missing in EVALUATION_REPORT.md"
-        assert prec_str in readme, f"Precision {prec_str} for {row['strategy']} missing in README.md"
-        assert prec_str in eval_report, f"Precision {prec_str} for {row['strategy']} missing in EVALUATION_REPORT.md"
+        for doc_name, doc_text in [("README.md", readme), ("EVALUATION_REPORT.md", eval_report), ("MODEL_CARD.md", model_card)]:
+            assert net_p0_str in doc_text, f"Net value (p=0) {net_p0_str} for {row['strategy']} missing in {doc_name}"
+            assert net_base_p_str in doc_text, f"Net value (base p) {net_base_p_str} for {row['strategy']} missing in {doc_name}"
+            assert prec_str in doc_text, f"Precision {prec_str} for {row['strategy']} missing in {doc_name}"
 
-    # Check Bootstrap 95% CI
-    b_ci = strat_comp["bootstrap_diff_vs_contest_everything"]
-    ci_str = f"[-₹{abs(b_ci['ci_95_lower_lakh']):.2f} lakh, -₹{abs(b_ci['ci_95_upper_lakh']):.2f} lakh]"
-    assert ci_str in readme, f"Bootstrap CI {ci_str} missing in README.md"
-    assert ci_str in eval_report, f"Bootstrap CI {ci_str} missing in EVALUATION_REPORT.md"
+    # Check Bootstrap 95% CIs across docs
+    boots = strat_comp["bootstrap_comparisons"]
+    ci_auto_0 = f"[-₹{abs(boots['auto_only_vs_contest_everything_p0']['ci_95_lower_lakh']):.2f} lakh, -₹{abs(boots['auto_only_vs_contest_everything_p0']['ci_95_upper_lakh']):.2f} lakh]"
+    ci_auto_p = f"[+₹{boots['auto_only_vs_contest_everything_base_p']['ci_95_lower_lakh']:.2f} lakh, +₹{boots['auto_only_vs_contest_everything_base_p']['ci_95_upper_lakh']:.2f} lakh]"
+    ci_scenb_0 = f"[-₹{abs(boots['scenario_b_vs_contest_everything_p0']['ci_95_lower_lakh']):.2f} lakh, -₹{abs(boots['scenario_b_vs_contest_everything_p0']['ci_95_upper_lakh']):.2f} lakh]"
+    ci_scenb_p = f"[-₹{abs(boots['scenario_b_vs_contest_everything_base_p']['ci_95_lower_lakh']):.2f} lakh, -₹{abs(boots['scenario_b_vs_contest_everything_base_p']['ci_95_upper_lakh']):.2f} lakh]"
+
+    for doc_name, doc_text in [("README.md", readme), ("EVALUATION_REPORT.md", eval_report), ("MODEL_CARD.md", model_card)]:
+        assert ci_auto_0 in doc_text, f"Bootstrap CI {ci_auto_0} missing in {doc_name}"
+        assert ci_auto_p in doc_text, f"Bootstrap CI {ci_auto_p} missing in {doc_name}"
+        assert ci_scenb_0 in doc_text, f"Bootstrap CI {ci_scenb_0} missing in {doc_name}"
+        assert ci_scenb_p in doc_text, f"Bootstrap CI {ci_scenb_p} missing in {doc_name}"
 
     # Check break-even penalty levels
     b_even = strat_comp["break_even_analysis"]
-    thresh_auto_ce = f"₹{b_even['ranking_flip_vs_auto_only']['threshold_inr_ce_only']:,.2f}"
-    thresh_auto_both = f"₹{b_even['ranking_flip_vs_auto_only']['threshold_inr_both_penalized']:,.2f}"
-    thresh_policy_b = f"₹{b_even['ranking_flip_vs_policy_scenario_b']['threshold_inr_ce_only']:,.2f}"
+    thresh_auto = f"₹{b_even['ranking_flip_vs_auto_only_threshold_inr']:,.2f}"
+    thresh_scenb = f"₹{b_even['ranking_flip_vs_scenario_b_threshold_inr']:,.2f}"
 
-    assert thresh_auto_ce in readme, f"Threshold {thresh_auto_ce} missing in README.md"
-    assert thresh_auto_ce in eval_report, f"Threshold {thresh_auto_ce} missing in EVALUATION_REPORT.md"
-    assert thresh_auto_both in readme, f"Threshold {thresh_auto_both} missing in README.md"
-    assert thresh_auto_both in eval_report, f"Threshold {thresh_auto_both} missing in EVALUATION_REPORT.md"
-    assert thresh_policy_b in readme, f"Threshold {thresh_policy_b} missing in README.md"
-    assert thresh_policy_b in eval_report, f"Threshold {thresh_policy_b} missing in EVALUATION_REPORT.md"
+    for doc_name, doc_text in [("README.md", readme), ("EVALUATION_REPORT.md", eval_report), ("MODEL_CARD.md", model_card)]:
+        assert thresh_auto in doc_text, f"Threshold {thresh_auto} missing in {doc_name}"
+        assert thresh_scenb in doc_text, f"Threshold {thresh_scenb} missing in {doc_name}"

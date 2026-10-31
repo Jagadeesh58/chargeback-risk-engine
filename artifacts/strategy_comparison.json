@@ -1,30 +1,25 @@
 {
+  "assumed_loss_penalty_inr": 4150.0,
+  "penalty_modelling_assumption_note": "Sensitivity parameter / modelling assumption (~$50 per lost contest); not an official card-network fee. Card-brand monitoring programmes (Visa VAMP, Mastercard VFMP) track dispute ratios rather than assessing flat per-loss fines.",
   "strategy_table": [
     {
-      "strategy": "Contest Everything (Unconstrained)",
+      "strategy": "Contest Everything",
       "auto_contest_share": 1.0,
       "human_review_share": 0.0,
       "contested_precision": 0.5648,
       "contested_count": 5000,
+      "lost_contest_count": 2176.0,
       "gross_recovery": 11644729.8,
       "contest_and_review_cost": 750000.0,
-      "fine_penalty": 0.0,
+      "realized_net_value_p0": 10894729.8,
+      "realized_net_value_p0_lakh": 108.947298,
+      "fine_penalty_base_p": 9030400.0,
+      "realized_net_value_base_p": 1864329.8000000007,
+      "realized_net_value_base_p_lakh": 18.64329800000001,
       "realized_net_value": 10894729.8,
       "realized_net_value_lakh": 108.947298,
-      "cost_assumptions": "Blind 100% contesting; \u20b9150 filing fee; assumes zero compliance penalties"
-    },
-    {
-      "strategy": "Contest Everything (with Loss Penalty)",
-      "auto_contest_share": 1.0,
-      "human_review_share": 0.0,
-      "contested_precision": 0.5648,
-      "contested_count": 5000,
-      "gross_recovery": 11644729.8,
-      "contest_and_review_cost": 750000.0,
       "fine_penalty": 9030400.0,
-      "realized_net_value": 1864329.8000000007,
-      "realized_net_value_lakh": 18.64329800000001,
-      "cost_assumptions": "Documented Visa VAMP / Mastercard VFMP fine of $50 (\u20b94,150) per lost contest"
+      "cost_assumptions": "Blind 100% contesting; \u20b9150 filing fee; pays penalty on lost disputes"
     },
     {
       "strategy": "Live Policy (Automated-Only)",
@@ -32,25 +27,37 @@
       "human_review_share": 0.6654,
       "contested_precision": 0.7483403741701871,
       "contested_count": 1657,
+      "lost_contest_count": 417.0,
       "gross_recovery": 5221442.859999999,
       "contest_and_review_cost": 248550.0,
-      "fine_penalty": 0.0,
+      "realized_net_value_p0": 4972892.859999999,
+      "realized_net_value_p0_lakh": 49.728928599999996,
+      "fine_penalty_base_p": 1730550.0,
+      "realized_net_value_base_p": 3242342.8599999994,
+      "realized_net_value_base_p_lakh": 32.423428599999994,
       "realized_net_value": 4972892.859999999,
       "realized_net_value_lakh": 49.728928599999996,
-      "cost_assumptions": "Conservative automation: only high-confidence cases automated; reviewed cases valued at \u20b90"
+      "fine_penalty": 1730550.0,
+      "cost_assumptions": "Conservative automation: high-confidence cases only; reviewed cases valued at \u20b90 recovery"
     },
     {
       "strategy": "Live Policy + Human Review (Scenario a: Model Rate)",
       "auto_contest_share": 0.3314,
       "human_review_share": 0.6654,
-      "contested_precision": 0.5646067415730337,
+      "contested_precision": 0.5645289019520672,
       "contested_count": 4984,
+      "lost_contest_count": 2170.3879526708974,
       "gross_recovery": 11723084.233546998,
       "contest_and_review_cost": 913950.0,
-      "fine_penalty": 0.0,
+      "realized_net_value_p0": 10809134.233546998,
+      "realized_net_value_p0_lakh": 108.09134233546999,
+      "fine_penalty_base_p": 9007110.003584225,
+      "realized_net_value_base_p": 1802024.2299627736,
+      "realized_net_value_base_p_lakh": 18.020242299627736,
       "realized_net_value": 10809134.233546998,
       "realized_net_value_lakh": 108.09134233546999,
-      "cost_assumptions": "Reviewed cases recover at model calibrated win probability with \u20b950 review fee"
+      "fine_penalty": 9007110.003584225,
+      "cost_assumptions": "Reviewed cases contested at model expected win rate with \u20b950 review fee (bound)"
     },
     {
       "strategy": "Live Policy + Human Review (Scenario b: Observed Rate)",
@@ -58,29 +65,41 @@
       "human_review_share": 0.6654,
       "contested_precision": 0.5658105939004815,
       "contested_count": 4984,
+      "lost_contest_count": 2164.0,
       "gross_recovery": 11643057.09,
       "contest_and_review_cost": 913950.0,
-      "fine_penalty": 0.0,
+      "realized_net_value_p0": 10729107.09,
+      "realized_net_value_p0_lakh": 107.2910709,
+      "fine_penalty_base_p": 8980600.0,
+      "realized_net_value_base_p": 1748507.0899999999,
+      "realized_net_value_base_p_lakh": 17.4850709,
       "realized_net_value": 10729107.09,
       "realized_net_value_lakh": 107.2910709,
-      "cost_assumptions": "Reviewed cases recover at observed held-out win rate (47.5%) with \u20b950 review fee"
+      "fine_penalty": 8980600.0,
+      "cost_assumptions": "Reviewed cases contested at observed held-out win rate with \u20b950 review fee (bound)"
     },
     {
       "strategy": "Theoretical Oracle Ceiling",
-      "auto_contest_share": 1.0,
+      "auto_contest_share": 0.9722,
       "human_review_share": 0.0,
-      "contested_precision": 1.0,
-      "contested_count": 5000,
-      "gross_recovery": 11650220.35,
-      "contest_and_review_cost": 750000.0,
-      "fine_penalty": 0.0,
-      "realized_net_value": 10900220.35,
-      "realized_net_value_lakh": 109.0022035,
-      "cost_assumptions": "Bayes-optimal ceiling with hidden seller-legitimacy state access"
+      "contested_precision": 0.5751902900637729,
+      "contested_count": 4861,
+      "lost_contest_count": 2065.0,
+      "gross_recovery": 11629370.350000001,
+      "contest_and_review_cost": 729150.0,
+      "realized_net_value_p0": 10900220.350000001,
+      "realized_net_value_p0_lakh": 109.00220350000002,
+      "fine_penalty_base_p": 8569750.0,
+      "realized_net_value_base_p": 2330470.3500000015,
+      "realized_net_value_base_p_lakh": 23.304703500000016,
+      "realized_net_value": 10900220.350000001,
+      "realized_net_value_lakh": 109.00220350000002,
+      "fine_penalty": 8569750.0,
+      "cost_assumptions": "Unpenalized Bayes-optimal policy ceiling with hidden state access"
     }
   ],
   "bootstrap_diff_vs_contest_everything": {
-    "comparison": "Live Policy (Scenario b) minus Contest Everything (Unconstrained)",
+    "comparison": "Live Policy (Scenario b) minus Contest Everything at p=0",
     "observed_difference_inr": -165622.71,
     "observed_difference_lakh": -1.6562271,
     "bootstrap_mean_inr": -165626.47709,
@@ -89,14 +108,52 @@
     "ci_95_lower_lakh": -1.6910427799999999,
     "ci_95_upper_lakh": -1.62191783
   },
-  "break_even_analysis": {
-    "raw_value_winner": "Contest Everything (Unconstrained) recovers \u20b9108.95L vs \u20b949.73L (auto-only) and \u20b9107.29L (policy + review scenario b).",
-    "ranking_flip_vs_auto_only": {
-      "threshold_inr_ce_only": 2721.432417279412,
-      "threshold_inr_both_penalized": 3366.5929164297904
+  "bootstrap_comparisons": {
+    "auto_only_vs_contest_everything_p0": {
+      "comparison": "Live Policy (Automated-Only) minus Contest Everything at p=0",
+      "observed_difference_inr": -5921836.9399999995,
+      "observed_difference_lakh": -59.21836939999999,
+      "bootstrap_mean_inr": -5917683.568980001,
+      "ci_95_lower_inr": -6200674.4575000005,
+      "ci_95_upper_inr": -5601992.5967500005,
+      "ci_95_lower_lakh": -62.006744575000006,
+      "ci_95_upper_lakh": -56.01992596750001
     },
-    "ranking_flip_vs_policy_scenario_b": {
-      "threshold_inr_ce_only": 76.11337775735335
+    "auto_only_vs_contest_everything_base_p": {
+      "comparison": "Live Policy (Automated-Only) minus Contest Everything at p=4150.0",
+      "observed_difference_inr": 1378013.06,
+      "observed_difference_lakh": 13.7801306,
+      "bootstrap_mean_inr": 1383797.38102,
+      "ci_95_lower_inr": 906281.7202499999,
+      "ci_95_upper_inr": 1905264.4764999996,
+      "ci_95_lower_lakh": 9.0628172025,
+      "ci_95_upper_lakh": 19.052644764999997
+    },
+    "scenario_b_vs_contest_everything_p0": {
+      "comparison": "Live Policy (Scenario b) minus Contest Everything at p=0",
+      "observed_difference_inr": -165622.71,
+      "observed_difference_lakh": -1.6562271,
+      "bootstrap_mean_inr": -165626.47709,
+      "ci_95_lower_inr": -169104.278,
+      "ci_95_upper_inr": -162191.783,
+      "ci_95_lower_lakh": -1.6910427799999999,
+      "ci_95_upper_lakh": -1.62191783
+    },
+    "scenario_b_vs_contest_everything_base_p": {
+      "comparison": "Live Policy (Scenario b) minus Contest Everything at p=4150.0",
+      "observed_difference_inr": -115822.70999999999,
+      "observed_difference_lakh": -1.1582271,
+      "bootstrap_mean_inr": -115830.62709000001,
+      "ci_95_lower_inr": -142736.82375,
+      "ci_95_upper_inr": -84798.997,
+      "ci_95_lower_lakh": -1.4273682375,
+      "ci_95_upper_lakh": -0.84798997
     }
+  },
+  "break_even_analysis": {
+    "raw_value_winner": "Contest Everything wins on unpenalized raw value (p=0): \u20b9108.95L vs \u20b949.73L (auto-only) and \u20b9107.29L (scenario b).",
+    "ranking_flip_vs_auto_only_threshold_inr": 3366.5929164297904,
+    "ranking_flip_vs_scenario_b_threshold_inr": 13801.892500000075,
+    "notes": "When both strategies pay penalty p on lost contests, Live Policy Automated-Only beats Contest Everything when p > \u20b93,366.59. At the base-case sensitivity assumption of p=\u20b94,150.00, Automated-Only yields \u20b932.42L vs Contest Everything's \u20b918.64L (+\u20b913.78L advantage). Scenario b requires an extreme penalty of >\u20b913,801.89 because contesting virtually all reviewed cases only avoids 12 losses while incurring review fees."
   }
 }
