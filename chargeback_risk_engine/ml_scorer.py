@@ -1,17 +1,22 @@
 """Reason-aware Logistic Regression used as the single live risk model.
 
 Security Note:
-Pickle deserialization executes arbitrary code and is only safe for trusted,
-hash-verified files. When saving, a SHA-256 sidecar (.sha256) is written.
-When loading, integrity is verified against the sidecar before unpickling.
-Set CHARGEBACK_REQUIRE_MODEL_HASH=1 to mandate the presence of the sidecar.
+Model serialization uses a safe, deterministic JSON representation
+(coefficients, intercept, classes, feature ordering, and version stamps).
+Arbitrary code execution via pickle is disallowed in production mode.
+Integrity is strictly verified via SHA-256 sidecars (.sha256) or
+the CHARGEBACK_MODEL_SHA256 environment variable.
 """
 from __future__ import annotations
 
 import hashlib
+import json
+import logging
+import math
 import os
 import pickle
 
+import numpy as np
 import pandas as pd
 import sklearn
 from sklearn.linear_model import LogisticRegression
@@ -25,7 +30,10 @@ from chargeback_risk_engine.config import (
 )
 from chargeback_risk_engine.paths import ARTIFACTS_DIR, DATA_DIR
 
-MODEL_PATH = str(ARTIFACTS_DIR / "ml_scorer_model.pkl")
+logger = logging.getLogger("chargeback_risk_engine")
+
+MODEL_PATH = str(ARTIFACTS_DIR / "ml_scorer_model.json")
+LEGACY_MODEL_PATH = str(ARTIFACTS_DIR / "ml_scorer_model.pkl")
 _cached_scorer = None
 
 
@@ -50,7 +58,6 @@ class MLScorer:
         return self
 
     def predict_win_probability(self, dispute: dict) -> float:
-        import math
         reason = dispute["reason_code"]
         fields = RELEVANT_EVIDENCE_BY_REASON[reason]
         model = self.models[reason]
@@ -76,21 +83,32 @@ def save_ml_scorer(path: str = MODEL_PATH, train_csv: str | None = None) -> MLSc
 
     scorer = MLScorer().fit(pd.read_csv(train_csv))
     ARTIFACTS_DIR.mkdir(exist_ok=True)
+
+    bundle = {
+        "model_version": LIVE_MODEL_VERSION,
+        "feature_version": FEATURE_VERSION,
+        "sklearn_version": sklearn.__version__,
+        "models": {
+            reason: {
+                "feature_order": list(RELEVANT_EVIDENCE_BY_REASON[reason]),
+                "coef": [float(c) for c in model.coef_[0]],
+                "intercept": [float(model.intercept_[0])],
+                "classes": [int(c) for c in model.classes_],
+            }
+            for reason, model in scorer.models.items()
+        },
+    }
+
+    raw_json = json.dumps(bundle, indent=2, sort_keys=True)
+    json_bytes = raw_json.encode("utf-8")
     with open(path, "wb") as f:
-        pickle.dump(
-            {
-                "scorer": scorer,
-                "model_version": LIVE_MODEL_VERSION,
-                "feature_version": FEATURE_VERSION,
-                "sklearn_version": sklearn.__version__,
-            },
-            f,
-        )
+        f.write(json_bytes)
+
     # Write sidecar SHA-256 for integrity verification
-    with open(path, "rb") as f:
-        digest = hashlib.sha256(f.read()).hexdigest()
-    with open(path + ".sha256", "w", encoding="utf-8") as f:
+    digest = hashlib.sha256(json_bytes).hexdigest()
+    with open(path + ".sha256", "w", encoding="utf-8", newline="\n") as f:
         f.write(digest.strip() + "\n")
+
     return scorer
 
 
@@ -101,42 +119,91 @@ def load_or_fit_ml_scorer(path: str = MODEL_PATH, train_csv: str | None = None) 
     if _cached_scorer is not None:
         return _cached_scorer
 
-    if os.path.exists(path):
-        sidecar_path = path + ".sha256"
-        require_hash = (
-            path == MODEL_PATH
-            or os.getenv("CHARGEBACK_REQUIRE_MODEL_HASH", "0").lower() in ("1", "true", "yes")
-        )
-        if os.path.exists(sidecar_path):
-            with open(sidecar_path, "r", encoding="utf-8") as sf:
-                expected_hash = sf.read().strip()
-            with open(path, "rb") as f:
-                actual_hash = hashlib.sha256(f.read()).hexdigest()
-            if actual_hash != expected_hash:
-                raise ValueError(
-                    f"Model integrity failure: SHA-256 mismatch for {path}. "
-                    f"Expected {expected_hash}, got {actual_hash}."
-                )
-        elif require_hash:
-            raise ValueError(f"Model integrity failure: missing required sidecar hash {sidecar_path}")
+    env = os.getenv("CHARGEBACK_ENV", "production").lower().strip()
 
-        with open(path, "rb") as f:
-            bundle = pickle.load(f)
-        if isinstance(bundle, dict) and "scorer" in bundle:
-            if bundle.get("model_version") not in (None, LIVE_MODEL_VERSION):
-                raise RuntimeError(f"Incompatible live model artifact: {bundle.get('model_version')}")
-            if bundle.get("feature_version") not in (None, FEATURE_VERSION):
-                raise RuntimeError(f"Incompatible feature artifact: {bundle.get('feature_version')}")
-            if bundle.get("sklearn_version") not in (None, sklearn.__version__):
-                raise RuntimeError(
-                    f"Live model was trained with scikit-learn {bundle.get('sklearn_version')}, "
-                    f"runtime has {sklearn.__version__}"
-                )
-            _cached_scorer = bundle["scorer"]
+    # If default json path does not exist, check for legacy pkl in dev or fit fresh
+    effective_path = path
+    if not os.path.exists(effective_path):
+        if effective_path == MODEL_PATH and os.path.exists(LEGACY_MODEL_PATH):
+            effective_path = LEGACY_MODEL_PATH
         else:
-            _cached_scorer = bundle
+            _cached_scorer = save_ml_scorer(path, train_csv)
+            return _cached_scorer
+
+    with open(effective_path, "rb") as f:
+        raw_bytes = f.read()
+
+    # Integrity verification
+    sidecar_path = effective_path + ".sha256"
+    expected_hash = os.getenv("CHARGEBACK_MODEL_SHA256")
+    if not expected_hash and os.path.exists(sidecar_path):
+        with open(sidecar_path, "r", encoding="utf-8") as sf:
+            expected_hash = sf.read().strip()
+
+    actual_hash = hashlib.sha256(raw_bytes).hexdigest()
+    if expected_hash:
+        if actual_hash != expected_hash:
+            raise ValueError(
+                f"Model integrity failure: SHA-256 mismatch for {effective_path}. "
+                f"Expected {expected_hash}, got {actual_hash}."
+            )
     else:
-        _cached_scorer = save_ml_scorer(path, train_csv)
+        if env == "production":
+            raise RuntimeError(
+                f"Model integrity failure: missing required SHA-256 integrity hash for {effective_path} in production mode."
+            )
+        logger.warning("SECURITY WARNING: Missing integrity sidecar hash for %s", effective_path)
+
+    # Check serialization format: safe JSON vs legacy pickle
+    is_json = False
+    bundle = None
+    try:
+        bundle = json.loads(raw_bytes.decode("utf-8"))
+        if isinstance(bundle, dict) and "models" in bundle:
+            is_json = True
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        is_json = False
+
+    if not is_json:
+        # Legacy pickle artifact
+        if env == "production":
+            raise RuntimeError(
+                f"Refusing to load untrusted legacy .pkl model artifact '{effective_path}' in production mode. "
+                "Use safe JSON model artifact."
+            )
+        logger.warning(
+            "DEPRECATION WARNING: Loading legacy pickle model artifact '%s'. "
+            "Re-train or migrate to safe JSON representation.",
+            effective_path,
+        )
+        with open(effective_path, "rb") as pf:
+            legacy_bundle = pickle.load(pf)
+        if isinstance(legacy_bundle, dict) and "scorer" in legacy_bundle:
+            _cached_scorer = legacy_bundle["scorer"]
+        else:
+            _cached_scorer = legacy_bundle
+        return _cached_scorer
+
+    # Safe JSON reconstruction
+    if bundle.get("model_version") not in (None, LIVE_MODEL_VERSION):
+        raise RuntimeError(f"Incompatible live model artifact: {bundle.get('model_version')}")
+    if bundle.get("feature_version") not in (None, FEATURE_VERSION):
+        raise RuntimeError(f"Incompatible feature artifact: {bundle.get('feature_version')}")
+    if bundle.get("sklearn_version") not in (None, sklearn.__version__):
+        raise RuntimeError(
+            f"Live model was trained with scikit-learn {bundle.get('sklearn_version')}, "
+            f"runtime has {sklearn.__version__}"
+        )
+
+    scorer = MLScorer()
+    for reason, m_data in bundle["models"].items():
+        lr = LogisticRegression()
+        lr.coef_ = np.array([m_data["coef"]], dtype=float)
+        lr.intercept_ = np.array(m_data["intercept"], dtype=float)
+        lr.classes_ = np.array(m_data["classes"], dtype=int)
+        scorer.models[reason] = lr
+
+    _cached_scorer = scorer
     return _cached_scorer
 
 

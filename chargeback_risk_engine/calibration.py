@@ -28,14 +28,66 @@ for code that can be fully explained over an opaque library call.
 
 import csv
 import json
+import logging
+import math
 import os
+from typing import Any
 
 from chargeback_risk_engine.paths import DATA_DIR, ARTIFACTS_DIR
+
+logger = logging.getLogger("chargeback_risk_engine")
 
 CALIBRATION_POINTS_PATH = str(ARTIFACTS_DIR / "calibration_points.json")
 FIT_SOURCE = "live_model"
 
 _cached_points = None
+_calibration_metadata = {
+    "valid": True,
+    "error": None,
+    "fallback_to_raw": False,
+    "source": CALIBRATION_POINTS_PATH,
+}
+
+
+def get_calibration_metadata() -> dict[str, Any]:
+    """Return the current calibration validation and fallback status."""
+    return dict(_calibration_metadata)
+
+
+def validate_calibration_points(points: Any) -> tuple[bool, str | None]:
+    """Validate calibration points against schema, bounds, and monotonicity constraints.
+
+    Requires:
+    1. List of 2-element pairs (x, y)
+    2. Finite numeric values
+    3. x in [0, 1] and y in [0, 1]
+    4. Monotonically non-decreasing y values (and non-decreasing x)
+    """
+    if not isinstance(points, (list, tuple)):
+        return False, "Calibration points must be a list or tuple of pairs."
+    if not points:
+        return False, "Calibration points list is empty."
+    last_x = -1.0
+    last_y = -1.0
+    for idx, item in enumerate(points):
+        if not isinstance(item, (list, tuple)) or len(item) != 2:
+            return False, f"Item at index {idx} is not a 2-element pair: {item}."
+        x, y = item
+        if not (isinstance(x, (int, float)) and isinstance(y, (int, float))):
+            return False, f"Item at index {idx} contains non-numeric values: ({x}, {y})."
+        if not (math.isfinite(x) and math.isfinite(y)):
+            return False, f"Item at index {idx} contains non-finite values: ({x}, {y})."
+        if not (0.0 <= x <= 1.0):
+            return False, f"Item at index {idx} has x outside [0, 1]: {x}."
+        if not (0.0 <= y <= 1.0):
+            return False, f"Item at index {idx} has y outside [0, 1]: {y}."
+        if x < last_x - 1e-9:
+            return False, f"Item at index {idx} violates non-decreasing x: {x} < {last_x}."
+        if y < last_y - 1e-9:
+            return False, f"Item at index {idx} violates monotonic non-decreasing y: {y} < {last_y}."
+        last_x = float(x)
+        last_y = float(y)
+    return True, None
 
 
 def _pava(pairs: list[tuple[float, float]]) -> list[tuple[float, float]]:
@@ -80,9 +132,13 @@ def _pava(pairs: list[tuple[float, float]]) -> list[tuple[float, float]]:
 
 def apply_calibration(points: list[tuple[float, float]], raw_probability: float) -> float:
     """Linear interpolation between fitted points; clamped at the ends.
-    Matches how a fitted isotonic curve is normally used to score a new,
-    unseen value."""
+
+    If points are missing or fail validation, falls back safely to raw_probability.
+    """
     if not points:
+        return raw_probability
+    is_valid, _ = validate_calibration_points(points)
+    if not is_valid:
         return raw_probability
     if raw_probability <= points[0][0]:
         return points[0][1]
@@ -133,17 +189,64 @@ def load_or_fit_calibration_points(path: str = CALIBRATION_POINTS_PATH,
                                      dev_csv_path: str | None = None) -> list[tuple[float, float]]:
     """Loads a saved fit if one exists; otherwise fits fresh from dev.csv
     and saves it, so a clean clone with no prior run still works with
-    zero setup."""
-    global _cached_points
+    zero setup.
+
+    Validates calibration points against schema, bounds, and monotonicity.
+    On validation failure, falls back safely to raw probability and flags in metadata.
+    """
+    global _cached_points, _calibration_metadata
     if _cached_points is not None:
         return _cached_points
 
     if os.path.exists(path):
-        with open(path) as f:
-            _cached_points = [tuple(p) for p in json.load(f)]
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+            is_valid, err = validate_calibration_points(loaded)
+            if not is_valid:
+                logger.warning(
+                    "Calibration validation failed for %s: %s; falling back to raw probability.",
+                    path,
+                    err,
+                )
+                _calibration_metadata = {
+                    "valid": False,
+                    "error": err,
+                    "fallback_to_raw": True,
+                    "source": path,
+                }
+                _cached_points = []
+                return []
+            _calibration_metadata = {
+                "valid": True,
+                "error": None,
+                "fallback_to_raw": False,
+                "source": path,
+            }
+            _cached_points = [tuple(p) for p in loaded]
+        except Exception as e:
+            logger.warning(
+                "Error reading calibration file %s: %s; falling back to raw probability.",
+                path,
+                e,
+            )
+            _calibration_metadata = {
+                "valid": False,
+                "error": str(e),
+                "fallback_to_raw": True,
+                "source": path,
+            }
+            _cached_points = []
+            return []
     else:
         _cached_points = fit_calibration_points(dev_csv_path)
         save_calibration_points(_cached_points, path)
+        _calibration_metadata = {
+            "valid": True,
+            "error": None,
+            "fallback_to_raw": False,
+            "source": path,
+        }
     return _cached_points
 
 
