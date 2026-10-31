@@ -49,6 +49,7 @@ The authoritative entry point is:
 
 ```python
 from chargeback_risk_engine.engine.hybrid_pipeline import decide_case
+
 result = decide_case(dispute)
 ```
 

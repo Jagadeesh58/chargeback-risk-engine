@@ -1,4 +1,5 @@
 """Stable repository paths independent of the current working directory."""
+
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

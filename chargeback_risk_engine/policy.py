@@ -1,4 +1,5 @@
 """Deterministic final policy authority for chargeback routing."""
+
 from __future__ import annotations
 
 import math
@@ -63,7 +64,9 @@ def decide(
     if not math.isfinite(float(win_probability)) or not 0.0 <= float(win_probability) <= 1.0:
         return PolicyDecision(HUMAN_REVIEW, "Invalid risk estimate; manual review required.", 0.0)
     if not math.isfinite(float(graph_risk_score)) or not 0.0 <= float(graph_risk_score) <= 1.0:
-        return PolicyDecision(HUMAN_REVIEW, "Invalid relationship risk score; manual review required.", 0.0)
+        return PolicyDecision(
+            HUMAN_REVIEW, "Invalid relationship risk score; manual review required.", 0.0
+        )
 
     if amount > float(monetary_ceiling):
         return PolicyDecision(
@@ -76,7 +79,9 @@ def decide(
 
     policy_score = float(win_probability if decision_score is None else decision_score)
     if not math.isfinite(policy_score) or not 0.0 <= policy_score <= 1.0:
-        return PolicyDecision(HUMAN_REVIEW, "Invalid deterministic routing score; manual review required.", ev)
+        return PolicyDecision(
+            HUMAN_REVIEW, "Invalid deterministic routing score; manual review required.", ev
+        )
 
     if evidence_quality is not None:
         if evidence_quality.completeness < float(min_evidence_completeness):
@@ -154,8 +159,7 @@ def decide(
         # Unverified source check: Any True evidence value whose source is manual_upload/unknown
         # or whose timestamp is missing counts as UNVERIFIED (treated as WARN for auto-contest gate).
         unverified_items = [
-            item.field for item in evidence_quality.items
-            if not getattr(item, "verified", True)
+            item.field for item in evidence_quality.items if not getattr(item, "verified", True)
         ]
         if unverified_items:
             return PolicyDecision(

@@ -10,10 +10,12 @@ from chargeback_risk_engine.baseline import run_naive_baseline
 
 
 def _tiny_dataset():
-    return pd.DataFrame({
-        "amount": [1000, 2000, 500, 3000, 1500],
-        "would_win": [True, False, True, False, True],
-    })
+    return pd.DataFrame(
+        {
+            "amount": [1000, 2000, 500, 3000, 1500],
+            "would_win": [True, False, True, False, True],
+        }
+    )
 
 
 def test_precision_matches_hand_calculation():

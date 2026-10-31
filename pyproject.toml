@@ -46,9 +46,22 @@ select = ["E", "F", "W", "B", "I"]
 ignore = [
   "E501",  # line length handled by black/formatter
   "B008",  # do not perform function calls in argument defaults (FastAPI Depends)
+  "B905",  # zip() without explicit strict= parameter
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"scripts/*" = ["E402", "E701", "E702"]
+"training/*" = ["E402"]
+"tests/*" = ["E402", "B011", "B007", "B023", "F841", "W293"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_configs = true
+check_untyped_defs = true
+
 [project.scripts]
+chargeback-cli = "chargeback_risk_engine.cli:main"
 chargeback-demo = "scripts.demo:main"
 
 

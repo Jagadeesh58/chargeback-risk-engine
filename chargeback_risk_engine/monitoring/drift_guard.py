@@ -1,8 +1,9 @@
 """Deterministic drift monitor: detect, explain, and recommend; never auto-promote a model."""
+
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
-import math
+from dataclasses import asdict, dataclass
+
 import numpy as np
 
 
@@ -47,19 +48,27 @@ def detect_drift(
         if len(b) == 0 or len(c) == 0:
             continue
         z = abs(float(np.mean(c) - np.mean(b))) / _safe_std(b)
-        status = "ADAPTATION_CANDIDATE" if z >= adapt_z else "SHIFT_DETECTED" if z >= warn_z else "NORMAL"
+        status = (
+            "ADAPTATION_CANDIDATE"
+            if z >= adapt_z
+            else "SHIFT_DETECTED"
+            if z >= warn_z
+            else "NORMAL"
+        )
         signals.append(DriftSignal(feature, float(np.mean(b)), float(np.mean(c)), z, status))
 
     max_z = max((s.standardized_shift for s in signals), default=0.0)
     if max_z >= adapt_z:
         return DriftReport(
-            "ADAPTATION_CANDIDATE", signals,
-            "HUMAN_REVIEW_AND_RECALIBRATION", 
+            "ADAPTATION_CANDIDATE",
+            signals,
+            "HUMAN_REVIEW_AND_RECALIBRATION",
             "A persistent material distribution shift should be validated on a fresh held-out window before promotion.",
         )
     if max_z >= warn_z:
         return DriftReport(
-            "SHIFT_DETECTED", signals,
+            "SHIFT_DETECTED",
+            signals,
             "MONITOR_AND_GATHER_FRESH_LABELS",
             "Distribution shift is visible but below the automatic adaptation threshold.",
         )

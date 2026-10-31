@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
-from chargeback_risk_engine.api import app, _validate_startup_config
+from chargeback_risk_engine.api import _validate_startup_config, app
 from chargeback_risk_engine.audit_log import SQLiteAuditStore
-from chargeback_risk_engine.settings import Settings, get_settings, reset_settings
+from chargeback_risk_engine.settings import reset_settings
 
 
 @pytest.fixture(autouse=True)

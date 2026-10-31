@@ -1,9 +1,10 @@
 """Deterministic evidence quality metadata built from the canonical evidence packet."""
+
 from __future__ import annotations
 
+import os
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
-import os
 from typing import Any
 
 from chargeback_risk_engine.config import RELEVANT_EVIDENCE_BY_REASON
@@ -82,7 +83,9 @@ def score_evidence(dispute: dict, evidence_packet=None) -> EvidenceScore:
     packet_by_field = {item.field: item for item in packet.items}
     items: list[EvidenceIntelligenceItem] = []
 
-    meta_dict = dispute.get("evidence_meta") if isinstance(dispute.get("evidence_meta"), dict) else {}
+    meta_dict = (
+        dispute.get("evidence_meta") if isinstance(dispute.get("evidence_meta"), dict) else {}
+    )
     has_any_provenance = any(
         (k.endswith("_source") or k.endswith("_timestamp") or k == "evidence_timestamp")
         and dispute.get(k) is not None
@@ -90,10 +93,9 @@ def score_evidence(dispute: dict, evidence_packet=None) -> EvidenceScore:
     ) or bool(meta_dict)
 
     env = os.getenv("CHARGEBACK_ENV", "production").lower().strip()
-    allow_unverified = (
-        env in ("development", "demo")
-        and os.getenv("CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE", "0").lower().strip() in ("1", "true")
-    )
+    allow_unverified = env in ("development", "demo") and os.getenv(
+        "CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE", "0"
+    ).lower().strip() in ("1", "true")
 
     for field in RELEVANT_EVIDENCE_BY_REASON[reason]:
         value = dispute.get(field)
@@ -103,20 +105,26 @@ def score_evidence(dispute: dict, evidence_packet=None) -> EvidenceScore:
         confidence = 0.95 if value is True and valid else 0.80 if value is False and valid else 0.25
 
         field_meta = meta_dict.get(field) if isinstance(meta_dict, dict) else None
-        if hasattr(field_meta, "model_dump"):
+        if field_meta is not None and hasattr(field_meta, "model_dump"):
             field_meta = field_meta.model_dump()
-        elif hasattr(field_meta, "dict"):
+        elif field_meta is not None and hasattr(field_meta, "dict"):
             field_meta = field_meta.dict()
         elif not isinstance(field_meta, dict):
             field_meta = {}
 
         field_source = dispute.get(f"{field}_source") or field_meta.get("source")
-        field_ts = dispute.get(f"{field}_timestamp") or field_meta.get("timestamp") or dispute.get("evidence_timestamp")
+        field_ts = (
+            dispute.get(f"{field}_timestamp")
+            or field_meta.get("timestamp")
+            or dispute.get("evidence_timestamp")
+        )
         field_consistent = dispute.get(f"{field}_consistent")
         if field_consistent is None:
             field_consistent = field_meta.get("consistent", True)
 
-        source_str = str(field_source or ("unspecified" if not allow_unverified else "merchant_record"))
+        source_str = str(
+            field_source or ("unspecified" if not allow_unverified else "merchant_record")
+        )
 
         # Provenance verification rule:
         # Evidence value True counts as VERIFIED only if it has an allowed trusted source
@@ -128,7 +136,9 @@ def score_evidence(dispute: dict, evidence_packet=None) -> EvidenceScore:
             if allow_unverified and not has_any_provenance:
                 is_verified = True
             else:
-                has_trusted_source = bool(field_source and str(field_source).lower() in TRUSTED_SOURCES)
+                has_trusted_source = bool(
+                    field_source and str(field_source).lower() in TRUSTED_SOURCES
+                )
                 valid_ts = validate_evidence_timestamp(field_ts)
                 is_verified = has_trusted_source and valid_ts
 
@@ -150,11 +160,13 @@ def score_evidence(dispute: dict, evidence_packet=None) -> EvidenceScore:
     completeness = sum(item.available for item in items) / n
     validity = sum(item.valid and item.consistent for item in items) / n
     field_confidence = sum(item.confidence for item in items) / n
-    source_reliability = dispute.get("evidence_source_reliability")
-    try:
-        source_reliability = float(source_reliability)
-    except (TypeError, ValueError):
-        source_reliability = None
+    source_reliability_val = dispute.get("evidence_source_reliability")
+    source_reliability: float | None = None
+    if source_reliability_val is not None:
+        try:
+            source_reliability = float(source_reliability_val)
+        except (TypeError, ValueError):
+            source_reliability = None
     if source_reliability is not None and 0.0 <= source_reliability <= 1.0:
         confidence = 0.65 * field_confidence + 0.35 * source_reliability
     else:

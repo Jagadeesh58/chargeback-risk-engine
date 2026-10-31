@@ -4,11 +4,12 @@ The generated dates are synthetic and are not evidence of production time
 shift. This script checks whether a chronological train/test split remains
 runnable without presenting it as temporal robustness proof.
 """
+
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:

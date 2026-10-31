@@ -3,14 +3,14 @@ verify_no_leakage.py — one-off empirical check that the synthetic data
 generator doesn't leak the label into any single evidence field. Not
 part of the pipeline; run manually after generating data.
 """
-from pathlib import Path
+
 import sys
+from pathlib import Path
 
 # Allow direct execution from the repository root.
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
-
 
 
 import pandas as pd
@@ -28,6 +28,7 @@ print("would_win rate by reason_code (train):")
 print(train.groupby("reason_code")["would_win"].mean().round(3))
 print()
 
+
 # Encode: True->1, False->0, missing (NaN after pandas read) -> 0.5 (neutral)
 def encode(df):
     X = df[ALL_EVIDENCE_FIELDS].copy()
@@ -35,6 +36,7 @@ def encode(df):
         X[col] = X[col].map({True: 1.0, False: 0.0}).fillna(0.5)
     y = df["would_win"].astype(int)
     return X, y
+
 
 X_train, y_train = encode(train)
 X_dev, y_dev = encode(dev)

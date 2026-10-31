@@ -1,35 +1,31 @@
 """Tests for model artifact integrity, safe JSON deserialization, and calibration safety."""
+
 import hashlib
 import json
 import os
-from pathlib import Path
 import tempfile
-import pytest
-import pandas as pd
+from pathlib import Path
 
-from chargeback_risk_engine.config import (
-    FEATURE_VERSION,
-    LIVE_MODEL_VERSION,
-    REASON_CODES,
-    RELEVANT_EVIDENCE_BY_REASON,
+import pandas as pd
+import pytest
+
+from chargeback_risk_engine.calibration import (
+    apply_calibration,
+    get_calibration_metadata,
+    load_or_fit_calibration_points,
 )
 from chargeback_risk_engine.ml_scorer import (
     MLScorer,
     load_or_fit_ml_scorer,
     save_ml_scorer,
 )
-from chargeback_risk_engine.calibration import (
-    apply_calibration,
-    load_or_fit_calibration_points,
-    validate_calibration_points,
-    get_calibration_metadata,
-)
 
 
 @pytest.fixture(autouse=True)
 def reset_in_process_caches():
-    import chargeback_risk_engine.ml_scorer as ml_module
     import chargeback_risk_engine.calibration as cal_module
+    import chargeback_risk_engine.ml_scorer as ml_module
+
     ml_module._cached_scorer = None
     cal_module._cached_points = None
     yield
@@ -46,6 +42,7 @@ def test_tampered_model_artifact_is_rejected():
 
         # Confirm valid load before tampering
         import chargeback_risk_engine.ml_scorer as ml_module
+
         ml_module._cached_scorer = None
         loaded = load_or_fit_ml_scorer(path=model_path, train_csv=train_csv)
         assert loaded is not None
@@ -120,6 +117,7 @@ def test_malformed_calibration_falls_back_safely():
             json.dump(non_monotonic, f)
 
         import chargeback_risk_engine.calibration as cal_module
+
         cal_module._cached_points = None
         points = load_or_fit_calibration_points(path=cal_path)
         assert points == []
@@ -152,18 +150,53 @@ def test_round_trip_prediction_equality_to_1e_9():
         save_ml_scorer(path=json_path, train_csv="data/train.csv")
 
         import chargeback_risk_engine.ml_scorer as ml_module
+
         ml_module._cached_scorer = None
         reloaded = load_or_fit_ml_scorer(path=json_path, train_csv="data/train.csv")
 
         # Test across multiple reason codes and feature combinations
         test_cases = [
-            {"reason_code": "item_not_received", "has_tracking_number": True, "has_delivery_confirmation": True, "has_signature_confirmation": True},
-            {"reason_code": "item_not_received", "has_tracking_number": False, "has_delivery_confirmation": False, "has_signature_confirmation": False},
-            {"reason_code": "item_not_received", "has_tracking_number": True, "has_delivery_confirmation": None, "has_signature_confirmation": False},
-            {"reason_code": "unauthorized_transaction", "has_avs_match": True, "has_cvv_match": True, "has_device_fingerprint_match": False},
-            {"reason_code": "unauthorized_transaction", "has_avs_match": False, "has_cvv_match": True, "has_device_fingerprint_match": True},
-            {"reason_code": "item_not_as_described", "has_product_photos": True, "has_item_description_match": True, "has_return_communication": None},
-            {"reason_code": "duplicate_charge", "has_duplicate_transaction_proof": True, "has_refund_already_issued": False},
+            {
+                "reason_code": "item_not_received",
+                "has_tracking_number": True,
+                "has_delivery_confirmation": True,
+                "has_signature_confirmation": True,
+            },
+            {
+                "reason_code": "item_not_received",
+                "has_tracking_number": False,
+                "has_delivery_confirmation": False,
+                "has_signature_confirmation": False,
+            },
+            {
+                "reason_code": "item_not_received",
+                "has_tracking_number": True,
+                "has_delivery_confirmation": None,
+                "has_signature_confirmation": False,
+            },
+            {
+                "reason_code": "unauthorized_transaction",
+                "has_avs_match": True,
+                "has_cvv_match": True,
+                "has_device_fingerprint_match": False,
+            },
+            {
+                "reason_code": "unauthorized_transaction",
+                "has_avs_match": False,
+                "has_cvv_match": True,
+                "has_device_fingerprint_match": True,
+            },
+            {
+                "reason_code": "item_not_as_described",
+                "has_product_photos": True,
+                "has_item_description_match": True,
+                "has_return_communication": None,
+            },
+            {
+                "reason_code": "duplicate_charge",
+                "has_duplicate_transaction_proof": True,
+                "has_refund_already_issued": False,
+            },
         ]
 
         for dispute in test_cases:
@@ -185,6 +218,7 @@ def test_production_mode_refuses_legacy_pkl(monkeypatch):
 
         monkeypatch.setenv("CHARGEBACK_ENV", "production")
         import chargeback_risk_engine.ml_scorer as ml_module
+
         ml_module._cached_scorer = None
         with pytest.raises(RuntimeError, match="Legacy pickle model artifacts are disallowed"):
             load_or_fit_ml_scorer(path=pkl_path)
@@ -193,6 +227,7 @@ def test_production_mode_refuses_legacy_pkl(monkeypatch):
 def test_no_pickle_imported_in_package_or_scripts():
     """Verify via AST analysis that pickle is never imported in chargeback_risk_engine or scripts."""
     import ast
+
     repo_root = Path(__file__).resolve().parents[1]
     targets = [repo_root / "chargeback_risk_engine", repo_root / "scripts"]
     violations = []
@@ -205,6 +240,8 @@ def test_no_pickle_imported_in_package_or_scripts():
                         if alias.name == "pickle" or alias.name.startswith("pickle."):
                             violations.append((str(py_file), node.lineno))
                 elif isinstance(node, ast.ImportFrom):
-                    if node.module == "pickle" or (node.module and node.module.startswith("pickle.")):
+                    if node.module == "pickle" or (
+                        node.module and node.module.startswith("pickle.")
+                    ):
                         violations.append((str(py_file), node.lineno))
     assert not violations, f"Forbidden pickle imports found: {violations}"

@@ -1,9 +1,10 @@
 """AI + evidence + economics + deterministic policy orchestration."""
+
 from __future__ import annotations
 
 import os
 
-
+from chargeback_risk_engine.ai_analyst import analyze_evidence, fallback_analysis
 from chargeback_risk_engine.audit_log import (
     DB_PATH,
     PayloadConflictError,
@@ -13,25 +14,27 @@ from chargeback_risk_engine.audit_log import (
     load_graph_rows,
 )
 from chargeback_risk_engine.calibration import apply_calibration, load_or_fit_calibration_points
+from chargeback_risk_engine.config import (
+    CHALLENGER_MODEL_VERSION,
+    FEATURE_VERSION,
+    MODEL_VERSION,
+    POLICY_VERSION,
+    RULE_MODEL_VERSION,
+)
+from chargeback_risk_engine.engine.decision_result import CanonicalDecision
+from chargeback_risk_engine.engine.economic_decision import calculate_economic_value
+from chargeback_risk_engine.engine.evidence_score import score_evidence
+from chargeback_risk_engine.engine.explainability import (
+    build_explanation,
+    logistic_feature_contributions,
+)
+from chargeback_risk_engine.engine.risk_graph import ENTITY_FIELDS, RiskGraph
+from chargeback_risk_engine.engine.risk_model import live_risk_probability
 from chargeback_risk_engine.evidence import assemble
+from chargeback_risk_engine.gateway_adapter import generate_contest_draft
 from chargeback_risk_engine.ml_scorer import dispute_from_evidence_items, load_or_fit_ml_scorer
 from chargeback_risk_engine.policy import decide
 from chargeback_risk_engine.policy_profile import decision_score, load_policy_profile
-from chargeback_risk_engine.gateway_adapter import generate_contest_draft
-from chargeback_risk_engine.engine.economic_decision import calculate_economic_value
-from chargeback_risk_engine.ai_analyst import analyze_evidence, fallback_analysis
-from chargeback_risk_engine.engine.evidence_score import score_evidence
-from chargeback_risk_engine.engine.decision_result import CanonicalDecision
-from chargeback_risk_engine.engine.explainability import build_explanation, logistic_feature_contributions
-from chargeback_risk_engine.engine.risk_graph import ENTITY_FIELDS, RiskGraph
-from chargeback_risk_engine.engine.risk_model import live_risk_probability
-from chargeback_risk_engine.config import (
-    MODEL_VERSION,
-    FEATURE_VERSION,
-    POLICY_VERSION,
-    CHALLENGER_MODEL_VERSION,
-    RULE_MODEL_VERSION,
-)
 
 
 def _logged_dispute(logged) -> dict:
@@ -51,9 +54,7 @@ def _logged_dispute(logged) -> dict:
 def _graph_data_for(dispute: dict) -> dict:
     """Persist only the relationship identifiers needed to rebuild graph history."""
     return {
-        field: dispute[field]
-        for field in ENTITY_FIELDS
-        if dispute.get(field) not in (None, "")
+        field: dispute[field] for field in ENTITY_FIELDS if dispute.get(field) not in (None, "")
     }
 
 
@@ -66,7 +67,12 @@ def _score_case(
     actor: str = "anonymous",
 ) -> dict:
     """Score and persist one case through the canonical decision path."""
-    effective_db = db_path or os.getenv("CHARGEBACK_DB_PATH") or os.getenv("CHARGEBACK_AUDIT_DB_PATH") or DB_PATH
+    effective_db = (
+        db_path
+        or os.getenv("CHARGEBACK_DB_PATH")
+        or os.getenv("CHARGEBACK_AUDIT_DB_PATH")
+        or DB_PATH
+    )
     dispute_id = dispute["dispute_id"]
     current_payload_hash = canonical_payload_hash(dispute)
     existing = get_existing_decision(dispute_id, effective_db)
@@ -74,11 +80,17 @@ def _score_case(
         if existing.payload_hash and existing.payload_hash != current_payload_hash:
             raise PayloadConflictError(dispute_id)
         if not existing.payload_hash:
-            if abs(float(existing.amount) - float(dispute.get("amount", 0))) > 1e-4 or existing.reason_code != dispute.get("reason_code"):
+            if abs(
+                float(existing.amount) - float(dispute.get("amount", 0))
+            ) > 1e-4 or existing.reason_code != dispute.get("reason_code"):
                 raise PayloadConflictError(dispute_id)
     ml = load_or_fit_ml_scorer()
     points = load_or_fit_calibration_points()
-    graph = risk_graph if risk_graph is not None else RiskGraph(load_graph_rows(effective_db, dispute=dispute))
+    graph = (
+        risk_graph
+        if risk_graph is not None
+        else RiskGraph(load_graph_rows(effective_db, dispute=dispute))
+    )
 
     def compute():
         packet = assemble(dispute)
@@ -88,7 +100,8 @@ def _score_case(
         economic = calculate_economic_value(dispute["amount"], risk_probability)
         profile = load_policy_profile()
         routing_score = decision_score(
-            risk_probability, evidence_quality.confidence,
+            risk_probability,
+            evidence_quality.confidence,
             evidence_signal_weight=profile.evidence_signal_weight,
         )
         # Safety boundary: ML, evidence, graph, economics, and AI provide decision signals.
@@ -121,7 +134,10 @@ def _score_case(
                 context_text=str(dispute.get("evidence_text", "")),
             )
         else:
-            ai_analysis = fallback_analysis({"reason_code": packet.reason_code, "items": evidence_list}, reason_code=packet.reason_code)
+            ai_analysis = fallback_analysis(
+                {"reason_code": packet.reason_code, "items": evidence_list},
+                reason_code=packet.reason_code,
+            )
 
         return (
             risk_probability,
@@ -153,11 +169,7 @@ def _score_case(
         logged = existing
 
     original_dispute = _logged_dispute(logged)
-    known_ids = {
-        node_id.split(":", 1)[1]
-        for node_id in graph.node_to_entities
-        if ":" in node_id
-    }
+    known_ids = {node_id.split(":", 1)[1] for node_id in graph.node_to_entities if ":" in node_id}
     if logged.dispute_id not in known_ids:
         graph.add(original_dispute)
 
@@ -180,9 +192,15 @@ def _score_case(
     if logged.ai_metadata:
         ai_analysis = logged.ai_metadata
     elif call_ai_analyst:
-        ai_analysis = analyze_evidence({"reason_code": logged.reason_code, "items": logged.evidence}, reason_code=logged.reason_code).to_dict()
+        ai_analysis = analyze_evidence(
+            {"reason_code": logged.reason_code, "items": logged.evidence},
+            reason_code=logged.reason_code,
+        ).to_dict()
     else:
-        ai_analysis = fallback_analysis({"reason_code": logged.reason_code, "items": logged.evidence}, reason_code=logged.reason_code).to_dict()
+        ai_analysis = fallback_analysis(
+            {"reason_code": logged.reason_code, "items": logged.evidence},
+            reason_code=logged.reason_code,
+        ).to_dict()
 
     draft = None
     if logged.action == "AUTO-CONTEST":
@@ -195,7 +213,9 @@ def _score_case(
         "reason_code": logged.reason_code,
         "amount": logged.amount,
         "win_probability": logged.win_probability,
-        "routing_score": (logged.routing_score if logged.routing_score is not None else logged.win_probability),
+        "routing_score": (
+            logged.routing_score if logged.routing_score is not None else logged.win_probability
+        ),
         "calibrated_win_probability": calibrated_probability,
         "evidence": logged.evidence,
         "evidence_score": evidence_quality.to_dict(),
@@ -231,8 +251,17 @@ def decide_case(
     actor: str = "anonymous",
 ) -> dict:
     """Public canonical entry point used by API, UI, demo and evaluation."""
-    effective_db = db_path or os.getenv("CHARGEBACK_DB_PATH") or os.getenv("CHARGEBACK_AUDIT_DB_PATH") or DB_PATH
-    active_graph = risk_graph if risk_graph is not None else RiskGraph(load_graph_rows(effective_db, dispute=dispute))
+    effective_db = (
+        db_path
+        or os.getenv("CHARGEBACK_DB_PATH")
+        or os.getenv("CHARGEBACK_AUDIT_DB_PATH")
+        or DB_PATH
+    )
+    active_graph = (
+        risk_graph
+        if risk_graph is not None
+        else RiskGraph(load_graph_rows(effective_db, dispute=dispute))
+    )
     effective_actor = str(dispute.get("actor", actor))
     result = _score_case(
         dispute,
@@ -243,8 +272,11 @@ def decide_case(
     )
     if include_counterfactual:
         from chargeback_risk_engine.engine.counterfactual import find_minimal_decision_reversal
+
         original_record = get_existing_decision(dispute["dispute_id"], effective_db)
-        counterfactual_input = _logged_dispute(original_record) if original_record is not None else dict(dispute)
+        counterfactual_input = (
+            _logged_dispute(original_record) if original_record is not None else dict(dispute)
+        )
         result["counterfactual"] = find_minimal_decision_reversal(
             counterfactual_input,
             result,

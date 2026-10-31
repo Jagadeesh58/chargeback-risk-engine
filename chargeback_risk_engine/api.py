@@ -12,7 +12,7 @@ import uuid
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Any, Literal
+from typing import Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,8 +22,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from chargeback_risk_engine.audit_log import (
     DB_PATH,
     PayloadConflictError,
-    verify_audit_integrity,
     _get_connection,
+    verify_audit_integrity,
 )
 from chargeback_risk_engine.config import REASON_CODES
 from chargeback_risk_engine.engine.hybrid_pipeline import decide_case
@@ -31,8 +31,8 @@ from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer
 from chargeback_risk_engine.observability import (
     AUDIT_WRITES_TOTAL,
     CONTENT_TYPE_LATEST,
-    DECISIONS_TOTAL,
     DECISION_DURATION_SECONDS,
+    DECISIONS_TOTAL,
     EVIDENCE_SCORES,
     RATE_LIMIT_EXCEEDED_TOTAL,
     configure_logging,
@@ -152,7 +152,12 @@ async def request_context_and_security_middleware(request: Request, call_next):
         settings = get_settings()
         env = settings.env.lower().strip()
         default_limit = 60 if env == "production" else 0
-        rate_limit = int(os.getenv("CHARGEBACK_RATE_LIMIT", str(settings.rate_limit if settings.rate_limit != 60 else default_limit)))
+        rate_limit = int(
+            os.getenv(
+                "CHARGEBACK_RATE_LIMIT",
+                str(settings.rate_limit if settings.rate_limit != 60 else default_limit),
+            )
+        )
         if rate_limit > 0:
             client_ip = request.client.host if request.client else "unknown"
             x_api_key = request.headers.get("X-API-Key")
@@ -212,7 +217,8 @@ async def request_context_and_security_middleware(request: Request, call_next):
     request._body = b"".join(body_chunks)
 
     # 4. Timeout and downstream execution
-    timeout_sec = float(os.getenv("CHARGEBACK_REQUEST_TIMEOUT_SECONDS", "5.0"))
+    default_timeout = "60.0" if os.getenv("CHARGEBACK_ENV") in ("development", "demo") else "5.0"
+    timeout_sec = float(os.getenv("CHARGEBACK_REQUEST_TIMEOUT_SECONDS", default_timeout))
     try:
         response = await asyncio.wait_for(call_next(request), timeout=timeout_sec)
     except asyncio.TimeoutError:
@@ -252,7 +258,9 @@ def _validate_iso_timestamp(ts_str: str | None) -> str | None:
 
     max_age_days = float(os.getenv("CHARGEBACK_MAX_EVIDENCE_AGE_DAYS", "365"))
     if (now - dt).total_seconds() > max_age_days * 86400:
-        raise ValueError(f"Timestamp is older than allowed maximum age of {max_age_days} days: '{ts_str}'")
+        raise ValueError(
+            f"Timestamp is older than allowed maximum age of {max_age_days} days: '{ts_str}'"
+        )
 
     return ts_str
 
@@ -406,7 +414,9 @@ def healthz():
 def readyz():
     checks: dict[str, str] = {}
     is_ready = True
-    effective_db = os.getenv("CHARGEBACK_DB_PATH") or os.getenv("CHARGEBACK_AUDIT_DB_PATH") or DB_PATH
+    effective_db = (
+        os.getenv("CHARGEBACK_DB_PATH") or os.getenv("CHARGEBACK_AUDIT_DB_PATH") or DB_PATH
+    )
 
     # 1. Database check
     try:
@@ -437,12 +447,13 @@ def readyz():
 def health():
     settings = get_settings()
     env = settings.env.lower().strip()
-    allow_unverified = (
-        env in ("development", "demo")
-        and os.getenv("CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE", "0").lower().strip() in ("1", "true")
-    )
+    allow_unverified = env in ("development", "demo") and os.getenv(
+        "CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE", "0"
+    ).lower().strip() in ("1", "true")
     keys = settings.get_parsed_api_keys()
-    auth_mode = "api-key" if keys else ("demo-open" if env in ("development", "demo") else "unconfigured")
+    auth_mode = (
+        "api-key" if keys else ("demo-open" if env in ("development", "demo") else "unconfigured")
+    )
     return {
         "status": "ok",
         "auth": auth_mode,
@@ -510,5 +521,7 @@ def score_compatibility(
 @app.get("/audit/verify")
 def audit_verify(key_info: KeyInfo = Depends(require_api_key)):
     """Verify the durable SQLite audit hash chain (accessible with decision or read-only key)."""
-    effective_db = os.getenv("CHARGEBACK_DB_PATH") or os.getenv("CHARGEBACK_AUDIT_DB_PATH") or DB_PATH
+    effective_db = (
+        os.getenv("CHARGEBACK_DB_PATH") or os.getenv("CHARGEBACK_AUDIT_DB_PATH") or DB_PATH
+    )
     return verify_audit_integrity(effective_db)

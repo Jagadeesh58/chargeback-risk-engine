@@ -10,9 +10,10 @@ Field mappings are defined generically; the adapter produces a draft payload
 """
 
 import hashlib
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from chargeback_risk_engine.paths import DATA_DIR
-from datetime import datetime, timedelta, timezone
 
 # Mapping from internal evidence fields to generic payment‑gateway evidence categories.
 # Categories are generic across reason codes (shipping_proof, billing_proof, ...).
@@ -29,10 +30,16 @@ EVIDENCE_FIELD_TO_GATEWAY_CATEGORY = {
 }
 
 GATEWAY_EVIDENCE_CATEGORIES = (
-    "shipping_proof", "billing_proof", "cancellation_proof",
-    "customer_communication", "proof_of_service", "explanation_letter",
-    "refund_confirmation", "access_activity_log",
-    "refund_cancellation_policy", "term_and_conditions",
+    "shipping_proof",
+    "billing_proof",
+    "cancellation_proof",
+    "customer_communication",
+    "proof_of_service",
+    "explanation_letter",
+    "refund_confirmation",
+    "access_activity_log",
+    "refund_cancellation_policy",
+    "term_and_conditions",
 )
 
 
@@ -50,6 +57,7 @@ def _mock_document_id(dispute_id: str, field_name: str) -> str:
 
 # IMPORTANT: this adapter is intentionally local/mock.
 # It never uses gateway credentials or performs a network request.
+
 
 def fetch_dispute(dispute_id: str, csv_path: str | None = None) -> dict:
     """
@@ -87,17 +95,19 @@ def fetch_dispute(dispute_id: str, csv_path: str | None = None) -> dict:
 
     respond_by = datetime.now(timezone.utc) + timedelta(days=7)
     evidence_fields = {
-        k: v for k, v in row.items()
-        if k not in ("dispute_id", "payment_id", "reason_code", "amount",
-                     "respond_by", "would_win")
+        k: v
+        for k, v in row.items()
+        if k not in ("dispute_id", "payment_id", "reason_code", "amount", "respond_by", "would_win")
     }
     return {
         "id": f"disp_MOCK{dispute_id}",
         "entity": "dispute",
         "payment_id": f"pay_MOCK{dispute_id}",
-        "amount": int(round(row["amount"] * 100)),  # amounts in minor units (e.g. paise/cents)
+        "amount": int(
+            round(float(row["amount"]) * 100)
+        ),  # amounts in minor units (e.g. paise/cents)
         "currency": "INR",
-        "amount_deducted": int(round(row["amount"] * 100)),
+        "amount_deducted": int(round(float(row["amount"]) * 100)),
         "reason_code": row["reason_code"],
         "reason_description": row["reason_code"].replace("_", " "),
         "respond_by": int(respond_by.timestamp()),
@@ -120,8 +130,9 @@ def gateway_dispute_to_internal_dict(gateway_dispute: dict) -> dict:
     return internal
 
 
-def build_contest_payload(dispute_id: str, amount: float, evidence_items: list[dict],
-                            summary: str, action: str = "draft") -> dict:
+def build_contest_payload(
+    dispute_id: str, amount: float, evidence_items: list[dict], summary: str, action: str = "draft"
+) -> dict:
     """
     Builds the dispute contest request body for the payment gateway API.
     `action` mirrors standard gateway fields of the same name ("draft" | "submit").
@@ -130,7 +141,7 @@ def build_contest_payload(dispute_id: str, amount: float, evidence_items: list[d
     if action not in ("draft", "submit"):
         raise ValueError(f"action must be 'draft' or 'submit', got {action!r}")
 
-    payload = {category: [] for category in GATEWAY_EVIDENCE_CATEGORIES}
+    payload: dict[str, Any] = {category: [] for category in GATEWAY_EVIDENCE_CATEGORIES}
     others = []
 
     for item in evidence_items:
@@ -150,8 +161,9 @@ def build_contest_payload(dispute_id: str, amount: float, evidence_items: list[d
     return payload
 
 
-def generate_contest_draft(dispute_id: str, amount: float, evidence_items: list[dict],
-                             summary: str) -> dict:
+def generate_contest_draft(
+    dispute_id: str, amount: float, evidence_items: list[dict], summary: str
+) -> dict:
     """
     The only entry point the automatic pipeline calls. There is no
     parameter here that lets a caller ask for "submit" -- structurally

@@ -5,8 +5,9 @@ hidden_seller_legitimate anywhere in the output -- only reason_code,
 amount, evidence fields, and would_win are written out, matching what a
 real scorer would actually have access to.
 """
-from pathlib import Path
+
 import sys
+from pathlib import Path
 
 # Allow direct execution from the repository root.
 _REPO_ROOT = Path(__file__).resolve().parents[1]

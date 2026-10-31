@@ -13,6 +13,11 @@ import ast
 
 import pandas as pd
 
+from chargeback_risk_engine.baseline import run_naive_baseline
+from chargeback_risk_engine.calibration import (
+    calibration_error,
+    fit_calibration_points,
+)
 from chargeback_risk_engine.metrics import (
     calibration_check,
     confusion_matrix_for_auto_contest,
@@ -20,16 +25,8 @@ from chargeback_risk_engine.metrics import (
     precision_recall_f1,
     run_pipeline,
 )
-
-from chargeback_risk_engine.baseline import run_naive_baseline
-
 from chargeback_risk_engine.sensitivity import (
     sweep_auto_contest_threshold,
-)
-
-from chargeback_risk_engine.calibration import (
-    calibration_error,
-    fit_calibration_points,
 )
 
 
@@ -85,9 +82,7 @@ def test_calibration_error_comparison_matches_app_logic():
 
     results = run_pipeline(test)
 
-    calib_points = fit_calibration_points(
-        "data/dev.csv"
-    )
+    calib_points = fit_calibration_points("data/dev.csv")
 
     pairs = list(
         zip(
@@ -175,10 +170,7 @@ def test_dashboard_declares_five_demo_cases():
             continue
 
         for target in node.targets:
-            if (
-                isinstance(target, ast.Name)
-                and target.id == "demo_cases"
-            ):
+            if isinstance(target, ast.Name) and target.id == "demo_cases":
                 demo_cases_node = node.value
                 break
 
@@ -199,13 +191,8 @@ def test_dashboard_declares_five_demo_cases():
 
         first_element = item.elts[0]
 
-        if (
-            isinstance(first_element, ast.Constant)
-            and isinstance(first_element.value, str)
-        ):
-            declared_cases.add(
-                first_element.value
-            )
+        if isinstance(first_element, ast.Constant) and isinstance(first_element.value, str):
+            declared_cases.add(first_element.value)
 
     assert declared_cases == expected_cases
 
@@ -214,4 +201,3 @@ def test_dashboard_declares_five_demo_cases():
 
     # Streamlit expander is used for the cases.
     assert "st.expander(" in source
-    

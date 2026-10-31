@@ -1,4 +1,5 @@
 """Sensitivity analysis using the canonical policy authority."""
+
 from __future__ import annotations
 
 import pandas as pd
@@ -8,13 +9,12 @@ from chargeback_risk_engine.engine.evidence_score import score_evidence
 from chargeback_risk_engine.evidence import assemble
 from chargeback_risk_engine.metrics import _row_to_dispute
 from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer
-from chargeback_risk_engine.policy_profile import decision_score, load_policy_profile
 from chargeback_risk_engine.policy import (
     ACCEPT_LOSS_THRESHOLD,
     AUTO_CONTEST_THRESHOLD,
-    MONETARY_CEILING,
     decide,
 )
+from chargeback_risk_engine.policy_profile import decision_score, load_policy_profile
 
 
 def _precompute(df: pd.DataFrame) -> list[dict]:
@@ -26,14 +26,16 @@ def _precompute(df: pd.DataFrame) -> list[dict]:
         quality = score_evidence(dispute, packet)
         probability = ml.predict_win_probability(dispute)
         economic = calculate_economic_value(dispute["amount"], probability)
-        rows.append({
-            "amount": dispute["amount"],
-            "would_win": dispute["would_win"],
-            "probability": probability,
-            "packet": packet,
-            "quality": quality,
-            "economic": economic,
-        })
+        rows.append(
+            {
+                "amount": dispute["amount"],
+                "would_win": dispute["would_win"],
+                "probability": probability,
+                "packet": packet,
+                "quality": quality,
+                "economic": economic,
+            }
+        )
     return rows
 
 
@@ -54,7 +56,11 @@ def sweep_auto_contest_threshold(
                 evidence_packet=row["packet"],
                 evidence_quality=row["quality"],
                 expected_net_value=row["economic"].expected_net_value,
-                decision_score=decision_score(row["probability"], row["quality"].confidence, evidence_signal_weight=profile.evidence_signal_weight),
+                decision_score=decision_score(
+                    row["probability"],
+                    row["quality"].confidence,
+                    evidence_signal_weight=profile.evidence_signal_weight,
+                ),
                 auto_contest_threshold=threshold,
                 min_evidence_completeness=profile.min_evidence_completeness,
             )
@@ -66,13 +72,15 @@ def sweep_auto_contest_threshold(
                 fp += 1
             elif not predicted_win and actual_win:
                 fn += 1
-        results.append({
-            "threshold": threshold,
-            "precision": tp / (tp + fp) if tp + fp else 0.0,
-            "recall": tp / (tp + fn) if tp + fn else 0.0,
-            "auto_contest_count": tp + fp,
-            "false_positive_cost": fp * contest_cost,
-        })
+        results.append(
+            {
+                "threshold": threshold,
+                "precision": tp / (tp + fp) if tp + fp else 0.0,
+                "recall": tp / (tp + fn) if tp + fn else 0.0,
+                "auto_contest_count": tp + fp,
+                "false_positive_cost": fp * contest_cost,
+            }
+        )
     return pd.DataFrame(results)
 
 
@@ -96,7 +104,11 @@ def sweep_monetary_ceiling(
                 auto_contest_threshold=AUTO_CONTEST_THRESHOLD,
                 accept_loss_threshold=ACCEPT_LOSS_THRESHOLD,
                 monetary_ceiling=ceiling,
-                decision_score=decision_score(row["probability"], row["quality"].confidence, evidence_signal_weight=profile.evidence_signal_weight),
+                decision_score=decision_score(
+                    row["probability"],
+                    row["quality"].confidence,
+                    evidence_signal_weight=profile.evidence_signal_weight,
+                ),
                 min_evidence_completeness=profile.min_evidence_completeness,
             )
             if decision.action == "HUMAN-REVIEW":
@@ -106,11 +118,13 @@ def sweep_monetary_ceiling(
                     tp += 1
                 else:
                     fp += 1
-        results.append({
-            "ceiling": ceiling,
-            "precision": tp / (tp + fp) if tp + fp else 0.0,
-            "auto_contest_count": tp + fp,
-            "human_review_count": human_review_count,
-            "false_positive_cost": fp * contest_cost,
-        })
+        results.append(
+            {
+                "ceiling": ceiling,
+                "precision": tp / (tp + fp) if tp + fp else 0.0,
+                "auto_contest_count": tp + fp,
+                "human_review_count": human_review_count,
+                "false_positive_cost": fp * contest_cost,
+            }
+        )
     return pd.DataFrame(results)

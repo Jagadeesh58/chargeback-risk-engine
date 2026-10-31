@@ -8,6 +8,9 @@ import pandas as pd
 import pytest
 from sklearn.metrics import roc_auc_score
 
+from chargeback_risk_engine.config import REASON_CODES
+from chargeback_risk_engine.evidence import assemble
+from chargeback_risk_engine.metrics import _row_to_dispute
 from chargeback_risk_engine.ml_scorer import (
     MLScorer,
     dispute_from_evidence_items,
@@ -15,9 +18,6 @@ from chargeback_risk_engine.ml_scorer import (
     load_or_fit_ml_scorer,
 )
 from chargeback_risk_engine.scorer import predict_win_probability
-from chargeback_risk_engine.evidence import assemble
-from chargeback_risk_engine.metrics import _row_to_dispute
-from chargeback_risk_engine.config import REASON_CODES
 
 TEST_MODEL_PATH = "test_ml_scorer_model_pytest.json"
 
@@ -28,6 +28,7 @@ def clean_model_file():
         if os.path.exists(f):
             os.remove(f)
     import chargeback_risk_engine.ml_scorer as ml_scorer
+
     ml_scorer._cached_scorer = None
     yield
     for f in (TEST_MODEL_PATH, TEST_MODEL_PATH + ".sha256"):

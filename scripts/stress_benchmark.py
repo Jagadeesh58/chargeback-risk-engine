@@ -1,9 +1,10 @@
 """Held-out stress benchmark: missingness, contradiction, and amount-shift robustness."""
+
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -12,14 +13,14 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from chargeback_risk_engine.evidence import assemble
+from chargeback_risk_engine.config import ALL_EVIDENCE_FIELDS
 from chargeback_risk_engine.engine.evidence_score import score_evidence
+from chargeback_risk_engine.evidence import assemble
 from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer
+from chargeback_risk_engine.monitoring.drift_guard import detect_drift, to_dict
+from chargeback_risk_engine.paths import ARTIFACTS_DIR, DATA_DIR
 from chargeback_risk_engine.policy import AUTO_CONTEST, decide
 from chargeback_risk_engine.policy_profile import decision_score, load_policy_profile
-from chargeback_risk_engine.paths import ARTIFACTS_DIR, DATA_DIR
-from chargeback_risk_engine.config import ALL_EVIDENCE_FIELDS
-from chargeback_risk_engine.monitoring.drift_guard import detect_drift, to_dict
 
 
 def _eval(df: pd.DataFrame, scorer, profile) -> dict:
@@ -33,19 +34,26 @@ def _eval(df: pd.DataFrame, scorer, profile) -> dict:
         q = score_evidence(row, assemble(row))
         s = decision_score(p, q.confidence, evidence_signal_weight=profile.evidence_signal_weight)
         d = decide(
-            p, float(row["amount"]), evidence_packet=assemble(row), evidence_quality=q,
+            p,
+            float(row["amount"]),
+            evidence_packet=assemble(row),
+            evidence_quality=q,
             expected_net_value=p * float(row["amount"]) - 150.0,
-            decision_score=s, auto_contest_threshold=profile.auto_contest_threshold,
+            decision_score=s,
+            auto_contest_threshold=profile.auto_contest_threshold,
             accept_loss_threshold=profile.accept_loss_threshold,
             monetary_ceiling=profile.monetary_ceiling,
             min_evidence_completeness=profile.min_evidence_completeness,
         )
-        actions.append(d.action); probs.append(p)
+        actions.append(d.action)
+        probs.append(p)
     auto = np.asarray(actions) == AUTO_CONTEST
     y = df["would_win"].astype(bool).to_numpy()
-    n = int(auto.sum()); tp = int((auto & y).sum())
+    n = int(auto.sum())
+    tp = int((auto & y).sum())
     return {
-        "rows": len(df), "auto_contest": n,
+        "rows": len(df),
+        "auto_contest": n,
         "precision": tp / n if n else 0.0,
         "recall": tp / int(y.sum()) if y.sum() else 0.0,
         "auto_rate": n / len(df) if len(df) else 0.0,
@@ -55,7 +63,8 @@ def _eval(df: pd.DataFrame, scorer, profile) -> dict:
 def main() -> None:
     test = pd.read_csv(DATA_DIR / "test.csv")
     stress = test.sample(n=min(1000, len(test)), random_state=42).reset_index(drop=True)
-    scorer = load_or_fit_ml_scorer(); profile = load_policy_profile()
+    scorer = load_or_fit_ml_scorer()
+    profile = load_policy_profile()
     rng = np.random.default_rng(42)
 
     missing = stress.copy()
@@ -73,7 +82,9 @@ def main() -> None:
         contradiction.loc[contradiction_mask, "has_delivery_confirmation"] = False
 
     amount_shift = stress.copy()
-    amount_shift["amount"] = amount_shift["amount"] * rng.lognormal(mean=0.35, sigma=0.25, size=len(amount_shift))
+    amount_shift["amount"] = amount_shift["amount"] * rng.lognormal(
+        mean=0.35, sigma=0.25, size=len(amount_shift)
+    )
 
     baseline = {"amount": test["amount"].tolist()[:2000]}
     current = {"amount": amount_shift["amount"].tolist()[:2000]}

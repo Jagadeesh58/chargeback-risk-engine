@@ -1,4 +1,5 @@
 """Lightweight, dependency-free relationship graph for suspicious clusters."""
+
 from __future__ import annotations
 
 from collections import defaultdict, deque
@@ -79,7 +80,9 @@ class RiskGraph:
     def add(self, row: dict) -> None:
         node = f"dispute:{row.get('dispute_id', 'unknown')}"
         try:
-            self.node_amounts[row.get("dispute_id", "unknown")] = float(row.get("amount", 0.0) or 0.0)
+            self.node_amounts[row.get("dispute_id", "unknown")] = float(
+                row.get("amount", 0.0) or 0.0
+            )
         except (TypeError, ValueError):
             self.node_amounts[row.get("dispute_id", "unknown")] = 0.0
         # analyze() can inspect the row immediately even when it was not pre-added.
@@ -125,12 +128,23 @@ class RiskGraph:
                             continue
                         neighbor_entities = self.node_to_entities.get(neighbor, set())
                         shares_strong = bool(
-                            {e for e in neighbor_entities if e.split(":", 1)[0] in STRONG_IDENTIFIERS}
-                            & {e for e in current_entities if e.split(":", 1)[0] in STRONG_IDENTIFIERS}
+                            {
+                                e
+                                for e in neighbor_entities
+                                if e.split(":", 1)[0] in STRONG_IDENTIFIERS
+                            }
+                            & {
+                                e
+                                for e in current_entities
+                                if e.split(":", 1)[0] in STRONG_IDENTIFIERS
+                            }
                         )
                         # Weak IP link protection: do not bridge separate clusters over IP alone
                         if not shares_strong:
-                            if depth >= 1 or len(distinct_customers) > self.ip_max_distinct_customers:
+                            if (
+                                depth >= 1
+                                or len(distinct_customers) > self.ip_max_distinct_customers
+                            ):
                                 continue
                         connected_nodes.add(neighbor)
                         next_depth = depth + 1 if shares_strong else self.max_bfs_hops
@@ -163,7 +177,9 @@ class RiskGraph:
                     connected_customers.add(value)
             try:
                 dispute_id = related_node.split(":", 1)[1]
-                historical_disputed_value += float(getattr(self, "node_amounts", {}).get(dispute_id, 0.0))
+                historical_disputed_value += float(
+                    getattr(self, "node_amounts", {}).get(dispute_id, 0.0)
+                )
             except (ValueError, TypeError):
                 pass
 
@@ -186,10 +202,8 @@ class RiskGraph:
 
         # ip_address counts at reduced weight and only toward risk if at least one strong
         # identifier is also shared or IP is shared by <= N distinct customers.
-        ip_counts_for_risk = (
-            ip_shared_count > 0 and (
-                strong_shared_count > 0 or ip_distinct_customers <= self.ip_max_distinct_customers
-            )
+        ip_counts_for_risk = ip_shared_count > 0 and (
+            strong_shared_count > 0 or ip_distinct_customers <= self.ip_max_distinct_customers
         )
         effective_ip_weight = WEIGHT_IP_ADDRESS if ip_counts_for_risk else 0.0
 
@@ -212,11 +226,21 @@ class RiskGraph:
         else:
             effective_dispute_count = other_disputes
 
-        risk_score = min(1.0, 0.15 * effective_dispute_count + weighted_id_score + cross_account_boost)
-        risk_type = "ORGANIZED_ABUSE" if risk_score >= GRAPH_ESCALATION_THRESHOLD else "SHARED_INFRASTRUCTURE" if risk_score > 0 else "NO_CLUSTER"
+        risk_score = min(
+            1.0, 0.15 * effective_dispute_count + weighted_id_score + cross_account_boost
+        )
+        risk_type = (
+            "ORGANIZED_ABUSE"
+            if risk_score >= GRAPH_ESCALATION_THRESHOLD
+            else "SHARED_INFRASTRUCTURE"
+            if risk_score > 0
+            else "NO_CLUSTER"
+        )
         clusters = []
         if other_disputes:
-            clusters.append({"size": len(connected_nodes), "related_disputes": sorted(connected_nodes)})
+            clusters.append(
+                {"size": len(connected_nodes), "related_disputes": sorted(connected_nodes)}
+            )
         explanation = (
             "No connected risk cluster detected."
             if not clusters

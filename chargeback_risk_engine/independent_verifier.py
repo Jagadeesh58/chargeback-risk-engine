@@ -4,18 +4,28 @@ This module intentionally does not call the LLM or the production orchestrator.
 It checks the persisted decision shape and re-evaluates the hard financial
 invariants from the canonical policy inputs.
 """
+
 from __future__ import annotations
 
 import math
 
-from chargeback_risk_engine.policy import AUTO_CONTEST, HUMAN_REVIEW, ACCEPT_LOSS
+from chargeback_risk_engine.policy import ACCEPT_LOSS, AUTO_CONTEST, HUMAN_REVIEW
 
 VALID_ACTIONS = {AUTO_CONTEST, HUMAN_REVIEW, ACCEPT_LOSS}
 
 
 def verify_decision(result: dict) -> dict:
     errors: list[str] = []
-    for field in ("dispute_id", "action", "win_probability", "routing_score", "amount", "economic_decision", "evidence_score", "graph_analysis"):
+    for field in (
+        "dispute_id",
+        "action",
+        "win_probability",
+        "routing_score",
+        "amount",
+        "economic_decision",
+        "evidence_score",
+        "graph_analysis",
+    ):
         if field not in result:
             errors.append(f"missing:{field}")
     if errors:
@@ -49,4 +59,15 @@ def verify_decision(result: dict) -> dict:
         if float(economic.get("expected_net_value", -1.0)) <= 0:
             errors.append("negative_economics_auto_contest")
 
-    return {"valid": not errors, "errors": errors, "checked": ["schema", "probability_bounds", "financial_ceiling", "evidence_gate", "graph_gate", "positive_economics"]}
+    return {
+        "valid": not errors,
+        "errors": errors,
+        "checked": [
+            "schema",
+            "probability_bounds",
+            "financial_ceiling",
+            "evidence_gate",
+            "graph_gate",
+            "positive_economics",
+        ],
+    }

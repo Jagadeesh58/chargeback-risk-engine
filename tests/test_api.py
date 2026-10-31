@@ -36,15 +36,18 @@ def test_health_check():
 
 
 def test_score_strong_evidence_auto_contests():
-    response = client.post("/decision", json={
-        "dispute_id": "D0001",
-        "payment_id": "pay_ABC",
-        "reason_code": "item_not_received",
-        "amount": 2000,
-        "has_tracking_number": True,
-        "has_delivery_confirmation": True,
-        "has_signature_confirmation": True,
-    })
+    response = client.post(
+        "/decision",
+        json={
+            "dispute_id": "D0001",
+            "payment_id": "pay_ABC",
+            "reason_code": "item_not_received",
+            "amount": 2000,
+            "has_tracking_number": True,
+            "has_delivery_confirmation": True,
+            "has_signature_confirmation": True,
+        },
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["action"] == "AUTO-CONTEST"
@@ -62,15 +65,18 @@ def test_score_human_review_has_no_contest_draft():
     """A contest draft only makes sense for AUTO-CONTEST -- there's
     nothing to draft for a dispute that was routed to a human or
     accepted as a loss."""
-    response = client.post("/score", json={
-        "dispute_id": "D0007",
-        "payment_id": "pay_PQR",
-        "reason_code": "item_not_received",
-        "amount": 1000,
-        "has_tracking_number": True,
-        "has_delivery_confirmation": None,
-        "has_signature_confirmation": False,
-    })
+    response = client.post(
+        "/score",
+        json={
+            "dispute_id": "D0007",
+            "payment_id": "pay_PQR",
+            "reason_code": "item_not_received",
+            "amount": 1000,
+            "has_tracking_number": True,
+            "has_delivery_confirmation": None,
+            "has_signature_confirmation": False,
+        },
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["action"] != "AUTO-CONTEST"
@@ -107,15 +113,18 @@ def test_score_over_ceiling_amount_forces_human_review_via_api():
     route to HUMAN-REVIEW even through the real HTTP layer, proving
     api.py did not accidentally re-implement (and potentially break)
     the ceiling logic."""
-    response = client.post("/score", json={
-        "dispute_id": "D0002",
-        "payment_id": "pay_XYZ",
-        "reason_code": "item_not_received",
-        "amount": 800000,
-        "has_tracking_number": True,
-        "has_delivery_confirmation": True,
-        "has_signature_confirmation": True,
-    })
+    response = client.post(
+        "/score",
+        json={
+            "dispute_id": "D0002",
+            "payment_id": "pay_XYZ",
+            "reason_code": "item_not_received",
+            "amount": 800000,
+            "has_tracking_number": True,
+            "has_delivery_confirmation": True,
+            "has_signature_confirmation": True,
+        },
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["action"] == "HUMAN-REVIEW"
@@ -123,14 +132,17 @@ def test_score_over_ceiling_amount_forces_human_review_via_api():
 
 
 def test_score_unknown_evidence_maps_to_warn_via_api():
-    response = client.post("/score", json={
-        "dispute_id": "D0003",
-        "payment_id": "pay_DEF",
-        "reason_code": "item_not_received",
-        "amount": 1000,
-        "has_tracking_number": True,
-        # has_delivery_confirmation and has_signature_confirmation omitted entirely
-    })
+    response = client.post(
+        "/score",
+        json={
+            "dispute_id": "D0003",
+            "payment_id": "pay_DEF",
+            "reason_code": "item_not_received",
+            "amount": 1000,
+            "has_tracking_number": True,
+            # has_delivery_confirmation and has_signature_confirmation omitted entirely
+        },
+    )
     assert response.status_code == 200
     data = response.json()
     statuses = {item["field"]: item["status"] for item in data["evidence"]}
@@ -142,12 +154,15 @@ def test_score_unknown_evidence_maps_to_warn_via_api():
 def test_score_missing_required_field_returns_422():
     """Pydantic validation should reject a request missing a required
     field (e.g. no reason_code) BEFORE it ever reaches the pipeline."""
-    response = client.post("/score", json={
-        "dispute_id": "D0004",
-        "payment_id": "pay_GHI",
-        "amount": 1000,
-        # reason_code missing entirely
-    })
+    response = client.post(
+        "/score",
+        json={
+            "dispute_id": "D0004",
+            "payment_id": "pay_GHI",
+            "amount": 1000,
+            # reason_code missing entirely
+        },
+    )
     assert response.status_code == 422
 
 
@@ -155,12 +170,15 @@ def test_score_invalid_reason_code_returns_422():
     """An unrecognized reason_code must be rejected with a clean 422
     at the API boundary, not allowed to fall through to scorer.py's
     dict lookup and raise an unhandled KeyError (a 500)."""
-    response = client.post("/score", json={
-        "dispute_id": "D0006",
-        "payment_id": "pay_MNO",
-        "reason_code": "not_a_real_reason_code",
-        "amount": 1000,
-    })
+    response = client.post(
+        "/score",
+        json={
+            "dispute_id": "D0006",
+            "payment_id": "pay_MNO",
+            "reason_code": "not_a_real_reason_code",
+            "amount": 1000,
+        },
+    )
     assert response.status_code == 422
 
 
@@ -177,14 +195,17 @@ def test_response_shape_matches_evidence_module_directly():
     }
     direct_packet = assemble(dispute)
 
-    response = client.post("/score", json={
-        "dispute_id": "D0005",
-        "payment_id": "pay_JKL",
-        "reason_code": "duplicate_charge",
-        "amount": 1000,
-        "has_duplicate_transaction_proof": True,
-        "has_refund_already_issued": False,
-    })
+    response = client.post(
+        "/score",
+        json={
+            "dispute_id": "D0005",
+            "payment_id": "pay_JKL",
+            "reason_code": "duplicate_charge",
+            "amount": 1000,
+            "has_duplicate_transaction_proof": True,
+            "has_refund_already_issued": False,
+        },
+    )
     api_statuses = {item["field"]: item["status"] for item in response.json()["evidence"]}
     direct_statuses = {item.field: item.status for item in direct_packet.items}
     assert api_statuses == direct_statuses
@@ -197,15 +218,18 @@ def test_calibrated_win_probability_matches_calibration_module_directly():
     itself."""
     from chargeback_risk_engine.calibration import apply_calibration, load_or_fit_calibration_points
 
-    response = client.post("/score", json={
-        "dispute_id": "D0008",
-        "payment_id": "pay_STU",
-        "reason_code": "item_not_received",
-        "amount": 2000,
-        "has_tracking_number": True,
-        "has_delivery_confirmation": True,
-        "has_signature_confirmation": True,
-    })
+    response = client.post(
+        "/score",
+        json={
+            "dispute_id": "D0008",
+            "payment_id": "pay_STU",
+            "reason_code": "item_not_received",
+            "amount": 2000,
+            "has_tracking_number": True,
+            "has_delivery_confirmation": True,
+            "has_signature_confirmation": True,
+        },
+    )
     data = response.json()
     points = load_or_fit_calibration_points()
     expected = apply_calibration(points, data["win_probability"])
@@ -215,15 +239,18 @@ def test_calibrated_win_probability_matches_calibration_module_directly():
 def test_live_win_probability_matches_ml_scorer_module_directly():
     from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer
 
-    response = client.post("/decision", json={
-        "dispute_id": "D0009",
-        "payment_id": "pay_VWX",
-        "reason_code": "item_not_received",
-        "amount": 2000,
-        "has_tracking_number": True,
-        "has_delivery_confirmation": True,
-        "has_signature_confirmation": True,
-    })
+    response = client.post(
+        "/decision",
+        json={
+            "dispute_id": "D0009",
+            "payment_id": "pay_VWX",
+            "reason_code": "item_not_received",
+            "amount": 2000,
+            "has_tracking_number": True,
+            "has_delivery_confirmation": True,
+            "has_signature_confirmation": True,
+        },
+    )
     data = response.json()
     scorer = load_or_fit_ml_scorer()
     dispute = {
@@ -234,6 +261,7 @@ def test_live_win_probability_matches_ml_scorer_module_directly():
     }
     expected = scorer.predict_win_probability(dispute)
     assert data["win_probability"] == expected
+
 
 def test_mutated_replay_uses_only_original_request_context():
     """A retry with changed evidence/amount must return HTTP 409 Conflict,
@@ -259,13 +287,15 @@ def test_mutated_replay_uses_only_original_request_context():
 
     # Mutated payload returns 409 Conflict naming the dispute_id
     mutated = dict(payload)
-    mutated.update({
-        "amount": 9999,
-        "device_id": "device-mutated",
-        "has_tracking_number": False,
-        "has_delivery_confirmation": False,
-        "has_signature_confirmation": False,
-    })
+    mutated.update(
+        {
+            "amount": 9999,
+            "device_id": "device-mutated",
+            "has_tracking_number": False,
+            "has_delivery_confirmation": False,
+            "has_signature_confirmation": False,
+        }
+    )
     second = client.post("/score", json=mutated)
     assert second.status_code == 409
     assert "D_API_MUTATED_REPLAY" in second.json()["detail"]
@@ -321,9 +351,11 @@ def test_apps_api_audit_verify_endpoint_uses_canonical_audit_checker():
 # API Hardening Tests (Auth, Rate Limit, Size Limit, Model Hash Integrity)
 # ---------------------------------------------------------------------------
 
+
 def test_api_key_auth_flow(monkeypatch):
     """Test demo mode, missing key, wrong key, and correct key."""
     from chargeback_risk_engine.api import _reset_rate_limiter
+
     _reset_rate_limiter()
 
     sample_payload = {
@@ -360,13 +392,16 @@ def test_api_key_auth_flow(monkeypatch):
 
     # Decision with correct key succeeds
     sample_payload["dispute_id"] = "D_AUTH_TEST_2"
-    correct = client.post("/decision", json=sample_payload, headers={"X-API-Key": "secret-test-key-123"})
+    correct = client.post(
+        "/decision", json=sample_payload, headers={"X-API-Key": "secret-test-key-123"}
+    )
     assert correct.status_code == 200
 
 
 def test_request_body_size_limit(monkeypatch):
     """Payloads exceeding maximum body size should return 413."""
     from chargeback_risk_engine.api import _reset_rate_limiter
+
     _reset_rate_limiter()
     monkeypatch.setenv("CHARGEBACK_MAX_BODY_BYTES", "512")
     monkeypatch.delenv("CHARGEBACK_API_KEY", raising=False)
@@ -385,6 +420,7 @@ def test_request_body_size_limit(monkeypatch):
 def test_rate_limiter_enforcement(monkeypatch):
     """Requests exceeding rate limit return 429 with Retry-After header."""
     from chargeback_risk_engine.api import _reset_rate_limiter
+
     _reset_rate_limiter()
     monkeypatch.setenv("CHARGEBACK_RATE_LIMIT", "2")
     monkeypatch.delenv("CHARGEBACK_API_KEY", raising=False)
@@ -413,6 +449,7 @@ def test_rate_limiter_enforcement(monkeypatch):
 def test_model_hash_verification(tmp_path, monkeypatch):
     """Loading model with corrupted/mismatched sidecar hash raises ValueError."""
     import chargeback_risk_engine.ml_scorer as ml_mod
+
     monkeypatch.setattr(ml_mod, "_cached_scorer", None)
 
     fake_model = tmp_path / "test_model.json"
@@ -426,6 +463,7 @@ def test_model_hash_verification(tmp_path, monkeypatch):
 
     # Correct hash allows load to proceed (will fail on format, but integrity passes)
     import hashlib
+
     correct_hash = hashlib.sha256(b"dummy model bytes").hexdigest()
     sidecar.write_text(correct_hash + "\n")
     with pytest.raises(RuntimeError, match="invalid model artifact format"):
@@ -442,6 +480,7 @@ def test_model_hash_verification(tmp_path, monkeypatch):
 def test_streaming_chunked_body_size_limit_aborts(monkeypatch):
     """Chunked transfer payloads exceeding max_bytes abort with 413."""
     from chargeback_risk_engine.api import _reset_rate_limiter
+
     _reset_rate_limiter()
     monkeypatch.setenv("CHARGEBACK_MAX_BODY_BYTES", "512")
     monkeypatch.delenv("CHARGEBACK_API_KEY", raising=False)
@@ -450,32 +489,50 @@ def test_streaming_chunked_body_size_limit_aborts(monkeypatch):
         for _ in range(10):
             yield b"x" * 200
 
-    resp = client.post("/decision", content=chunk_generator(), headers={"Content-Type": "application/json"})
+    resp = client.post(
+        "/decision", content=chunk_generator(), headers={"Content-Type": "application/json"}
+    )
     assert resp.status_code == 413
 
 
 def test_rate_limiter_evaluates_before_body_parsing(monkeypatch):
     """Rate limited client receives 429 even when sending an oversized body."""
     from chargeback_risk_engine.api import _reset_rate_limiter
+
     _reset_rate_limiter()
     monkeypatch.setenv("CHARGEBACK_RATE_LIMIT", "1")
     monkeypatch.setenv("CHARGEBACK_MAX_BODY_BYTES", "512")
     monkeypatch.delenv("CHARGEBACK_API_KEY", raising=False)
     headers = {"X-Client-Id": "pre-rate-client"}
 
-    r1 = client.post("/decision", json={
-        "dispute_id": "D_PRE_1", "payment_id": "p1", "reason_code": "item_not_received", "amount": 1000.0
-    }, headers=headers)
+    r1 = client.post(
+        "/decision",
+        json={
+            "dispute_id": "D_PRE_1",
+            "payment_id": "p1",
+            "reason_code": "item_not_received",
+            "amount": 1000.0,
+        },
+        headers=headers,
+    )
     assert r1.status_code == 200
 
-    oversized = {"dispute_id": "D_PRE_2", "payment_id": "p2", "reason_code": "item_not_received", "amount": 1000.0, "x": "x" * 2000}
+    oversized = {
+        "dispute_id": "D_PRE_2",
+        "payment_id": "p2",
+        "reason_code": "item_not_received",
+        "amount": 1000.0,
+        "x": "x" * 2000,
+    }
     r2 = client.post("/decision", json=oversized, headers=headers)
     assert r2.status_code == 429
 
 
 def test_startup_warning_when_api_key_unset(monkeypatch, caplog):
     import logging
+
     from chargeback_risk_engine.api import _validate_startup_config
+
     monkeypatch.setenv("CHARGEBACK_ENV", "development")
     monkeypatch.delenv("CHARGEBACK_API_KEY", raising=False)
     with caplog.at_level(logging.WARNING):
@@ -528,7 +585,9 @@ def test_production_auth_protection(monkeypatch):
     assert client.get("/audit/verify").status_code == 401
 
     # Wrong key -> 401
-    assert client.post("/decision", json=sample, headers={"X-API-Key": "wrong" * 8}).status_code == 401
+    assert (
+        client.post("/decision", json=sample, headers={"X-API-Key": "wrong" * 8}).status_code == 401
+    )
     assert client.get("/audit/verify", headers={"X-API-Key": "wrong" * 8}).status_code == 401
 
     # Correct key -> 200
@@ -573,4 +632,3 @@ def test_payload_conflict_returns_409_stable_body(monkeypatch):
     body = r3.json()
     assert body["error"] == "payload_conflict"
     assert body["dispute_id"] == "D_CONFLICT_TEST"
-

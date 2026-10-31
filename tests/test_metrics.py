@@ -5,11 +5,11 @@ test_metrics.py — real, runnable tests for metrics.py.
 import pandas as pd
 
 from chargeback_risk_engine.metrics import (
-    run_pipeline,
-    confusion_matrix_for_auto_contest,
-    precision_recall_f1,
-    false_positive_cost,
     calibration_check,
+    confusion_matrix_for_auto_contest,
+    false_positive_cost,
+    precision_recall_f1,
+    run_pipeline,
 )
 
 
@@ -54,11 +54,13 @@ def test_false_positive_cost_is_nonnegative():
 
 def test_false_positive_cost_only_counts_actual_false_positives():
     """Sanity check: cost should be zero if there are no false positives."""
-    fake_results = pd.DataFrame({
-        "action": ["AUTO-CONTEST", "AUTO-CONTEST"],
-        "would_win": [True, True],
-        "amount": [1000.0, 2000.0],
-    })
+    fake_results = pd.DataFrame(
+        {
+            "action": ["AUTO-CONTEST", "AUTO-CONTEST"],
+            "would_win": [True, True],
+            "amount": [1000.0, 2000.0],
+        }
+    )
     cost = false_positive_cost(fake_results)
     assert cost == 0.0
 

@@ -3,6 +3,7 @@
 The profile is an input to the deterministic policy layer, never to the model.
 If the artifact is missing or malformed, safe defaults are used.
 """
+
 from __future__ import annotations
 
 import functools
@@ -40,7 +41,9 @@ def load_policy_profile(path: str | Path = PROFILE_PATH) -> RuntimePolicyProfile
             min_evidence_completeness=float(raw.get("min_evidence_completeness", 0.50)),
             contest_cost=float(raw.get("contest_cost", 150.0)),
             evidence_signal_weight=float(raw.get("evidence_signal_weight", 0.05)),
-            model_threshold=float(raw.get("model_threshold", raw.get("auto_contest_threshold", 0.65))),
+            model_threshold=float(
+                raw.get("model_threshold", raw.get("auto_contest_threshold", 0.65))
+            ),
             profile_version=str(raw.get("policy_version", "loaded")),
         )
     except (OSError, ValueError, TypeError, json.JSONDecodeError):
@@ -60,6 +63,10 @@ def decision_score(
     authority.
     """
     profile = load_policy_profile()
-    weight = profile.evidence_signal_weight if evidence_signal_weight is None else float(evidence_signal_weight)
+    weight = (
+        profile.evidence_signal_weight
+        if evidence_signal_weight is None
+        else float(evidence_signal_weight)
+    )
     score = float(win_probability) + weight * (float(evidence_confidence) - 0.80)
     return max(0.0, min(1.0, score))

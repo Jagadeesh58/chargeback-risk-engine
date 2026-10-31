@@ -17,7 +17,7 @@ os.environ.setdefault("CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE", "1")
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import brier_score_loss, precision_recall_curve, roc_auc_score, auc
+from sklearn.metrics import auc, brier_score_loss, precision_recall_curve, roc_auc_score
 
 from chargeback_risk_engine.calibration import apply_calibration, load_or_fit_calibration_points
 from chargeback_risk_engine.engine.economic_decision import calculate_economic_value
@@ -136,6 +136,7 @@ def run_ablation_study() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]
     actions_by_config: dict[str, list[str]] = {}
 
     import tempfile
+
     from chargeback_risk_engine.engine.hybrid_pipeline import decide_case
     from chargeback_risk_engine.engine.risk_graph import RiskGraph
 
@@ -184,7 +185,8 @@ def run_ablation_study() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]
 
                 econ = calculate_economic_value(amt, prob)
                 routing = decision_score(
-                    prob, ev_qual.confidence,
+                    prob,
+                    ev_qual.confidence,
                     evidence_signal_weight=profile.evidence_signal_weight,
                 )
 
@@ -225,20 +227,22 @@ def run_ablation_study() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]
         net_p0 = gross_recovery - contest_costs - review_costs
         net_base_p = net_p0 - (lost_contests * BASE_PENALTY)
 
-        ablation_results.append({
-            "configuration": name,
-            "auto_contest_count": auto_count,
-            "auto_contest_share": round(auto_count / n_cases, 4),
-            "human_review_share": round(float(np.mean(review_mask)), 4),
-            "accept_loss_share": round(float(np.mean(accept_mask)), 4),
-            "precision": round(precision, 4),
-            "recall": round(recall, 4),
-            "lost_contests": lost_contests,
-            "realized_net_value_p0_inr": round(net_p0, 2),
-            "realized_net_value_p0_lakh": round(net_p0 / 100000.0, 2),
-            "realized_net_value_base_p_inr": round(net_base_p, 2),
-            "realized_net_value_base_p_lakh": round(net_base_p / 100000.0, 2),
-        })
+        ablation_results.append(
+            {
+                "configuration": name,
+                "auto_contest_count": auto_count,
+                "auto_contest_share": round(auto_count / n_cases, 4),
+                "human_review_share": round(float(np.mean(review_mask)), 4),
+                "accept_loss_share": round(float(np.mean(accept_mask)), 4),
+                "precision": round(precision, 4),
+                "recall": round(recall, 4),
+                "lost_contests": lost_contests,
+                "realized_net_value_p0_inr": round(net_p0, 2),
+                "realized_net_value_p0_lakh": round(net_p0 / 100000.0, 2),
+                "realized_net_value_base_p_inr": round(net_base_p, 2),
+                "realized_net_value_base_p_lakh": round(net_base_p / 100000.0, 2),
+            }
+        )
 
     # 2. Bootstrap 95% Confidence Intervals for Live Policy
     rng = np.random.RandomState(42)

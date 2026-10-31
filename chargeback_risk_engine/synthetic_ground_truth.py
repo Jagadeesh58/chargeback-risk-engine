@@ -28,16 +28,16 @@ from dataclasses import dataclass
 from chargeback_risk_engine.config import ALL_EVIDENCE_FIELDS, RELEVANT_EVIDENCE_BY_REASON
 
 # --- Tunable parameters, all in one place for later sensitivity checks ---
-HIDDEN_LEGIT_BASE_RATE = 0.60          # P(hidden_seller_legitimate = True)
-WIN_RATE_IF_LEGIT = 0.82               # P(would_win | legitimate)
-WIN_RATE_IF_NOT_LEGIT = 0.18           # P(would_win | not legitimate)
+HIDDEN_LEGIT_BASE_RATE = 0.60  # P(hidden_seller_legitimate = True)
+WIN_RATE_IF_LEGIT = 0.82  # P(would_win | legitimate)
+WIN_RATE_IF_NOT_LEGIT = 0.18  # P(would_win | not legitimate)
 
-RELEVANT_FIELD_RATE_IF_LEGIT = 0.78    # P(relevant evidence True | legit)
+RELEVANT_FIELD_RATE_IF_LEGIT = 0.78  # P(relevant evidence True | legit)
 RELEVANT_FIELD_RATE_IF_NOT_LEGIT = 0.30  # P(relevant evidence True | not legit)
-IRRELEVANT_FIELD_RATE = 0.50           # P(irrelevant evidence True), no dependence on hidden truth
+IRRELEVANT_FIELD_RATE = 0.50  # P(irrelevant evidence True), no dependence on hidden truth
 
-CONTRADICTION_RATE = 0.08              # chance a relevant field is flipped anyway
-MISSINGNESS_RATE = 0.15                # chance any evidence field is None
+CONTRADICTION_RATE = 0.08  # chance a relevant field is flipped anyway
+MISSINGNESS_RATE = 0.15  # chance any evidence field is None
 
 
 def _sample_bool(rng: random.Random, p: float) -> bool:
@@ -47,7 +47,7 @@ def _sample_bool(rng: random.Random, p: float) -> bool:
 @dataclass
 class HiddenTruthResult:
     reason_code: str
-    hidden_seller_legitimate: bool   # NEVER exposed to the scorer
+    hidden_seller_legitimate: bool  # NEVER exposed to the scorer
     would_win: bool
     evidence: dict[str, bool | None]
 
@@ -56,19 +56,15 @@ def generate_one(rng: random.Random, reason_code: str) -> HiddenTruthResult:
     relevant_fields = set(RELEVANT_EVIDENCE_BY_REASON[reason_code])
 
     hidden_legit = _sample_bool(rng, HIDDEN_LEGIT_BASE_RATE)
-    would_win = _sample_bool(
-        rng, WIN_RATE_IF_LEGIT if hidden_legit else WIN_RATE_IF_NOT_LEGIT
-    )
+    would_win = _sample_bool(rng, WIN_RATE_IF_LEGIT if hidden_legit else WIN_RATE_IF_NOT_LEGIT)
 
     evidence: dict[str, bool | None] = {}
     for field_name in ALL_EVIDENCE_FIELDS:
         if field_name in relevant_fields:
             base_rate = (
-                RELEVANT_FIELD_RATE_IF_LEGIT
-                if hidden_legit
-                else RELEVANT_FIELD_RATE_IF_NOT_LEGIT
+                RELEVANT_FIELD_RATE_IF_LEGIT if hidden_legit else RELEVANT_FIELD_RATE_IF_NOT_LEGIT
             )
-            value = _sample_bool(rng, base_rate)
+            value: bool | None = _sample_bool(rng, base_rate)
             # occasional contradiction: flip it anyway, independent of truth
             if _sample_bool(rng, CONTRADICTION_RATE):
                 value = not value

@@ -6,6 +6,7 @@ separate from the bundled headline benchmark: it never modifies the repository's
 train/dev/test data and its output is intentionally generated outside the tracked
 public proof artifacts unless explicitly retained by the user.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -18,8 +19,8 @@ from chargeback_risk_engine.config import ALL_EVIDENCE_FIELDS
 from chargeback_risk_engine.engine.evidence_score import score_evidence
 from chargeback_risk_engine.evidence import assemble
 from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer
-from chargeback_risk_engine.policy_profile import load_policy_profile, decision_score
-from chargeback_risk_engine.policy import decide, AUTO_CONTEST
+from chargeback_risk_engine.policy import AUTO_CONTEST, decide
+from chargeback_risk_engine.policy_profile import decision_score, load_policy_profile
 
 
 def main() -> None:
@@ -38,7 +39,8 @@ def main() -> None:
     probs = []
     for row in df.to_dict("records"):
         for k, v in list(row.items()):
-            if isinstance(v, float) and pd.isna(v): row[k] = None
+            if isinstance(v, float) and pd.isna(v):
+                row[k] = None
         p = scorer.predict_win_probability(row)
         packet = assemble(row)
         q = score_evidence(row, packet)
@@ -76,6 +78,7 @@ def main() -> None:
     Path(args.output).parent.mkdir(exist_ok=True)
     Path(args.output).write_text(json.dumps(result, indent=2))
     print(json.dumps(result, indent=2))
+
 
 if __name__ == "__main__":
     main()

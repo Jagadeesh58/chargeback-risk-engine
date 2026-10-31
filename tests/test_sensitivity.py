@@ -25,7 +25,9 @@ def test_higher_threshold_never_decreases_precision():
     result = sweep_auto_contest_threshold(test, [0.5, 0.6, 0.7, 0.8, 0.9])
     pairs = [(c, p) for c, p in zip(result["auto_contest_count"], result["precision"]) if c > 0]
     precisions = [p for _, p in pairs]
-    assert all(precisions[i] <= precisions[i + 1] + 0.001 for i in range(len(precisions) - 1)), f"precision should be non-decreasing among non-empty auto-contest sets: {precisions}"
+    assert all(precisions[i] <= precisions[i + 1] + 0.001 for i in range(len(precisions) - 1)), (
+        f"precision should be non-decreasing among non-empty auto-contest sets: {precisions}"
+    )
 
 
 def test_higher_threshold_never_increases_recall():
@@ -42,9 +44,15 @@ def test_default_threshold_matches_metrics_module():
     reproduce the same precision/recall used by the live decision service."""
     test = pd.read_csv("data/test.csv").head(100)
     from chargeback_risk_engine.policy_profile import load_policy_profile
+
     result = sweep_auto_contest_threshold(test, [load_policy_profile().auto_contest_threshold])
     row = result.iloc[0]
-    from chargeback_risk_engine.metrics import run_pipeline, confusion_matrix_for_auto_contest, precision_recall_f1
+    from chargeback_risk_engine.metrics import (
+        confusion_matrix_for_auto_contest,
+        precision_recall_f1,
+        run_pipeline,
+    )
+
     baseline = run_pipeline(test)
     prf = precision_recall_f1(confusion_matrix_for_auto_contest(baseline))
     assert abs(row["precision"] - prf["precision"]) < 0.01

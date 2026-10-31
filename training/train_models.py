@@ -5,8 +5,8 @@ from __future__ import annotations
 import argparse
 import json
 import pickle
-from pathlib import Path
 import sys
+from pathlib import Path
 
 # Allow direct execution from the repository root without duplicate path setup.
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -18,7 +18,6 @@ import pandas as pd
 import sklearn
 from sklearn.calibration import calibration_curve
 from sklearn.ensemble import HistGradientBoostingClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     average_precision_score,
     brier_score_loss,
@@ -30,16 +29,16 @@ from sklearn.metrics import (
 )
 
 from chargeback_risk_engine.config import (
-    RELEVANT_EVIDENCE_BY_REASON,
-    HYBRID_MODEL_WEIGHTS,
-    LIVE_MODEL_VERSION,
     CHALLENGER_MODEL_VERSION,
     FEATURE_VERSION,
+    HYBRID_MODEL_WEIGHTS,
+    LIVE_MODEL_VERSION,
+    RELEVANT_EVIDENCE_BY_REASON,
 )
-from chargeback_risk_engine.ml_scorer import MLScorer
 from chargeback_risk_engine.engine.economic_decision import calculate_economic_value
 from chargeback_risk_engine.engine.evidence_score import score_evidence
 from chargeback_risk_engine.evidence import assemble
+from chargeback_risk_engine.ml_scorer import MLScorer
 from chargeback_risk_engine.paths import ARTIFACTS_DIR, DATA_DIR
 from chargeback_risk_engine.policy import CONTEST_COST, decide
 from chargeback_risk_engine.scorer import predict_win_probability
@@ -111,7 +110,9 @@ def rules_probs(df: pd.DataFrame) -> np.ndarray:
     return np.array([predict_win_probability(r.to_dict()) for _, r in df.iterrows()])
 
 
-def hybrid_probs(rule_probs: np.ndarray, lr_probs: np.ndarray, tree_probs: np.ndarray) -> np.ndarray:
+def hybrid_probs(
+    rule_probs: np.ndarray, lr_probs: np.ndarray, tree_probs: np.ndarray
+) -> np.ndarray:
     w = HYBRID_MODEL_WEIGHTS
     total = sum(w.values())
     return (w["rules"] * rule_probs + w["logistic"] * lr_probs + w["tree"] * tree_probs) / total
@@ -198,11 +199,11 @@ def select_live_model(dev: pd.DataFrame, models: dict[str, np.ndarray]) -> tuple
     ranked_by_pr_auc = sorted(candidates, key=lambda name: candidates[name]["pr_auc"], reverse=True)
     top_pr_auc = candidates[ranked_by_pr_auc[0]]["pr_auc"]
     near_ties = [
-        name for name in ranked_by_pr_auc
-        if top_pr_auc - candidates[name]["pr_auc"] <= 0.01
+        name for name in ranked_by_pr_auc if top_pr_auc - candidates[name]["pr_auc"] <= 0.01
     ]
     materially_better = [
-        name for name in near_ties
+        name
+        for name in near_ties
         if candidates[name]["pr_auc"] >= candidates["logistic_regression"]["pr_auc"] + 0.01
     ]
     if materially_better:
@@ -211,7 +212,12 @@ def select_live_model(dev: pd.DataFrame, models: dict[str, np.ndarray]) -> tuple
             key=lambda name: (
                 candidates[name]["brier_score"],
                 candidates[name]["calibration_error"],
-                {"rules": 0, "logistic_regression": 1, "hist_gradient_boosting": 2, "hybrid_risk": 3}[name],
+                {
+                    "rules": 0,
+                    "logistic_regression": 1,
+                    "hist_gradient_boosting": 2,
+                    "hybrid_risk": 3,
+                }[name],
             ),
         )
     else:
@@ -234,6 +240,7 @@ def main(argv: list[str] | None = None):
     hgb_probs = predict_model(hgb, columns, test)
     lr_model = MLScorer().fit(train)
     from chargeback_risk_engine.ml_scorer import save_ml_scorer
+
     save_ml_scorer(train_csv=str(args.train))
     lr_probs = []
     for _, row in test.iterrows():
@@ -246,15 +253,18 @@ def main(argv: list[str] | None = None):
     rule = rules_probs(test)
     hybrid = hybrid_probs(rule, lr_probs, hgb_probs)
     dev_hgb_probs = predict_model(hgb, columns, dev)
-    dev_lr_probs = np.asarray([
-        lr_model.predict_win_probability(
-            {
-                key: (None if isinstance(value, float) and pd.isna(value) else value)
-                for key, value in row.items()
-            }
-        )
-        for row in dev.to_dict("records")
-    ], dtype=float)
+    dev_lr_probs = np.asarray(
+        [
+            lr_model.predict_win_probability(
+                {
+                    key: (None if isinstance(value, float) and pd.isna(value) else value)
+                    for key, value in row.items()
+                }
+            )
+            for row in dev.to_dict("records")
+        ],
+        dtype=float,
+    )
     dev_rule_probs = np.array([predict_win_probability(r) for r in dev.to_dict("records")])
     dev_hybrid_probs = hybrid_probs(dev_rule_probs, dev_lr_probs, dev_hgb_probs)
     selected_name, dev_selection = select_live_model(
@@ -288,10 +298,22 @@ def main(argv: list[str] | None = None):
             "selection_rule": "use Logistic Regression unless another candidate improves PR-AUC by at least 0.01 on dev; among qualifying alternatives prefer lower Brier score, then lower calibration error, then simpler implementation",
         },
         "models": {
-            "rules": {**metrics(test["would_win"], rule), "calibration_error": calibration_error(test["would_win"], rule)},
-            "logistic_regression": {**metrics(test["would_win"], lr_probs), "calibration_error": calibration_error(test["would_win"], lr_probs)},
-            "hist_gradient_boosting": {**metrics(test["would_win"], hgb_probs), "calibration_error": calibration_error(test["would_win"], hgb_probs)},
-            "hybrid_risk": {**metrics(test["would_win"], hybrid), "calibration_error": calibration_error(test["would_win"], hybrid)},
+            "rules": {
+                **metrics(test["would_win"], rule),
+                "calibration_error": calibration_error(test["would_win"], rule),
+            },
+            "logistic_regression": {
+                **metrics(test["would_win"], lr_probs),
+                "calibration_error": calibration_error(test["would_win"], lr_probs),
+            },
+            "hist_gradient_boosting": {
+                **metrics(test["would_win"], hgb_probs),
+                "calibration_error": calibration_error(test["would_win"], hgb_probs),
+            },
+            "hybrid_risk": {
+                **metrics(test["would_win"], hybrid),
+                "calibration_error": calibration_error(test["would_win"], hybrid),
+            },
         },
         "final_test_split": "test is used only for final evaluation after model selection is frozen",
         "hybrid_definition": {

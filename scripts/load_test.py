@@ -6,7 +6,6 @@ import argparse
 import concurrent.futures
 import os
 import statistics
-import sys
 import time
 from typing import Any
 
@@ -61,7 +60,9 @@ def main() -> None:
     for i in range(5):
         run_single_request(client, f"warmup_{i}")
 
-    print(f"Executing load test: {args.num_requests} requests with concurrency={args.concurrency}...")
+    print(
+        f"Executing load test: {args.num_requests} requests with concurrency={args.concurrency}..."
+    )
     latencies: list[float] = []
     successes = 0
 
@@ -88,7 +89,9 @@ def main() -> None:
 
     print("\n--- Load Test Results ---")
     print(f"Total Requests:     {args.num_requests}")
-    print(f"Success Rate:       {successes / args.num_requests * 100:.1f}% ({successes}/{args.num_requests})")
+    print(
+        f"Success Rate:       {successes / args.num_requests * 100:.1f}% ({successes}/{args.num_requests})"
+    )
     print(f"Total Wall Time:    {total_wall:.2f} s")
     print(f"Throughput:         {rps:.1f} req/s")
     print(f"Mean Latency:       {mean_lat:.2f} ms")

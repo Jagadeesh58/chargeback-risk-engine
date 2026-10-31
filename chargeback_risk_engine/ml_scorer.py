@@ -7,6 +7,7 @@ Arbitrary code execution via pickle is disallowed in production mode.
 Integrity is strictly verified via SHA-256 sidecars (.sha256) or
 the CHARGEBACK_MODEL_SHA256 environment variable.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -14,6 +15,7 @@ import json
 import logging
 import math
 import os
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -69,7 +71,7 @@ class MLScorer:
 
 def dispute_from_evidence_items(reason_code: str, evidence_items: list[dict]) -> dict:
     status_to_value = {"PASS": True, "FAIL": False, "WARN": None}
-    dispute = {"reason_code": reason_code}
+    dispute: dict[str, Any] = {"reason_code": reason_code}
     for item in evidence_items:
         dispute[item["field"]] = status_to_value[item["status"]]
     return dispute
@@ -166,7 +168,7 @@ def load_or_fit_ml_scorer(path: str = MODEL_PATH, train_csv: str | None = None) 
     except (UnicodeDecodeError, json.JSONDecodeError):
         is_json = False
 
-    if not is_json:
+    if not is_json or not isinstance(bundle, dict):
         raise RuntimeError(
             f"Legacy pickle or invalid model artifact format in '{effective_path}'. "
             "Re-train with safe JSON representation via 'make train'."
@@ -184,7 +186,10 @@ def load_or_fit_ml_scorer(path: str = MODEL_PATH, train_csv: str | None = None) 
         )
 
     scorer = MLScorer()
-    for reason, m_data in bundle["models"].items():
+    models_dict = bundle.get("models")
+    if not isinstance(models_dict, dict):
+        raise RuntimeError("Missing models dict in serialized model bundle")
+    for reason, m_data in models_dict.items():
         lr = LogisticRegression()
         lr.coef_ = np.array([m_data["coef"]], dtype=float)
         lr.intercept_ = np.array(m_data["intercept"], dtype=float)

@@ -1,4 +1,5 @@
 """Structured, deterministic decision explanations."""
+
 from __future__ import annotations
 
 
@@ -33,7 +34,9 @@ def build_explanation(
             "Missing evidence is not treated as positive evidence.",
             "Final action is selected by deterministic policy.",
         ],
-        "graph_reason": graph_analysis.get("explanation") if graph_analysis else "Graph analysis not available.",
+        "graph_reason": graph_analysis.get("explanation")
+        if graph_analysis
+        else "Graph analysis not available.",
         "final_action": final_action,
     }
 
@@ -47,13 +50,23 @@ def logistic_feature_contributions(ml_scorer, dispute: dict) -> dict[str, float]
     reason = dispute["reason_code"]
     model = ml_scorer.models[reason]
     from chargeback_risk_engine.config import RELEVANT_EVIDENCE_BY_REASON
+
     fields = RELEVANT_EVIDENCE_BY_REASON[reason]
-    encoded = [1.0 if dispute.get(f) is True else 0.0 if dispute.get(f) is False else 0.5 for f in fields]
-    return {field: float(coef * value) for field, coef, value in zip(fields, model.coef_[0], encoded)}
+    encoded = [
+        1.0 if dispute.get(f) is True else 0.0 if dispute.get(f) is False else 0.5 for f in fields
+    ]
+    return {
+        field: float(coef * value) for field, coef, value in zip(fields, model.coef_[0], encoded)
+    }
 
 
-def permutation_feature_importance(model, X, y, feature_names, random_state: int = 42) -> dict[str, float]:
+def permutation_feature_importance(
+    model, X, y, feature_names, random_state: int = 42
+) -> dict[str, float]:
     """Deterministic model-agnostic feature importance for tabular models."""
     from sklearn.inspection import permutation_importance
-    result = permutation_importance(model, X, y, n_repeats=8, random_state=random_state, scoring="roc_auc")
+
+    result = permutation_importance(
+        model, X, y, n_repeats=8, random_state=random_state, scoring="roc_auc"
+    )
     return {name: float(value) for name, value in zip(feature_names, result.importances_mean)}

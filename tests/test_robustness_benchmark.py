@@ -1,9 +1,8 @@
 """Test that robustness benchmark runs within budget and produces stable schema."""
-import time
-from pathlib import Path
-import pytest
 
-from scripts.robustness_benchmark import run_robustness_benchmark, OUTPUT_PATH
+import time
+
+from scripts.robustness_benchmark import OUTPUT_PATH, run_robustness_benchmark
 
 
 def test_robustness_benchmark_runs_under_60s_with_stable_schema(tmp_path):
@@ -53,8 +52,11 @@ def test_robustness_benchmark_runs_under_60s_with_stable_schema(tmp_path):
 
 
 def test_committed_robustness_report_exists_and_matches_schema():
-    assert OUTPUT_PATH.exists(), "artifacts/robustness_report.json missing. Run scripts/robustness_benchmark.py"
+    assert OUTPUT_PATH.exists(), (
+        "artifacts/robustness_report.json missing. Run scripts/robustness_benchmark.py"
+    )
     import json
+
     with open(OUTPUT_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
     assert "circular by construction" in data["methodology_disclaimer"].lower()

@@ -8,6 +8,7 @@ from the underlying JSON artifacts, this test fails.
 import json
 import re
 from pathlib import Path
+
 import pytest
 
 from chargeback_risk_engine.paths import ARTIFACTS_DIR
@@ -24,6 +25,7 @@ def artifacts():
     if not benchmark_path.exists():
         import subprocess
         import sys
+
         subprocess.run([sys.executable, str(REPO_ROOT / "scripts" / "benchmark.py")], check=True)
 
     assert benchmark_path.exists(), "candidate_benchmark.json missing. Run scripts/benchmark.py"
@@ -33,7 +35,9 @@ def artifacts():
     profile = json.loads(profile_path.read_text(encoding="utf-8"))
     oracle = json.loads(oracle_path.read_text(encoding="utf-8")) if oracle_path.exists() else {}
 
-    strategy = next((s for s in benchmark["strategies"] if s["strategy"] == "CHARGEBACK-RISK-ENGINE"), None)
+    strategy = next(
+        (s for s in benchmark["strategies"] if s["strategy"] == "CHARGEBACK-RISK-ENGINE"), None
+    )
     assert strategy is not None, "CHARGEBACK-RISK-ENGINE strategy missing from benchmark"
 
     return {
@@ -62,7 +66,9 @@ def test_readme_metrics_match_artifacts(artifacts):
     assert pytest.approx(readme_rec, abs=1e-3) == strategy["auto_contest_recall"]
 
     # Threshold in README table
-    match_thresh = re.search(r"\|\s*Selected policy threshold\s*\|\s*\*\*([0-9.]+)\*\*\s*from `dev.csv`\s*\|", readme)
+    match_thresh = re.search(
+        r"\|\s*Selected policy threshold\s*\|\s*\*\*([0-9.]+)\*\*\s*from `dev.csv`\s*\|", readme
+    )
     assert match_thresh, "Threshold not found in README.md"
     readme_thresh = float(match_thresh.group(1))
     assert pytest.approx(readme_thresh, abs=1e-3) == profile["auto_contest_threshold"]
@@ -97,7 +103,9 @@ def test_evaluation_report_metrics_match_artifacts(artifacts):
     # Threshold
     match_thresh = re.search(r"- auto-contest threshold: `([0-9.]+)`", eval_report)
     assert match_thresh, "Threshold not found in EVALUATION_REPORT.md"
-    assert pytest.approx(float(match_thresh.group(1)), abs=1e-3) == profile["auto_contest_threshold"]
+    assert (
+        pytest.approx(float(match_thresh.group(1)), abs=1e-3) == profile["auto_contest_threshold"]
+    )
 
     # Candidate decision metrics
     match_count = re.search(r"\|\s*Auto-contest count\s*\|\s*([0-9,]+)\s*\|", eval_report)
@@ -118,9 +126,14 @@ def test_strategy_comparison_table_matches_docs(artifacts):
     if not strategy_comp_path.exists():
         import subprocess
         import sys
-        subprocess.run([sys.executable, str(REPO_ROOT / "scripts" / "generate_report.py")], check=True)
 
-    assert strategy_comp_path.exists(), "strategy_comparison.json missing. Run scripts/generate_report.py"
+        subprocess.run(
+            [sys.executable, str(REPO_ROOT / "scripts" / "generate_report.py")], check=True
+        )
+
+    assert strategy_comp_path.exists(), (
+        "strategy_comparison.json missing. Run scripts/generate_report.py"
+    )
     strat_comp = json.loads(strategy_comp_path.read_text(encoding="utf-8"))
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     eval_report = (REPO_ROOT / "docs" / "EVALUATION_REPORT.md").read_text(encoding="utf-8")
@@ -130,11 +143,21 @@ def test_strategy_comparison_table_matches_docs(artifacts):
     for row in strat_comp["strategy_table"]:
         net_p0_str = f"₹{row['realized_net_value_p0_lakh']:.2f} lakh"
         net_base_p_str = f"₹{row['realized_net_value_base_p_lakh']:.2f} lakh"
-        prec_str = f"{row['contested_precision']*100:.1f}%"
-        for doc_name, doc_text in [("README.md", readme), ("EVALUATION_REPORT.md", eval_report), ("MODEL_CARD.md", model_card)]:
-            assert net_p0_str in doc_text, f"Net value (p=0) {net_p0_str} for {row['strategy']} missing in {doc_name}"
-            assert net_base_p_str in doc_text, f"Net value (base p) {net_base_p_str} for {row['strategy']} missing in {doc_name}"
-            assert prec_str in doc_text, f"Precision {prec_str} for {row['strategy']} missing in {doc_name}"
+        prec_str = f"{row['contested_precision'] * 100:.1f}%"
+        for doc_name, doc_text in [
+            ("README.md", readme),
+            ("EVALUATION_REPORT.md", eval_report),
+            ("MODEL_CARD.md", model_card),
+        ]:
+            assert net_p0_str in doc_text, (
+                f"Net value (p=0) {net_p0_str} for {row['strategy']} missing in {doc_name}"
+            )
+            assert net_base_p_str in doc_text, (
+                f"Net value (base p) {net_base_p_str} for {row['strategy']} missing in {doc_name}"
+            )
+            assert prec_str in doc_text, (
+                f"Precision {prec_str} for {row['strategy']} missing in {doc_name}"
+            )
 
     # Check Bootstrap 95% CIs across docs
     boots = strat_comp["bootstrap_comparisons"]
@@ -143,7 +166,11 @@ def test_strategy_comparison_table_matches_docs(artifacts):
     ci_scenb_0 = f"[-₹{abs(boots['scenario_b_vs_contest_everything_p0']['ci_95_lower_lakh']):.2f} lakh, -₹{abs(boots['scenario_b_vs_contest_everything_p0']['ci_95_upper_lakh']):.2f} lakh]"
     ci_scenb_p = f"[-₹{abs(boots['scenario_b_vs_contest_everything_base_p']['ci_95_lower_lakh']):.2f} lakh, -₹{abs(boots['scenario_b_vs_contest_everything_base_p']['ci_95_upper_lakh']):.2f} lakh]"
 
-    for doc_name, doc_text in [("README.md", readme), ("EVALUATION_REPORT.md", eval_report), ("MODEL_CARD.md", model_card)]:
+    for doc_name, doc_text in [
+        ("README.md", readme),
+        ("EVALUATION_REPORT.md", eval_report),
+        ("MODEL_CARD.md", model_card),
+    ]:
         assert ci_auto_0 in doc_text, f"Bootstrap CI {ci_auto_0} missing in {doc_name}"
         assert ci_auto_p in doc_text, f"Bootstrap CI {ci_auto_p} missing in {doc_name}"
         assert ci_scenb_0 in doc_text, f"Bootstrap CI {ci_scenb_0} missing in {doc_name}"
@@ -154,7 +181,11 @@ def test_strategy_comparison_table_matches_docs(artifacts):
     thresh_auto = f"₹{b_even['ranking_flip_vs_auto_only_threshold_inr']:,.2f}"
     thresh_scenb = f"₹{b_even['ranking_flip_vs_scenario_b_threshold_inr']:,.2f}"
 
-    for doc_name, doc_text in [("README.md", readme), ("EVALUATION_REPORT.md", eval_report), ("MODEL_CARD.md", model_card)]:
+    for doc_name, doc_text in [
+        ("README.md", readme),
+        ("EVALUATION_REPORT.md", eval_report),
+        ("MODEL_CARD.md", model_card),
+    ]:
         assert thresh_auto in doc_text, f"Threshold {thresh_auto} missing in {doc_name}"
         assert thresh_scenb in doc_text, f"Threshold {thresh_scenb} missing in {doc_name}"
 
@@ -185,7 +216,14 @@ def test_fees_and_penalties_have_rupee_or_source_citation():
     for doc in doc_paths:
         for lineno, line in enumerate(doc.read_text(encoding="utf-8").splitlines(), 1):
             if pattern.search(line):
-                if "₹" not in line and "Rs" not in line and "INR" not in line and "[source:" not in line:
+                if (
+                    "₹" not in line
+                    and "Rs" not in line
+                    and "INR" not in line
+                    and "[source:" not in line
+                ):
                     violations.append(f"{doc.name}:{lineno}: {line.strip()}")
 
-    assert not violations, "Found fee/penalty amounts without rupee or source citation:\n" + "\n".join(violations)
+    assert not violations, (
+        "Found fee/penalty amounts without rupee or source citation:\n" + "\n".join(violations)
+    )

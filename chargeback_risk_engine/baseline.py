@@ -28,11 +28,11 @@ def run_naive_baseline(df: pd.DataFrame, contest_cost: float = 150.0) -> dict:
     # fee -- matches policy.py's EV assumption (RISK_COST_IF_LOSE_CONTEST
     # = 0.0). The amount was already gone via the chargeback regardless
     # of the contest decision, so it isn't an extra cost of contesting.
-    lost_disputes = df[df["would_win"] == False]
+    lost_disputes = df[~df["would_win"].astype(bool)]
     fp_cost = float(len(lost_disputes) * contest_cost)
 
     # Total money recovered from WON contests, for a fuller picture
-    won_disputes = df[df["would_win"] == True]
+    won_disputes = df[df["would_win"].astype(bool)]
     money_recovered = float(won_disputes["amount"].sum()) - (total * contest_cost)
 
     return {

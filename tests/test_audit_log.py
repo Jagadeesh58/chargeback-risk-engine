@@ -10,10 +10,10 @@ import threading
 import pytest
 
 from chargeback_risk_engine.audit_log import (
-    get_or_create_decision,
-    get_existing_decision,
-    verify_audit_integrity,
     PayloadConflictError,
+    get_existing_decision,
+    get_or_create_decision,
+    verify_audit_integrity,
 )
 
 TEST_DB = "test_audit_log_pytest.db"
@@ -32,20 +32,27 @@ def _fake_compute(call_counter):
     def compute():
         call_counter.append(1)
         return (0.8, [{"field": "x", "status": "PASS"}], "AUTO-CONTEST", "test reason", 1000.0)
+
     return compute
 
 
 def test_first_call_is_not_replayed():
     calls = []
-    result = get_or_create_decision("D1", "item_not_received", 2000.0, _fake_compute(calls), db_path=TEST_DB)
+    result = get_or_create_decision(
+        "D1", "item_not_received", 2000.0, _fake_compute(calls), db_path=TEST_DB
+    )
     assert result.replayed is False
     assert len(calls) == 1
 
 
 def test_second_call_same_id_is_replayed_and_does_not_recompute():
     calls = []
-    first = get_or_create_decision("D1", "item_not_received", 2000.0, _fake_compute(calls), db_path=TEST_DB)
-    second = get_or_create_decision("D1", "item_not_received", 2000.0, _fake_compute(calls), db_path=TEST_DB)
+    first = get_or_create_decision(
+        "D1", "item_not_received", 2000.0, _fake_compute(calls), db_path=TEST_DB
+    )
+    second = get_or_create_decision(
+        "D1", "item_not_received", 2000.0, _fake_compute(calls), db_path=TEST_DB
+    )
 
     assert second.replayed is True
     assert len(calls) == 1, "compute function should NOT be called a second time"
@@ -56,8 +63,12 @@ def test_second_call_same_id_is_replayed_and_does_not_recompute():
 
 def test_different_dispute_ids_are_independent():
     calls = []
-    d1 = get_or_create_decision("D1", "item_not_received", 2000.0, _fake_compute(calls), db_path=TEST_DB)
-    d2 = get_or_create_decision("D2", "item_not_received", 2000.0, _fake_compute(calls), db_path=TEST_DB)
+    d1 = get_or_create_decision(
+        "D1", "item_not_received", 2000.0, _fake_compute(calls), db_path=TEST_DB
+    )
+    d2 = get_or_create_decision(
+        "D2", "item_not_received", 2000.0, _fake_compute(calls), db_path=TEST_DB
+    )
     assert d1.replayed is False
     assert d2.replayed is False
     assert len(calls) == 2

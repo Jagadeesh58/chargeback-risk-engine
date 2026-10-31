@@ -2,8 +2,8 @@
 test_evidence.py — real, runnable tests for evidence.py.
 """
 
+from chargeback_risk_engine.config import REASON_CODES, RELEVANT_EVIDENCE_BY_REASON
 from chargeback_risk_engine.evidence import assemble
-from chargeback_risk_engine.config import RELEVANT_EVIDENCE_BY_REASON, REASON_CODES
 
 
 def test_true_maps_to_pass():

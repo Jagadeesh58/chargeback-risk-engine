@@ -33,7 +33,6 @@ from chargeback_risk_engine.scorer import predict_win_probability
 from chargeback_risk_engine.synthetic_ground_truth import (
     WIN_RATE_IF_LEGIT,
     WIN_RATE_IF_NOT_LEGIT,
-    generate_one,
 )
 from training.train_models import fit_model, predict_model
 
@@ -44,16 +43,15 @@ def compute_oracle_probabilities(n: int = 30000, seed: int = 42) -> dict[str, fl
     No data files or disk artifacts are written.
     """
     from datetime import date, timedelta
+
     from chargeback_risk_engine.config import ALL_EVIDENCE_FIELDS, RELEVANT_EVIDENCE_BY_REASON
     from chargeback_risk_engine.synthetic_ground_truth import (
+        CONTRADICTION_RATE,
         HIDDEN_LEGIT_BASE_RATE,
-        WIN_RATE_IF_LEGIT,
-        WIN_RATE_IF_NOT_LEGIT,
+        IRRELEVANT_FIELD_RATE,
+        MISSINGNESS_RATE,
         RELEVANT_FIELD_RATE_IF_LEGIT,
         RELEVANT_FIELD_RATE_IF_NOT_LEGIT,
-        IRRELEVANT_FIELD_RATE,
-        CONTRADICTION_RATE,
-        MISSINGNESS_RATE,
     )
 
     rng = random.Random(seed)
@@ -62,9 +60,13 @@ def compute_oracle_probabilities(n: int = 30000, seed: int = 42) -> dict[str, fl
         rc = rng.choice(REASON_CODES)
         rel = set(RELEVANT_EVIDENCE_BY_REASON[rc])
         hl = rng.random() < HIDDEN_LEGIT_BASE_RATE
-        ww = rng.random() < (WIN_RATE_IF_LEGIT if hl else WIN_RATE_IF_NOT_LEGIT)
+        _ = rng.random() < (WIN_RATE_IF_LEGIT if hl else WIN_RATE_IF_NOT_LEGIT)
         for f in ALL_EVIDENCE_FIELDS:
-            br = (RELEVANT_FIELD_RATE_IF_LEGIT if hl else RELEVANT_FIELD_RATE_IF_NOT_LEGIT) if f in rel else IRRELEVANT_FIELD_RATE
+            br = (
+                (RELEVANT_FIELD_RATE_IF_LEGIT if hl else RELEVANT_FIELD_RATE_IF_NOT_LEGIT)
+                if f in rel
+                else IRRELEVANT_FIELD_RATE
+            )
             v = rng.random() < br
             if f in rel and rng.random() < CONTRADICTION_RATE:
                 v = not v
@@ -79,7 +81,9 @@ def compute_oracle_probabilities(n: int = 30000, seed: int = 42) -> dict[str, fl
     return oracle_probs
 
 
-def calculate_net_value(amounts: np.ndarray, wins: np.ndarray, probs: np.ndarray, threshold: float = 0.5) -> float:
+def calculate_net_value(
+    amounts: np.ndarray, wins: np.ndarray, probs: np.ndarray, threshold: float = 0.5
+) -> float:
     """Calculate realized net financial value under optimal thresholding."""
     contested = probs >= threshold
     net_per_case = np.where(
@@ -166,7 +170,9 @@ def main(output_dir: Path | None = None) -> dict:
     oracle_brier = float(brier_score_loss(y_true, oracle_probs))
     # Economic optimal contest threshold: p * amount > CONTEST_COST => p > CONTEST_COST / amount
     economic_thresholds = CONTEST_COST / np.maximum(amounts, 1.0)
-    oracle_net_val = calculate_net_value(amounts, y_true, oracle_probs, threshold=economic_thresholds)
+    oracle_net_val = calculate_net_value(
+        amounts, y_true, oracle_probs, threshold=economic_thresholds
+    )
 
     # 1. Rules Model
     rows = test_df.to_dict("records")

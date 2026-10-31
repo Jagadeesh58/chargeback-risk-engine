@@ -1,14 +1,16 @@
 """Regression tests for evidence provenance, timestamp validation, and fail-field gates."""
-from datetime import datetime, timezone, timedelta
+
 import os
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 
 from chargeback_risk_engine.api import app
 from chargeback_risk_engine.audit_log import DB_PATH
-from chargeback_risk_engine.evidence import assemble
 from chargeback_risk_engine.engine.evidence_score import score_evidence
-from chargeback_risk_engine.policy import decide, AUTO_CONTEST, HUMAN_REVIEW, ACCEPT_LOSS
+from chargeback_risk_engine.evidence import assemble
+from chargeback_risk_engine.policy import ACCEPT_LOSS, AUTO_CONTEST, HUMAN_REVIEW, decide
 
 client = TestClient(app)
 
@@ -327,16 +329,21 @@ def test_dev_override_works_and_is_reported_by_health(monkeypatch):
 
 
 from unittest import mock
-from hypothesis import given, settings
+
 import hypothesis.strategies as st
+from hypothesis import given, settings
 
 
 @settings(max_examples=25, deadline=None)
 @given(
-    source=st.sampled_from([None, "", "manual_upload", "unknown", "arbitrary_user_upload", "untrusted"]),
+    source=st.sampled_from(
+        [None, "", "manual_upload", "unknown", "arbitrary_user_upload", "untrusted"]
+    ),
     timestamp_offset=st.sampled_from([None, 10.0, -500.0]),  # None, future, stale (>365d)
 )
-def test_hypothesis_no_unverified_provenance_ever_auto_contests_in_production(source, timestamp_offset):
+def test_hypothesis_no_unverified_provenance_ever_auto_contests_in_production(
+    source, timestamp_offset
+):
     """Property-based test: in production, no dispute with missing/untrusted/out-of-window provenance ever yields AUTO-CONTEST."""
     env_patch = {
         "CHARGEBACK_ENV": "production",
@@ -371,4 +378,6 @@ def test_hypothesis_no_unverified_provenance_ever_auto_contests_in_production(so
             evidence_quality=quality,
             expected_net_value=1800.0,
         )
-        assert decision.action != AUTO_CONTEST, f"Unverified source={source}, ts={ts_str} unexpectedly reached AUTO-CONTEST"
+        assert decision.action != AUTO_CONTEST, (
+            f"Unverified source={source}, ts={ts_str} unexpectedly reached AUTO-CONTEST"
+        )

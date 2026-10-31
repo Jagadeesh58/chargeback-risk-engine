@@ -2,11 +2,10 @@
 
 from fastapi.testclient import TestClient
 
-from chargeback_risk_engine.audit_log import DB_PATH
+from chargeback_risk_engine.api import app
+from chargeback_risk_engine.engine.evidence_score import score_evidence
 from chargeback_risk_engine.evidence import assemble
 from chargeback_risk_engine.policy import MONETARY_CEILING, decide
-from chargeback_risk_engine.engine.evidence_score import score_evidence
-from chargeback_risk_engine.api import app
 
 client = TestClient(app)
 
@@ -32,10 +31,21 @@ def test_prompt_injection_is_data():
 
 
 def test_missing_evidence_is_safe():
-    dispute = _base(has_tracking_number=None, has_delivery_confirmation=None, has_signature_confirmation=None)
+    dispute = _base(
+        has_tracking_number=None, has_delivery_confirmation=None, has_signature_confirmation=None
+    )
     packet = assemble(dispute)
     quality = score_evidence(dispute, packet)
-    assert decide(0.99, dispute["amount"], evidence_packet=packet, evidence_quality=quality, expected_net_value=1000).action == "HUMAN-REVIEW"
+    assert (
+        decide(
+            0.99,
+            dispute["amount"],
+            evidence_packet=packet,
+            evidence_quality=quality,
+            expected_net_value=1000,
+        ).action
+        == "HUMAN-REVIEW"
+    )
 
 
 def test_contradictory_evidence_is_safe():
@@ -43,7 +53,16 @@ def test_contradictory_evidence_is_safe():
     dispute["has_delivery_confirmation_consistent"] = False
     packet = assemble(dispute)
     quality = score_evidence(dispute, packet)
-    assert decide(0.99, dispute["amount"], evidence_packet=packet, evidence_quality=quality, expected_net_value=1000).action == "HUMAN-REVIEW"
+    assert (
+        decide(
+            0.99,
+            dispute["amount"],
+            evidence_packet=packet,
+            evidence_quality=quality,
+            expected_net_value=1000,
+        ).action
+        == "HUMAN-REVIEW"
+    )
 
 
 def test_monetary_ceiling_cannot_be_bypassed():
@@ -85,6 +104,8 @@ def test_duplicate_request_replays_original_decision():
     assert second["action"] == first["action"]
 
     # Same dispute_id with conflicting payload returns 409 naming the dispute
-    conflict = client.post("/decision", json=_base(dispute_id="ADV_REPLAY", has_tracking_number=False))
+    conflict = client.post(
+        "/decision", json=_base(dispute_id="ADV_REPLAY", has_tracking_number=False)
+    )
     assert conflict.status_code == 409
     assert "ADV_REPLAY" in conflict.json()["detail"]

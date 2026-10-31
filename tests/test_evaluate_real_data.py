@@ -7,8 +7,9 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-import pytest
+
 import pandas as pd
+import pytest
 
 from scripts.evaluate_real_data import evaluate_dataset
 
@@ -26,7 +27,9 @@ def test_evaluate_real_data_with_ground_truth():
     assert "AUTO-CONTEST" in op
     assert "HUMAN-REVIEW" in op
     assert "ACCEPT-LOSS" in op
-    assert op["AUTO-CONTEST"]["count"] + op["HUMAN-REVIEW"]["count"] + op["ACCEPT-LOSS"]["count"] == 10
+    assert (
+        op["AUTO-CONTEST"]["count"] + op["HUMAN-REVIEW"]["count"] + op["ACCEPT-LOSS"]["count"] == 10
+    )
 
     gt = report["ground_truth_evaluation"]
     assert "auto_contest_precision" in gt

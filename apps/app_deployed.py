@@ -8,20 +8,18 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from chargeback_risk_engine.audit_log import verify_audit_integrity
 from chargeback_risk_engine.config import REASON_CODES, RELEVANT_EVIDENCE_BY_REASON
-from chargeback_risk_engine.local_pipeline import score_dispute_locally
 from chargeback_risk_engine.engine.hybrid_pipeline import decide_case
 from chargeback_risk_engine.engine.risk_graph import RiskGraph
+from chargeback_risk_engine.local_pipeline import score_dispute_locally
 from chargeback_risk_engine.metrics import (
     confusion_matrix_for_auto_contest,
     false_positive_cost,
     precision_recall_f1,
     run_pipeline,
 )
-from chargeback_risk_engine.paths import DATA_DIR, ARTIFACTS_DIR
+from chargeback_risk_engine.paths import ARTIFACTS_DIR, DATA_DIR
 from chargeback_risk_engine.review_budget import optimize_review_budget
-
 
 st.set_page_config(
     page_title="Chargeback Risk Engine",
@@ -31,9 +29,7 @@ st.set_page_config(
 
 st.title("Chargeback Risk Engine")
 st.caption("Track 02 — AI Risk Manager")
-st.write(
-    "AI-assisted chargeback decisions with deterministic financial safety controls"
-)
+st.write("AI-assisted chargeback decisions with deterministic financial safety controls")
 
 
 @st.cache_data
@@ -74,9 +70,7 @@ def proof_metrics():
     }
 
 
-score_tab, proof_tab, demo_tab = st.tabs(
-    ["Decision", "Proof", "Demo cases"]
-)
+score_tab, proof_tab, demo_tab = st.tabs(["Decision", "Proof", "Demo cases"])
 
 
 with score_tab:
@@ -166,17 +160,14 @@ with score_tab:
 
             st.write(
                 {
-                    "1 · model": (
-                        f"{result['win_probability']:.1%} win probability"
-                    ),
+                    "1 · model": (f"{result['win_probability']:.1%} win probability"),
                     "2 · evidence": (
                         f"{result['evidence_score']['completeness']:.0%} complete / "
                         f"{result['evidence_score']['validity']:.0%} valid"
                     ),
                     "3 · graph": result["graph_analysis"]["risk_type"],
                     "4 · economics": (
-                        f"₹{result['economic_decision']['expected_net_value']:,.0f} "
-                        "expected net"
+                        f"₹{result['economic_decision']['expected_net_value']:,.0f} expected net"
                     ),
                     "5 · policy": result["action"],
                 }
@@ -210,17 +201,13 @@ with score_tab:
 
             if result.get("contest_draft"):
                 with st.expander("Contest draft"):
-                    st.caption(
-                        "Draft only. No external financial action is executed."
-                    )
+                    st.caption("Draft only. No external financial action is executed.")
                     st.json(result["contest_draft"])
 
 
 with proof_tab:
     st.subheader("Measured system proof")
-    st.caption(
-        "Bundled synthetic evaluation data; not a production-performance claim."
-    )
+    st.caption("Bundled synthetic evaluation data; not a production-performance claim.")
 
     report_path = ARTIFACTS_DIR / "verification_report.json"
 
@@ -232,11 +219,7 @@ with proof_tab:
 
             review_budget_rows = raw.get("review_budget", [])
             rb10 = next(
-                (
-                    row
-                    for row in review_budget_rows
-                    if float(row.get("review_budget", 0)) == 0.10
-                ),
+                (row for row in review_budget_rows if float(row.get("review_budget", 0)) == 0.10),
                 None,
             )
 
@@ -264,11 +247,7 @@ with proof_tab:
 
             e.metric(
                 "10% review capacity",
-                (
-                    f"+{rb10.get('recall_at_budget', 0):.1%} recall"
-                    if rb10
-                    else "N/A"
-                ),
+                (f"+{rb10.get('recall_at_budget', 0):.1%} recall" if rb10 else "N/A"),
             )
 
             f.metric(
@@ -534,8 +513,7 @@ with demo_tab:
 
             result = (
                 st.session_state.get("demo_result")
-                if st.session_state.get("demo_case")
-                == case["dispute_id"]
+                if st.session_state.get("demo_case") == case["dispute_id"]
                 else None
             )
 
@@ -543,4 +521,3 @@ with demo_tab:
                 st.json(result)
             else:
                 st.caption("Deterministic demo input")
-

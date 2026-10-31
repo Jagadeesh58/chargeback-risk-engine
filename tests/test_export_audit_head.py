@@ -1,9 +1,9 @@
 """Tests for export_audit_head.py script."""
+
 import os
 import subprocess
 import sys
 import tempfile
-import pytest
 
 from chargeback_risk_engine.audit_log import log_new_decision
 from scripts.export_audit_head import export_audit_head, verify_against_head
@@ -14,8 +14,28 @@ def test_export_and_verify_audit_head_flow():
         db_path = os.path.join(tmp, "test_audit.db")
 
         # Log two decisions
-        log_new_decision("D_EXPORT_1", "item_not_received", 1000.0, 0.8, "AUTO-CONTEST", "test 1", 700.0, [], db_path=db_path)
-        log_new_decision("D_EXPORT_2", "unauthorized_transaction", 2500.0, 0.2, "ACCEPT-LOSS", "test 2", -100.0, [], db_path=db_path)
+        log_new_decision(
+            "D_EXPORT_1",
+            "item_not_received",
+            1000.0,
+            0.8,
+            "AUTO-CONTEST",
+            "test 1",
+            700.0,
+            [],
+            db_path=db_path,
+        )
+        log_new_decision(
+            "D_EXPORT_2",
+            "unauthorized_transaction",
+            2500.0,
+            0.2,
+            "ACCEPT-LOSS",
+            "test 2",
+            -100.0,
+            [],
+            db_path=db_path,
+        )
 
         # Export head
         exported = export_audit_head(db_path=db_path)
@@ -31,7 +51,15 @@ def test_export_and_verify_audit_head_flow():
 
         # Test CLI invocation
         res = subprocess.run(
-            [sys.executable, "scripts/export_audit_head.py", "--db", db_path, "--verify", "--against", head_hash],
+            [
+                sys.executable,
+                "scripts/export_audit_head.py",
+                "--db",
+                db_path,
+                "--verify",
+                "--against",
+                head_hash,
+            ],
             capture_output=True,
             text=True,
         )
@@ -39,7 +67,15 @@ def test_export_and_verify_audit_head_flow():
         assert "SUCCESS" in res.stdout
 
         res_bad = subprocess.run(
-            [sys.executable, "scripts/export_audit_head.py", "--db", db_path, "--verify", "--against", "bad_hash"],
+            [
+                sys.executable,
+                "scripts/export_audit_head.py",
+                "--db",
+                db_path,
+                "--verify",
+                "--against",
+                "bad_hash",
+            ],
             capture_output=True,
             text=True,
         )

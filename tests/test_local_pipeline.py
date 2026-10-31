@@ -8,8 +8,8 @@ import os
 
 import pytest
 
-from chargeback_risk_engine.local_pipeline import score_dispute_locally
 from chargeback_risk_engine.audit_log import DB_PATH
+from chargeback_risk_engine.local_pipeline import score_dispute_locally
 
 
 @pytest.fixture(autouse=True)
@@ -43,6 +43,7 @@ def test_matches_api_pipeline_exactly():
     proving the deployed app's logic hasn't silently diverged from the
     real API."""
     from fastapi.testclient import TestClient
+
     from chargeback_risk_engine.api import app as fastapi_app
 
     dispute = {
@@ -61,10 +62,13 @@ def test_matches_api_pipeline_exactly():
         os.remove(DB_PATH)
 
     client = TestClient(fastapi_app)
-    api_result = client.post("/score", json={
-        "payment_id": "pay_cross_check",
-        **dispute,
-    }).json()
+    api_result = client.post(
+        "/score",
+        json={
+            "payment_id": "pay_cross_check",
+            **dispute,
+        },
+    ).json()
 
     assert local_result["action"] == api_result["action"]
     assert local_result["win_probability"] == api_result["win_probability"]

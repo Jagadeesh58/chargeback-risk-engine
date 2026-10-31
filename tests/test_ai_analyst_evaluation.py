@@ -16,15 +16,14 @@ without any network traffic. They verify that:
 
 import json
 import math
-import os
 import urllib.error
 import urllib.request
+
 import pytest
 
 from chargeback_risk_engine.ai_analyst import (
-    analyze_evidence,
-    deterministic_analysis,
     EvidenceAnalysis,
+    analyze_evidence,
 )
 from chargeback_risk_engine.engine.hybrid_pipeline import decide_case
 
@@ -65,24 +64,33 @@ def test_valid_grounded_reply_accepted(monkeypatch):
     """(a) Valid grounded reply is accepted and returns a real EvidenceAnalysis with fallback False."""
     monkeypatch.setenv("CHARGEBACK_AI_ANALYST_URL", "http://dummy")
     monkeypatch.setenv("CHARGEBACK_AI_ANALYST_API_KEY", "key")
-    packet = _make_packet([
-        ("has_tracking_number", "PASS"),
-        ("has_delivery_confirmation", "PASS"),
-        ("has_signature_confirmation", "WARN"),
-    ])
+    packet = _make_packet(
+        [
+            ("has_tracking_number", "PASS"),
+            ("has_delivery_confirmation", "PASS"),
+            ("has_signature_confirmation", "WARN"),
+        ]
+    )
     payload = {
-        "choices": [{
-            "message": {
-                "content": json.dumps({
-                    "summary": "Valid shipping confirmation provided.",
-                    "supporting_evidence": ["has_tracking_number", "has_delivery_confirmation"],
-                    "contradicting_evidence": [],
-                    "missing_evidence": ["has_signature_confirmation"],
-                    "possible_dispute_arguments": ["Tracking and delivery are confirmed."],
-                    "confidence": 0.85,
-                })
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps(
+                        {
+                            "summary": "Valid shipping confirmation provided.",
+                            "supporting_evidence": [
+                                "has_tracking_number",
+                                "has_delivery_confirmation",
+                            ],
+                            "contradicting_evidence": [],
+                            "missing_evidence": ["has_signature_confirmation"],
+                            "possible_dispute_arguments": ["Tracking and delivery are confirmed."],
+                            "confidence": 0.85,
+                        }
+                    )
+                }
             }
-        }]
+        ]
     }
     monkeypatch.setattr(
         "urllib.request.urlopen",
@@ -101,18 +109,22 @@ def test_invented_field_triggers_fallback(monkeypatch):
     monkeypatch.setenv("CHARGEBACK_AI_ANALYST_API_KEY", "key")
     packet = _make_packet([("has_tracking_number", "PASS")])
     payload = {
-        "choices": [{
-            "message": {
-                "content": json.dumps({
-                    "summary": "Fabricated evidence",
-                    "supporting_evidence": ["invented_field_not_in_packet"],
-                    "contradicting_evidence": [],
-                    "missing_evidence": [],
-                    "possible_dispute_arguments": [],
-                    "confidence": 0.9,
-                })
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps(
+                        {
+                            "summary": "Fabricated evidence",
+                            "supporting_evidence": ["invented_field_not_in_packet"],
+                            "contradicting_evidence": [],
+                            "missing_evidence": [],
+                            "possible_dispute_arguments": [],
+                            "confidence": 0.9,
+                        }
+                    )
+                }
             }
-        }]
+        ]
     }
     monkeypatch.setattr(
         "urllib.request.urlopen",
@@ -127,23 +139,29 @@ def test_fail_field_in_supporting_triggers_fallback(monkeypatch):
     """(c) FAIL field in supporting -> fallback."""
     monkeypatch.setenv("CHARGEBACK_AI_ANALYST_URL", "http://dummy")
     monkeypatch.setenv("CHARGEBACK_AI_ANALYST_API_KEY", "key")
-    packet = _make_packet([
-        ("has_tracking_number", "FAIL"),
-        ("has_delivery_confirmation", "PASS"),
-    ])
+    packet = _make_packet(
+        [
+            ("has_tracking_number", "FAIL"),
+            ("has_delivery_confirmation", "PASS"),
+        ]
+    )
     payload = {
-        "choices": [{
-            "message": {
-                "content": json.dumps({
-                    "summary": "Hallucinated supporting claim",
-                    "supporting_evidence": ["has_tracking_number"],
-                    "contradicting_evidence": [],
-                    "missing_evidence": [],
-                    "possible_dispute_arguments": [],
-                    "confidence": 0.9,
-                })
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps(
+                        {
+                            "summary": "Hallucinated supporting claim",
+                            "supporting_evidence": ["has_tracking_number"],
+                            "contradicting_evidence": [],
+                            "missing_evidence": [],
+                            "possible_dispute_arguments": [],
+                            "confidence": 0.9,
+                        }
+                    )
+                }
             }
-        }]
+        ]
     }
     monkeypatch.setattr(
         "urllib.request.urlopen",
@@ -157,22 +175,28 @@ def test_pass_field_in_contradicting_triggers_fallback(monkeypatch):
     """(d) PASS field in contradicting -> fallback."""
     monkeypatch.setenv("CHARGEBACK_AI_ANALYST_URL", "http://dummy")
     monkeypatch.setenv("CHARGEBACK_AI_ANALYST_API_KEY", "key")
-    packet = _make_packet([
-        ("has_tracking_number", "PASS"),
-    ])
+    packet = _make_packet(
+        [
+            ("has_tracking_number", "PASS"),
+        ]
+    )
     payload = {
-        "choices": [{
-            "message": {
-                "content": json.dumps({
-                    "summary": "Contradicting confirmed evidence",
-                    "supporting_evidence": [],
-                    "contradicting_evidence": ["has_tracking_number"],
-                    "missing_evidence": [],
-                    "possible_dispute_arguments": [],
-                    "confidence": 0.9,
-                })
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps(
+                        {
+                            "summary": "Contradicting confirmed evidence",
+                            "supporting_evidence": [],
+                            "contradicting_evidence": ["has_tracking_number"],
+                            "missing_evidence": [],
+                            "possible_dispute_arguments": [],
+                            "confidence": 0.9,
+                        }
+                    )
+                }
             }
-        }]
+        ]
     }
     monkeypatch.setattr(
         "urllib.request.urlopen",
@@ -193,21 +217,29 @@ def test_network_and_parse_errors_trigger_fallback(monkeypatch, error_type):
     packet = _make_packet([("has_tracking_number", "PASS")])
 
     if error_type == "malformed_json":
+
         class _BadResponse:
             def __enter__(self):
                 return self
+
             def __exit__(self, exc_type, exc, tb):
                 pass
+
             def read(self):
                 return b"invalid json content {"
+
         monkeypatch.setattr("urllib.request.urlopen", lambda *a, **k: _BadResponse())
     elif error_type == "http_error":
+
         def _raise_http(*a, **k):
             raise urllib.error.HTTPError("http://dummy", 500, "Internal Server Error", {}, None)
+
         monkeypatch.setattr("urllib.request.urlopen", _raise_http)
     elif error_type == "timeout":
+
         def _raise_timeout(*a, **k):
             raise TimeoutError("timed out")
+
         monkeypatch.setattr("urllib.request.urlopen", _raise_timeout)
 
     result = analyze_evidence(packet, reason_code="item_not_received")
@@ -221,18 +253,22 @@ def test_invalid_confidence_triggers_fallback(monkeypatch, invalid_conf):
     monkeypatch.setenv("CHARGEBACK_AI_ANALYST_API_KEY", "key")
     packet = _make_packet([("has_tracking_number", "PASS")])
     payload = {
-        "choices": [{
-            "message": {
-                "content": json.dumps({
-                    "summary": "Bad confidence test",
-                    "supporting_evidence": ["has_tracking_number"],
-                    "contradicting_evidence": [],
-                    "missing_evidence": [],
-                    "possible_dispute_arguments": [],
-                    "confidence": invalid_conf if not math.isnan(invalid_conf) else "NaN",
-                })
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps(
+                        {
+                            "summary": "Bad confidence test",
+                            "supporting_evidence": ["has_tracking_number"],
+                            "contradicting_evidence": [],
+                            "missing_evidence": [],
+                            "possible_dispute_arguments": [],
+                            "confidence": invalid_conf if not math.isnan(invalid_conf) else "NaN",
+                        }
+                    )
+                }
             }
-        }]
+        ]
     }
     monkeypatch.setattr(
         "urllib.request.urlopen",
@@ -281,20 +317,26 @@ def test_prompt_injection_sanitized_as_data(monkeypatch):
 
     def _record_urlopen(req, timeout=3):
         recorded_requests.append(json.loads(req.data.decode("utf-8")))
-        return _fake_urlopen_success({
-            "choices": [{
-                "message": {
-                    "content": json.dumps({
-                        "summary": "Safe analysis",
-                        "supporting_evidence": ["has_tracking_number"],
-                        "contradicting_evidence": [],
-                        "missing_evidence": [],
-                        "possible_dispute_arguments": [],
-                        "confidence": 0.5,
-                    })
-                }
-            }]
-        })
+        return _fake_urlopen_success(
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "summary": "Safe analysis",
+                                    "supporting_evidence": ["has_tracking_number"],
+                                    "contradicting_evidence": [],
+                                    "missing_evidence": [],
+                                    "possible_dispute_arguments": [],
+                                    "confidence": 0.5,
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+        )
 
     monkeypatch.setenv("CHARGEBACK_AI_ANALYST_URL", "http://dummy")
     monkeypatch.setenv("CHARGEBACK_AI_ANALYST_API_KEY", "key")

@@ -5,8 +5,12 @@ test_scorer.py — real, runnable tests for scorer.py.
 import pandas as pd
 from sklearn.metrics import roc_auc_score
 
-from chargeback_risk_engine.scorer import predict_win_probability, raw_score
-from chargeback_risk_engine.config import RELEVANT_EVIDENCE_BY_REASON, ALL_EVIDENCE_FIELDS, REASON_CODES
+from chargeback_risk_engine.config import (
+    ALL_EVIDENCE_FIELDS,
+    REASON_CODES,
+    RELEVANT_EVIDENCE_BY_REASON,
+)
+from chargeback_risk_engine.scorer import predict_win_probability
 
 
 def test_irrelevant_evidence_does_not_affect_score():

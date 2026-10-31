@@ -1,4 +1,5 @@
 """Canonical result object returned by every decision entry point."""
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field

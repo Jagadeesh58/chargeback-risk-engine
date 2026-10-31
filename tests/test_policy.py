@@ -6,8 +6,8 @@ confidence can never override the monetary safety ceiling.
 
 import random
 
-from chargeback_risk_engine.policy import decide, MONETARY_CEILING, compute_expected_value
 from chargeback_risk_engine.evidence import assemble
+from chargeback_risk_engine.policy import MONETARY_CEILING, compute_expected_value, decide
 
 
 def test_ceiling_holds_even_at_maximum_confidence():
@@ -55,16 +55,33 @@ def test_below_ceiling_ambiguous_goes_to_human_review():
 def test_exactly_at_ceiling_is_still_eligible_for_auto_decisioning():
     """Boundary check: the rule is 'exceeds', so an amount exactly AT the
     ceiling should NOT be forced to HUMAN-REVIEW by the ceiling rule."""
-    packet = assemble({
-        "reason_code": "item_not_received",
-        "has_tracking_number": True,
-        "has_delivery_confirmation": True,
-        "has_signature_confirmation": True,
-    })
+    packet = assemble(
+        {
+            "reason_code": "item_not_received",
+            "has_tracking_number": True,
+            "has_delivery_confirmation": True,
+            "has_signature_confirmation": True,
+        }
+    )
     decision = decide(win_probability=0.95, amount=MONETARY_CEILING, evidence_packet=packet)
     from chargeback_risk_engine.engine.evidence_score import score_evidence
-    quality = score_evidence({"reason_code": "item_not_received", "has_tracking_number": True, "has_delivery_confirmation": True, "has_signature_confirmation": True}, packet)
-    decision = decide(win_probability=0.95, amount=MONETARY_CEILING, evidence_packet=packet, evidence_quality=quality, expected_net_value=1000)
+
+    quality = score_evidence(
+        {
+            "reason_code": "item_not_received",
+            "has_tracking_number": True,
+            "has_delivery_confirmation": True,
+            "has_signature_confirmation": True,
+        },
+        packet,
+    )
+    decision = decide(
+        win_probability=0.95,
+        amount=MONETARY_CEILING,
+        evidence_packet=packet,
+        evidence_quality=quality,
+        expected_net_value=1000,
+    )
     assert decision.action == "AUTO-CONTEST"
 
 
@@ -103,8 +120,15 @@ def test_majority_confirmed_evidence_allows_auto_contest():
     }
     packet = assemble(dispute)
     from chargeback_risk_engine.engine.evidence_score import score_evidence
+
     quality = score_evidence(dispute, packet)
-    decision = decide(win_probability=0.9, amount=2000, evidence_packet=packet, evidence_quality=quality, expected_net_value=500)
+    decision = decide(
+        win_probability=0.9,
+        amount=2000,
+        evidence_packet=packet,
+        evidence_quality=quality,
+        expected_net_value=500,
+    )
     assert decision.action == "AUTO-CONTEST"
 
 
@@ -135,19 +159,25 @@ def test_low_probability_large_dispute_with_positive_ev_routes_to_human_review()
 
 def test_monetary_bounds_and_policy_gates():
     """Verify behavior across monetary spectrum and ensure policy gates fire."""
-    packet = assemble({
-        "reason_code": "item_not_received",
-        "has_tracking_number": True,
-        "has_delivery_confirmation": True,
-        "has_signature_confirmation": True,
-    })
+    packet = assemble(
+        {
+            "reason_code": "item_not_received",
+            "has_tracking_number": True,
+            "has_delivery_confirmation": True,
+            "has_signature_confirmation": True,
+        }
+    )
     from chargeback_risk_engine.engine.evidence_score import score_evidence
-    quality = score_evidence({
-        "reason_code": "item_not_received",
-        "has_tracking_number": True,
-        "has_delivery_confirmation": True,
-        "has_signature_confirmation": True,
-    }, packet)
+
+    quality = score_evidence(
+        {
+            "reason_code": "item_not_received",
+            "has_tracking_number": True,
+            "has_delivery_confirmation": True,
+            "has_signature_confirmation": True,
+        },
+        packet,
+    )
 
     # 1. Retry contest count limit gate
     d_count = decide(0.9, 2000, evidence_packet=packet, evidence_quality=quality, contest_count=1)
@@ -155,12 +185,20 @@ def test_monetary_bounds_and_policy_gates():
     assert "retry/contest limit" in d_count.reason
 
     # 2. External service availability gate
-    d_ext = decide(0.9, 2000, evidence_packet=packet, evidence_quality=quality, external_service_available=False)
+    d_ext = decide(
+        0.9,
+        2000,
+        evidence_packet=packet,
+        evidence_quality=quality,
+        external_service_available=False,
+    )
     assert d_ext.action == "HUMAN-REVIEW"
     assert "Required external service is unavailable" in d_ext.reason
 
     # 3. Model confidence gate
-    d_conf = decide(0.9, 2000, evidence_packet=packet, evidence_quality=quality, model_confidence=0.4)
+    d_conf = decide(
+        0.9, 2000, evidence_packet=packet, evidence_quality=quality, model_confidence=0.4
+    )
     assert d_conf.action == "HUMAN-REVIEW"
     assert "below the minimum" in d_conf.reason
 

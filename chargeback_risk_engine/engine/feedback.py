@@ -1,4 +1,5 @@
 """Outcome feedback storage and analytics helpers."""
+
 from __future__ import annotations
 
 import json
@@ -77,7 +78,9 @@ def feedback_metrics(db_path: str) -> dict:
     """
     ensure_feedback_table(db_path)
     with sqlite3.connect(db_path) as conn:
-        rows = conn.execute("SELECT predicted_probability, action, final_chargeback_outcome, recovered_amount FROM outcomes").fetchall()
+        rows = conn.execute(
+            "SELECT predicted_probability, action, final_chargeback_outcome, recovered_amount FROM outcomes"
+        ).fetchall()
     labeled = [r for r in rows if r[2] is not None]
     if not labeled:
         return {"total_records": len(rows), "labeled_records": 0}
@@ -99,19 +102,35 @@ def feedback_metrics(db_path: str) -> dict:
     }
 
 
-def build_retraining_dataset(db_path: str, output_csv: str = "artifacts/retraining_feedback.csv") -> int:
+def build_retraining_dataset(
+    db_path: str, output_csv: str = "artifacts/retraining_feedback.csv"
+) -> int:
     """Export only confirmed-outcome feedback for future model validation.
     This never retrains a model automatically.
     """
     import csv
+
     ensure_feedback_table(db_path)
     with sqlite3.connect(db_path) as conn:
-        rows = conn.execute("SELECT dispute_id, predicted_probability, action, final_chargeback_outcome, recovered_amount, model_version, feature_version, recorded_at FROM outcomes WHERE final_chargeback_outcome IS NOT NULL").fetchall()
+        rows = conn.execute(
+            "SELECT dispute_id, predicted_probability, action, final_chargeback_outcome, recovered_amount, model_version, feature_version, recorded_at FROM outcomes WHERE final_chargeback_outcome IS NOT NULL"
+        ).fetchall()
     Path = __import__("pathlib").Path
     path = Path(output_csv)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["dispute_id", "predicted_probability", "action", "final_chargeback_outcome", "recovered_amount", "model_version", "feature_version", "recorded_at"])
+        writer.writerow(
+            [
+                "dispute_id",
+                "predicted_probability",
+                "action",
+                "final_chargeback_outcome",
+                "recovered_amount",
+                "model_version",
+                "feature_version",
+                "recorded_at",
+            ]
+        )
         writer.writerows(rows)
     return len(rows)

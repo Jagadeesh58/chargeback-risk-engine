@@ -33,14 +33,14 @@ import math
 import os
 from typing import Any
 
-from chargeback_risk_engine.paths import DATA_DIR, ARTIFACTS_DIR
+from chargeback_risk_engine.paths import ARTIFACTS_DIR, DATA_DIR
 
 logger = logging.getLogger("chargeback_risk_engine")
 
 CALIBRATION_POINTS_PATH = str(ARTIFACTS_DIR / "calibration_points.json")
 FIT_SOURCE = "live_model"
 
-_cached_points = None
+_cached_points: list[tuple[float, float]] | None = None
 _calibration_metadata = {
     "valid": True,
     "error": None,
@@ -84,7 +84,10 @@ def validate_calibration_points(points: Any) -> tuple[bool, str | None]:
         if x < last_x - 1e-9:
             return False, f"Item at index {idx} violates non-decreasing x: {x} < {last_x}."
         if y < last_y - 1e-9:
-            return False, f"Item at index {idx} violates monotonic non-decreasing y: {y} < {last_y}."
+            return (
+                False,
+                f"Item at index {idx} violates monotonic non-decreasing y: {y} < {last_y}.",
+            )
         last_x = float(x)
         last_y = float(y)
     return True, None
@@ -122,7 +125,7 @@ def _pava(pairs: list[tuple[float, float]]) -> list[tuple[float, float]]:
                 blocks[i][2],
                 blocks[i + 1][3],
             ]
-            blocks[i:i + 2] = [merged]
+            blocks[i : i + 2] = [merged]
             i = max(i - 1, 0)
         else:
             i += 1
@@ -180,13 +183,16 @@ def fit_calibration_points(dev_csv_path: str | None = None) -> list[tuple[float,
     return _pava(pairs)
 
 
-def save_calibration_points(points: list[tuple[float, float]], path: str = CALIBRATION_POINTS_PATH) -> None:
+def save_calibration_points(
+    points: list[tuple[float, float]], path: str = CALIBRATION_POINTS_PATH
+) -> None:
     with open(path, "w") as f:
         json.dump(points, f, indent=2)
 
 
-def load_or_fit_calibration_points(path: str = CALIBRATION_POINTS_PATH,
-                                     dev_csv_path: str | None = None) -> list[tuple[float, float]]:
+def load_or_fit_calibration_points(
+    path: str = CALIBRATION_POINTS_PATH, dev_csv_path: str | None = None
+) -> list[tuple[float, float]]:
     """Loads a saved fit if one exists; otherwise fits fresh from dev.csv
     and saves it, so a clean clone with no prior run still works with
     zero setup.
@@ -250,7 +256,9 @@ def load_or_fit_calibration_points(path: str = CALIBRATION_POINTS_PATH,
     return _cached_points
 
 
-def calibrated_win_probability(dispute: dict, points: list[tuple[float, float]] | None = None) -> float:
+def calibrated_win_probability(
+    dispute: dict, points: list[tuple[float, float]] | None = None
+) -> float:
     """Convenience wrapper: raw score -> calibrated probability, for a
     single dispute dict, using the cached/fitted calibration curve."""
     from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer
@@ -261,8 +269,9 @@ def calibrated_win_probability(dispute: dict, points: list[tuple[float, float]] 
     return apply_calibration(points, raw)
 
 
-def calibration_error(pairs: list[tuple[float, float]], points: list[tuple[float, float]] | None,
-                        n_bins: int = 5) -> float:
+def calibration_error(
+    pairs: list[tuple[float, float]], points: list[tuple[float, float]] | None, n_bins: int = 5
+) -> float:
     """Mean absolute difference between average predicted probability and
     actual observed win rate, across n_bins equal-width bins of the raw
     score -- the same shape of check as metrics.calibration_check(), but
@@ -270,7 +279,7 @@ def calibration_error(pairs: list[tuple[float, float]], points: list[tuple[float
     directly. Pass points=None to measure the raw, uncalibrated score."""
     if not pairs:
         return 0.0
-    bins = [[] for _ in range(n_bins)]
+    bins: list[list[tuple[float, Any]]] = [[] for _ in range(n_bins)]
     for raw, would_win in pairs:
         predicted = raw if points is None else apply_calibration(points, raw)
         idx = min(int(raw * n_bins), n_bins - 1)
@@ -289,5 +298,7 @@ def calibration_error(pairs: list[tuple[float, float]], points: list[tuple[float
 if __name__ == "__main__":
     points = fit_calibration_points(str(DATA_DIR / "dev.csv"))
     save_calibration_points(points)
-    print(f"Fitted {len(points)} calibration points from dev.csv, saved to {CALIBRATION_POINTS_PATH}")
+    print(
+        f"Fitted {len(points)} calibration points from dev.csv, saved to {CALIBRATION_POINTS_PATH}"
+    )
     print(points)

@@ -1,4 +1,5 @@
 """Canonical expected-value calculation for chargeback intervention."""
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass

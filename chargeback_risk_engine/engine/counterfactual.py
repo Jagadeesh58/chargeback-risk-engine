@@ -1,4 +1,5 @@
 """Bounded, read-only counterfactual decision analysis."""
+
 from __future__ import annotations
 
 import copy
@@ -27,6 +28,7 @@ def _candidate_inputs(dispute: dict, limit: int = 10):
 
 # Counterfactual cases are read-only simulations.
 # Candidate disputes must never be persisted or treated as real disputes.
+
 
 def find_single_change_decision_reversal(
     dispute: dict,
@@ -60,11 +62,13 @@ def find_single_change_decision_reversal(
         db_path = str(Path(tmp) / "counterfactual.db")
         for field, old_value, new_value in _candidate_inputs(dispute, limit=limit):
             candidate = dict(dispute)
-            candidate["dispute_id"] = f"CF_{dispute.get('dispute_id', 'CASE')}_{field}_{new_value!r}"[:120]
+            candidate["dispute_id"] = (
+                f"CF_{dispute.get('dispute_id', 'CASE')}_{field}_{new_value!r}"[:120]
+            )
             candidate[field] = new_value
             candidate_graph = (
                 base_graph.clone()
-                if hasattr(base_graph, "clone")
+                if (base_graph is not None and hasattr(base_graph, "clone"))
                 else copy.deepcopy(base_graph)
                 if base_graph is not None
                 else None
@@ -85,10 +89,13 @@ def find_single_change_decision_reversal(
                     "changed_field": field,
                     "from_value": old_value,
                     "to_value": new_value,
-                    "risk_change": float(result["win_probability"]) - float(current_result["win_probability"]),
+                    "risk_change": float(result["win_probability"])
+                    - float(current_result["win_probability"]),
                     "statement": f"Decision changes from {original_action} to {result['action']} when {field} changes from {old_value!r} to {new_value!r}.",
                 }
-            if delta > 0 and (best_risk_change is None or delta < best_risk_change["risk_delta_abs"]):
+            if delta > 0 and (
+                best_risk_change is None or delta < best_risk_change["risk_delta_abs"]
+            ):
                 best_risk_change = {
                     "field": field,
                     "from_value": old_value,

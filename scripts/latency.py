@@ -1,12 +1,12 @@
 """Local end-to-end latency benchmark for the canonical decision path across database scales."""
+
 from __future__ import annotations
 
 import json
-import statistics
+import sys
 import tempfile
 import time
 from pathlib import Path
-import sys
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
@@ -32,13 +32,41 @@ def _populate_scale(db_path: str, count: int) -> None:
         g_data = {"customer_id": cust, "ip_address": ip, "device_id": dev, "card_fingerprint": card}
         g_json = json.dumps(g_data)
         amt = 2500.0
-        decisions.append((d_id, "item_not_received", amt, 0.75, "AUTO-CONTEST", "prepopulated", 1500.0, "[]", now, "rules-v1", "features-v1", "policy-v1", g_json, "{}", "", None, "", "", ""))
+        decisions.append(
+            (
+                d_id,
+                "item_not_received",
+                amt,
+                0.75,
+                "AUTO-CONTEST",
+                "prepopulated",
+                1500.0,
+                "[]",
+                now,
+                "rules-v1",
+                "features-v1",
+                "policy-v1",
+                g_json,
+                "{}",
+                "",
+                None,
+                "",
+                "",
+                "",
+            )
+        )
         entities.append((d_id, "customer_id", cust, amt))
         entities.append((d_id, "ip_address", ip, amt))
         entities.append((d_id, "device_id", dev, amt))
         entities.append((d_id, "card_fingerprint", card, amt))
-    conn.executemany("INSERT INTO decisions (dispute_id, reason_code, amount, win_probability, action, reason, expected_value, evidence_json, created_at, model_version, feature_version, policy_version, graph_data_json, ai_metadata_json, request_id, routing_score, prev_hash, record_hash, payload_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", decisions)
-    conn.executemany("INSERT INTO graph_entities (dispute_id, entity_type, entity_value, amount) VALUES (?, ?, ?, ?)", entities)
+    conn.executemany(
+        "INSERT INTO decisions (dispute_id, reason_code, amount, win_probability, action, reason, expected_value, evidence_json, created_at, model_version, feature_version, policy_version, graph_data_json, ai_metadata_json, request_id, routing_score, prev_hash, record_hash, payload_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        decisions,
+    )
+    conn.executemany(
+        "INSERT INTO graph_entities (dispute_id, entity_type, entity_value, amount) VALUES (?, ?, ?, ?)",
+        entities,
+    )
     conn.commit()
     conn.close()
 
@@ -58,14 +86,25 @@ def benchmark_scale(db_path: str, scale_name: str, runs: int = 100) -> dict:
         "has_signature_confirmation": True,
     }
     # Warmup
-    decide_case({**case, "dispute_id": f"warmup_{scale_name}"}, db_path=db_path, include_counterfactual=False)
+    decide_case(
+        {**case, "dispute_id": f"warmup_{scale_name}"},
+        db_path=db_path,
+        include_counterfactual=False,
+    )
     samples = []
     for i in range(runs):
         start = time.perf_counter_ns()
-        decide_case({**case, "dispute_id": f"LAT_{scale_name}_{i}"}, db_path=db_path, include_counterfactual=False)
+        decide_case(
+            {**case, "dispute_id": f"LAT_{scale_name}_{i}"},
+            db_path=db_path,
+            include_counterfactual=False,
+        )
         samples.append((time.perf_counter_ns() - start) / 1_000_000)
     samples.sort()
-    pct = lambda p: round(samples[min(len(samples) - 1, max(0, int((p / 100) * len(samples)) - 1))], 2)
+
+    def pct(p: float) -> float:
+        return round(samples[min(len(samples) - 1, max(0, int((p / 100) * len(samples)) - 1))], 2)
+
     return {
         "scale": scale_name,
         "runs": runs,
@@ -93,7 +132,10 @@ def main():
                 _populate_scale(db, count)
             res = benchmark_scale(db, name, runs=runs)
             results.append(res)
-            print(f"[{name}] (n={runs}): p50={res['p50_ms']}ms, p95={res['p95_ms']}ms, p99={res['p99_ms']}ms", flush=True)
+            print(
+                f"[{name}] (n={runs}): p50={res['p50_ms']}ms, p95={res['p95_ms']}ms, p99={res['p99_ms']}ms",
+                flush=True,
+            )
 
     res_10k = next((r for r in results if r["scale"] == "10k_rows"), results[-1])
     print("\nSummary Result:", flush=True)

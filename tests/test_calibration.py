@@ -8,7 +8,6 @@ the code runs without crashing.
 import csv
 
 from chargeback_risk_engine.calibration import (
-    FIT_SOURCE,
     _pava,
     apply_calibration,
     calibrated_win_probability,
@@ -83,14 +82,14 @@ def test_calibration_reduces_error_on_dev_set():
     calibrated_err = calibration_error(dev_pairs, points=points)
 
     assert calibrated_err < raw_error, (
-        f"calibration should reduce error: raw={raw_error:.4f}, "
-        f"calibrated={calibrated_err:.4f}"
+        f"calibration should reduce error: raw={raw_error:.4f}, calibrated={calibrated_err:.4f}"
     )
 
 
 def test_calibrated_brier_on_test_set_matches_or_beats_raw_and_fit_source_is_live_model():
     """Assert calibrated Brier on test.csv <= raw Brier + 0.001, and fit source is live model."""
     from sklearn.metrics import brier_score_loss
+
     import chargeback_risk_engine.calibration as calibration
 
     assert getattr(calibration, "FIT_SOURCE", None) == "live_model"
@@ -123,6 +122,7 @@ def test_calibrated_win_probability_matches_manual_application():
 
 def test_load_or_fit_calibration_points_caches_in_memory():
     import chargeback_risk_engine.calibration as calibration
+
     calibration._cached_points = None
     first = load_or_fit_calibration_points()
     second = load_or_fit_calibration_points()

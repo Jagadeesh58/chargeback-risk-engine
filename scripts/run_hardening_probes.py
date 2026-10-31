@@ -1,16 +1,17 @@
 """Run and report verification probes for system hardening."""
+
 import concurrent.futures
-import hashlib
 import json
 import os
 import tempfile
+
 from fastapi.testclient import TestClient
 
 from chargeback_risk_engine.api import app
-from chargeback_risk_engine.audit_log import verify_audit_integrity, PayloadConflictError
+from chargeback_risk_engine.audit_log import verify_audit_integrity
 from chargeback_risk_engine.engine.hybrid_pipeline import decide_case
-from chargeback_risk_engine.engine.risk_graph import RiskGraph, GRAPH_ESCALATION_THRESHOLD
-from chargeback_risk_engine.ml_scorer import save_ml_scorer, load_or_fit_ml_scorer
+from chargeback_risk_engine.engine.risk_graph import GRAPH_ESCALATION_THRESHOLD, RiskGraph
+from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer, save_ml_scorer
 
 
 def run_probe_1():
@@ -35,7 +36,9 @@ def run_probe_1():
 
         integrity = verify_audit_integrity(db_path)
         print(f"Total concurrent decisions completed: {len(results)}")
-        print(f"Audit log integrity check: valid={integrity['valid']}, checked={integrity['checked']}, head_hash={integrity.get('head_hash', '')[:16]}...")
+        print(
+            f"Audit log integrity check: valid={integrity['valid']}, checked={integrity['checked']}, head_hash={integrity.get('head_hash', '')[:16]}..."
+        )
         assert len(results) == 24
         assert integrity["valid"] is True
         assert integrity["checked"] == 24
@@ -82,7 +85,7 @@ def run_probe_3():
     print("=== PROBE 3: Mutated Replay Dispute ID Conflict Handling ===")
     os.environ["CHARGEBACK_ENV"] = "development"
     client = TestClient(app)
-    
+
     payload_a = {
         "dispute_id": "REPLAY_CONFLICT_001",
         "payment_id": "pay_001",
@@ -113,9 +116,9 @@ def run_probe_4():
             "dispute_id": "FAIL_FIELD_001",
             "reason_code": "item_not_received",
             "amount": 3000.0,
-            "has_tracking_number": True,       # PASS
-            "has_delivery_confirmation": True, # PASS
-            "has_signature_confirmation": False # FAIL
+            "has_tracking_number": True,  # PASS
+            "has_delivery_confirmation": True,  # PASS
+            "has_signature_confirmation": False,  # FAIL
         }
         res = decide_case(dispute, db_path=db_path, include_counterfactual=False)
         print(f"Action: {res['action']}")
@@ -131,24 +134,30 @@ def run_probe_5():
     graph = RiskGraph()
     # 10 unrelated customers sharing only an IP address (e.g. coffee shop or corporate proxy)
     for i in range(10):
-        graph.add({
-            "dispute_id": f"DISP_IP_{i:02d}",
-            "customer_id": f"cust_ip_{i}",
+        graph.add(
+            {
+                "dispute_id": f"DISP_IP_{i:02d}",
+                "customer_id": f"cust_ip_{i}",
+                "ip_address": "192.0.2.1",
+                "card_fingerprint": f"card_{i}",
+                "device_id": f"device_{i}",
+            }
+        )
+    analysis = graph.analyze(
+        {
+            "dispute_id": "DISP_IP_99",
+            "customer_id": "cust_ip_99",
             "ip_address": "192.0.2.1",
-            "card_fingerprint": f"card_{i}",
-            "device_id": f"device_{i}",
-        })
-    analysis = graph.analyze({
-        "dispute_id": "DISP_IP_99",
-        "customer_id": "cust_ip_99",
-        "ip_address": "192.0.2.1",
-        "card_fingerprint": "card_99",
-        "device_id": "device_99",
-    })
+            "card_fingerprint": "card_99",
+            "device_id": "device_99",
+        }
+    )
     score = analysis.risk_score
     size = analysis.cluster_size
     print(f"Cluster size on shared IP: {size}")
-    print(f"Risk score on shared IP: {score:.3f} (Escalation threshold is {GRAPH_ESCALATION_THRESHOLD})")
+    print(
+        f"Risk score on shared IP: {score:.3f} (Escalation threshold is {GRAPH_ESCALATION_THRESHOLD})"
+    )
     assert score < GRAPH_ESCALATION_THRESHOLD
     print("PROBE 5 RESULT: PASS\n")
 
@@ -163,6 +172,7 @@ def run_probe_6():
             del os.environ["CHARGEBACK_API_KEY"]
 
         from chargeback_risk_engine.api import _validate_startup_config
+
         threw = False
         try:
             _validate_startup_config()
@@ -187,7 +197,7 @@ def run_probe_7():
     with tempfile.TemporaryDirectory() as tmp:
         model_path = os.path.join(tmp, "probe7_model.json")
         save_ml_scorer(path=model_path, train_csv="data/train.csv")
-        
+
         # Tamper with the model file bytes
         with open(model_path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -197,6 +207,7 @@ def run_probe_7():
             f.write(json.dumps(data).encode("utf-8"))
 
         import chargeback_risk_engine.ml_scorer as ml_module
+
         ml_module._cached_scorer = None
         threw = False
         try:

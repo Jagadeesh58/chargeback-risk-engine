@@ -5,6 +5,7 @@ threshold grid on ``dev.csv`` and writes the frozen policy profile consumed by
 benchmark/report tooling. The production decision function remains
 fully deterministic and the model never receives authority over the action.
 """
+
 from __future__ import annotations
 
 import json
@@ -21,7 +22,6 @@ from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer
 from chargeback_risk_engine.paths import ARTIFACTS_DIR, DATA_DIR
 from chargeback_risk_engine.policy import (
     ACCEPT_LOSS_THRESHOLD,
-    AUTO_CONTEST_THRESHOLD,
     CONTEST_COST,
     MIN_EVIDENCE_COMPLETENESS,
 )
@@ -93,16 +93,19 @@ def optimize_policy(
     max_auto_rate: float = 0.40,
 ) -> tuple[PolicyProfile, list[dict]]:
     dev = dev if dev is not None else pd.read_csv(DATA_DIR / "dev.csv")
-    thresholds = thresholds or [round(x, 3) for x in np.arange(0.55, 0.831, 0.005)]
+    thresholds = thresholds or [float(round(x, 3)) for x in np.arange(0.55, 0.831, 0.005)]
     probabilities = _model_probabilities(dev)
     candidates = [evaluate_threshold(dev, probabilities, t) for t in thresholds]
     feasible = [
-        c for c in candidates
+        c
+        for c in candidates
         if c["precision"] >= min_precision and c["auto_contest_rate"] <= max_auto_rate
     ]
     if not feasible:
         feasible = candidates
-    best = max(feasible, key=lambda c: (c["expected_net_value"], c["precision"], -c["auto_contest_rate"]))
+    best = max(
+        feasible, key=lambda c: (c["expected_net_value"], c["precision"], -c["auto_contest_rate"])
+    )
     profile = PolicyProfile(
         policy_version="policy-v5-dev-optimized",
         auto_contest_threshold=best["threshold"],
@@ -125,4 +128,14 @@ def save_policy_profile(profile: PolicyProfile, path: str | Path = POLICY_PROFIL
 if __name__ == "__main__":
     p, candidates = optimize_policy()
     save_policy_profile(p)
-    print(json.dumps({"selected": p.to_dict(), "top_candidates": sorted(candidates, key=lambda x: x["expected_net_value"], reverse=True)[:10]}, indent=2))
+    print(
+        json.dumps(
+            {
+                "selected": p.to_dict(),
+                "top_candidates": sorted(
+                    candidates, key=lambda x: x["expected_net_value"], reverse=True
+                )[:10],
+            },
+            indent=2,
+        )
+    )

@@ -24,7 +24,6 @@ os.environ.setdefault("CHARGEBACK_ENV", "development")
 
 import pandas as pd
 
-from chargeback_risk_engine.config import REASON_CODES
 from chargeback_risk_engine.engine.hybrid_pipeline import decide_case
 from chargeback_risk_engine.engine.risk_graph import RiskGraph
 from chargeback_risk_engine.policy import CONTEST_COST
@@ -46,7 +45,9 @@ def evaluate_dataset(
     required_cols = {"dispute_id", "reason_code", "amount"}
     missing = required_cols - set(df.columns)
     if missing:
-        raise ValueError(f"CSV missing mandatory columns: {missing}. Required: {sorted(required_cols)}")
+        raise ValueError(
+            f"CSV missing mandatory columns: {missing}. Required: {sorted(required_cols)}"
+        )
 
     # Ground-truth outcome detection
     has_ground_truth = False
@@ -167,10 +168,14 @@ def evaluate_dataset(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Evaluate external chargeback dataset with Chargeback Risk Engine")
+    parser = argparse.ArgumentParser(
+        description="Evaluate external chargeback dataset with Chargeback Risk Engine"
+    )
     parser.add_argument("--csv", type=str, required=True, help="Path to CSV dispute file")
     parser.add_argument("--out", type=str, default="", help="Optional JSON output destination")
-    parser.add_argument("--penalty", type=float, default=4150.0, help="Assumed penalty per lost contest (INR)")
+    parser.add_argument(
+        "--penalty", type=float, default=4150.0, help="Assumed penalty per lost contest (INR)"
+    )
     args = parser.parse_args()
 
     results = evaluate_dataset(args.csv, loss_penalty_inr=args.penalty)
@@ -178,20 +183,28 @@ def main() -> None:
     print("\n================ DATASET EVALUATION REPORT ================")
     print(f"Dataset:            {results['dataset_path']}")
     print(f"Total Disputes:     {results['total_disputes']}")
-    print(f"Total Volume:       ₹{results['total_disputed_amount_inr']:,.2f} ({results['total_disputed_amount_lakh']} lakh)")
+    print(
+        f"Total Volume:       ₹{results['total_disputed_amount_inr']:,.2f} ({results['total_disputed_amount_lakh']} lakh)"
+    )
     print("\nOperational Routing:")
     for action, stats in results["operational_distribution"].items():
-        print(f"  {action:<15}: {stats['count']:>4} ({stats['share']*100:>5.1f}%) | ₹{stats['amount_inr']:>12,.2f}")
+        print(
+            f"  {action:<15}: {stats['count']:>4} ({stats['share'] * 100:>5.1f}%) | ₹{stats['amount_inr']:>12,.2f}"
+        )
 
     gt = results["ground_truth_evaluation"]
     if "notice" in gt:
         print(f"\nGround Truth:       Not Provided ({gt['notice']})")
     else:
         print("\nGround Truth Performance:")
-        print(f"  Auto Precision:   {gt['auto_contest_precision']*100:.1f}%")
-        print(f"  Auto Recall:      {gt['auto_contest_recall']*100:.1f}%")
-        print(f"  Net Value (p=0):  ₹{gt['realized_net_value_p0_inr']:,.2f} ({gt['realized_net_value_p0_lakh']} lakh)")
-        print(f"  Net Value (base): ₹{gt['realized_net_value_base_p_inr']:,.2f} ({gt['realized_net_value_base_p_lakh']} lakh)")
+        print(f"  Auto Precision:   {gt['auto_contest_precision'] * 100:.1f}%")
+        print(f"  Auto Recall:      {gt['auto_contest_recall'] * 100:.1f}%")
+        print(
+            f"  Net Value (p=0):  ₹{gt['realized_net_value_p0_inr']:,.2f} ({gt['realized_net_value_p0_lakh']} lakh)"
+        )
+        print(
+            f"  Net Value (base): ₹{gt['realized_net_value_base_p_inr']:,.2f} ({gt['realized_net_value_base_p_lakh']} lakh)"
+        )
     print("===========================================================\n")
 
     if args.out:

@@ -4,14 +4,11 @@ from __future__ import annotations
 
 import concurrent.futures
 from pathlib import Path
-import pytest
 
 from chargeback_risk_engine.audit_log import (
     AuditStore,
-    AuditVerificationResult,
     LoggedDecision,
     SQLiteAuditStore,
-    export_head_anchor,
 )
 
 

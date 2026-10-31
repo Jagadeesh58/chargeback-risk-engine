@@ -9,8 +9,8 @@ import pytest
 from chargeback_risk_engine.gateway_adapter import (
     build_contest_payload,
     fetch_dispute,
-    generate_contest_draft,
     gateway_dispute_to_internal_dict,
+    generate_contest_draft,
 )
 
 
@@ -62,6 +62,7 @@ def test_generate_contest_draft_has_no_way_to_request_submit():
     doesn't expose an `action` parameter at all, so it's impossible for
     a caller to accidentally produce a "submit" payload through it."""
     import inspect
+
     sig = inspect.signature(generate_contest_draft)
     assert "action" not in sig.parameters
 

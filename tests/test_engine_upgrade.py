@@ -1,15 +1,18 @@
-import os
-
-from chargeback_risk_engine.evidence import assemble
-from chargeback_risk_engine.policy import decide, MONETARY_CEILING
 from chargeback_risk_engine.engine.economic_decision import calculate_economic_value
 from chargeback_risk_engine.engine.evidence_score import score_evidence
-from chargeback_risk_engine.engine.risk_graph import RiskGraph
 from chargeback_risk_engine.engine.feedback import record_outcome
+from chargeback_risk_engine.engine.risk_graph import RiskGraph
+from chargeback_risk_engine.evidence import assemble
+from chargeback_risk_engine.policy import MONETARY_CEILING, decide
 
 
 def test_evidence_score_treats_missing_as_low_confidence():
-    dispute = {"reason_code": "item_not_received", "has_tracking_number": True, "has_delivery_confirmation": None, "has_signature_confirmation": None}
+    dispute = {
+        "reason_code": "item_not_received",
+        "has_tracking_number": True,
+        "has_delivery_confirmation": None,
+        "has_signature_confirmation": None,
+    }
     packet = assemble(dispute)
     scored = score_evidence(dispute, packet)
     assert scored.completeness == 1 / 3
@@ -107,18 +110,59 @@ def test_risk_graph_nat_hub_cap_does_not_escalate_to_organized_abuse():
 
 
 def test_load_graph_rows_subgraph_2_hops(tmp_path):
-    from chargeback_risk_engine.audit_log import log_new_decision, load_graph_rows
+    from chargeback_risk_engine.audit_log import load_graph_rows, log_new_decision
+
     db = str(tmp_path / "subgraph_test.db")
-    log_new_decision("D1", "item_not_received", 1000.0, 0.8, "AUTO-CONTEST", "test", 800.0, [], db_path=db,
-                     graph_data={"customer_id": "c1", "ip_address": "1.1.1.1"})
-    log_new_decision("D2", "item_not_received", 1000.0, 0.8, "AUTO-CONTEST", "test", 800.0, [], db_path=db,
-                     graph_data={"customer_id": "c2", "ip_address": "1.1.1.1", "device_id": "dev_shared"})
-    log_new_decision("D3", "item_not_received", 1000.0, 0.8, "AUTO-CONTEST", "test", 800.0, [], db_path=db,
-                     graph_data={"customer_id": "c3", "device_id": "dev_shared"})
+    log_new_decision(
+        "D1",
+        "item_not_received",
+        1000.0,
+        0.8,
+        "AUTO-CONTEST",
+        "test",
+        800.0,
+        [],
+        db_path=db,
+        graph_data={"customer_id": "c1", "ip_address": "1.1.1.1"},
+    )
+    log_new_decision(
+        "D2",
+        "item_not_received",
+        1000.0,
+        0.8,
+        "AUTO-CONTEST",
+        "test",
+        800.0,
+        [],
+        db_path=db,
+        graph_data={"customer_id": "c2", "ip_address": "1.1.1.1", "device_id": "dev_shared"},
+    )
+    log_new_decision(
+        "D3",
+        "item_not_received",
+        1000.0,
+        0.8,
+        "AUTO-CONTEST",
+        "test",
+        800.0,
+        [],
+        db_path=db,
+        graph_data={"customer_id": "c3", "device_id": "dev_shared"},
+    )
     for i in range(20):
-        log_new_decision(f"UNRELATED_{i}", "item_not_received", 500.0, 0.5, "HUMAN-REVIEW", "test", 0.0, [], db_path=db,
-                         graph_data={"customer_id": f"unrel_{i}", "ip_address": f"10.0.0.{i}"})
-    
+        log_new_decision(
+            f"UNRELATED_{i}",
+            "item_not_received",
+            500.0,
+            0.5,
+            "HUMAN-REVIEW",
+            "test",
+            0.0,
+            [],
+            db_path=db,
+            graph_data={"customer_id": f"unrel_{i}", "ip_address": f"10.0.0.{i}"},
+        )
+
     subgraph = load_graph_rows(db, dispute={"customer_id": "c1"})
     found_ids = {r["dispute_id"] for r in subgraph}
     assert "D1" in found_ids

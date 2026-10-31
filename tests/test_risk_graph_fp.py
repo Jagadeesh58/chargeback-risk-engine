@@ -1,13 +1,13 @@
 """Tests for graph false-positive controls, entity weighting, and cluster boundaries."""
-import pytest
+
 from chargeback_risk_engine.engine.risk_graph import (
-    RiskGraph,
-    WEIGHT_STRONG_IDENTIFIER,
-    WEIGHT_IP_ADDRESS,
+    GRAPH_ESCALATION_THRESHOLD,
     MAX_BFS_HOPS,
     MAX_EVALUATED_CLUSTER_NODES,
-    GRAPH_ESCALATION_THRESHOLD,
     STRONG_IDENTIFIERS,
+    WEIGHT_IP_ADDRESS,
+    WEIGHT_STRONG_IDENTIFIER,
+    RiskGraph,
 )
 
 
@@ -152,9 +152,24 @@ def test_bfs_depth_is_capped_at_max_hops():
     """A long chain of strong identifiers A->B->C->D is capped at 2 hops from the query dispute."""
     rows = [
         {"dispute_id": "D_HOP_0", "customer_id": "cust_0", "device_id": "dev_0_1"},
-        {"dispute_id": "D_HOP_1", "customer_id": "cust_1", "device_id": "dev_0_1", "card_fingerprint": "card_1_2"},
-        {"dispute_id": "D_HOP_2", "customer_id": "cust_2", "card_fingerprint": "card_1_2", "device_id": "dev_2_3"},
-        {"dispute_id": "D_HOP_3", "customer_id": "cust_3", "device_id": "dev_2_3", "card_fingerprint": "card_3_4"},
+        {
+            "dispute_id": "D_HOP_1",
+            "customer_id": "cust_1",
+            "device_id": "dev_0_1",
+            "card_fingerprint": "card_1_2",
+        },
+        {
+            "dispute_id": "D_HOP_2",
+            "customer_id": "cust_2",
+            "card_fingerprint": "card_1_2",
+            "device_id": "dev_2_3",
+        },
+        {
+            "dispute_id": "D_HOP_3",
+            "customer_id": "cust_3",
+            "device_id": "dev_2_3",
+            "card_fingerprint": "card_3_4",
+        },
         {"dispute_id": "D_HOP_4", "customer_id": "cust_4", "card_fingerprint": "card_3_4"},
     ]
     graph = RiskGraph(rows, max_bfs_hops=2)

@@ -8,10 +8,25 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+
+__all__ = [
+    "AUDIT_WRITES_TOTAL",
+    "CONTENT_TYPE_LATEST",
+    "DECISIONS_TOTAL",
+    "DECISION_DURATION_SECONDS",
+    "EVIDENCE_SCORES",
+    "JSONLogFormatter",
+    "RATE_LIMIT_EXCEEDED_TOTAL",
+    "configure_logging",
+    "current_request_id",
+    "generate_latest",
+]
 
 # Context variable for correlating logs with incoming HTTP request IDs
-current_request_id: contextvars.ContextVar[str] = contextvars.ContextVar("current_request_id", default="")
+current_request_id: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "current_request_id", default=""
+)
 
 # Prometheus metrics
 DECISIONS_TOTAL = Counter(

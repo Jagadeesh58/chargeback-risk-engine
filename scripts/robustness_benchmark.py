@@ -2,23 +2,29 @@
 
 label noise, and covariate shifts against the synthetic ground truth.
 """
+
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
+
 import numpy as np
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from chargeback_risk_engine.config import ALL_EVIDENCE_FIELDS, REASON_CODES, RELEVANT_EVIDENCE_BY_REASON
-from chargeback_risk_engine.evidence import assemble
+from chargeback_risk_engine.config import (
+    ALL_EVIDENCE_FIELDS,
+    REASON_CODES,
+    RELEVANT_EVIDENCE_BY_REASON,
+)
 from chargeback_risk_engine.engine.evidence_score import score_evidence
+from chargeback_risk_engine.evidence import assemble
 from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer
 from chargeback_risk_engine.paths import ARTIFACTS_DIR
-from chargeback_risk_engine.policy import AUTO_CONTEST, HUMAN_REVIEW, ACCEPT_LOSS, decide
+from chargeback_risk_engine.policy import ACCEPT_LOSS, AUTO_CONTEST, HUMAN_REVIEW, decide
 from chargeback_risk_engine.policy_profile import decision_score, load_policy_profile
 
 OUTPUT_PATH = ARTIFACTS_DIR / "robustness_report.json"
@@ -63,7 +69,11 @@ def generate_scenario_cases(
         # Generate evidence
         for field in ALL_EVIDENCE_FIELDS:
             if field in relevant_fields:
-                p_true = relevant_field_rate_if_legit if hidden_legit else relevant_field_rate_if_not_legit
+                p_true = (
+                    relevant_field_rate_if_legit
+                    if hidden_legit
+                    else relevant_field_rate_if_not_legit
+                )
                 val = bool(rng.random() < p_true)
                 if rng.random() < contradiction_rate:
                     val = not val
@@ -193,4 +203,6 @@ if __name__ == "__main__":
     report = run_robustness_benchmark()
     print(f"Robustness benchmark saved to {OUTPUT_PATH}")
     for name, metrics in report["scenarios"].items():
-        print(f"  {name:30s} -> precision={metrics['precision']:.4f}, recall={metrics['recall']:.4f}, auto_rate={metrics['auto_contest_rate']:.4f}")
+        print(
+            f"  {name:30s} -> precision={metrics['precision']:.4f}, recall={metrics['recall']:.4f}, auto_rate={metrics['auto_contest_rate']:.4f}"
+        )

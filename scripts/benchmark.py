@@ -1,11 +1,12 @@
 """Fair held-out comparison of risk strategies and realized economics."""
+
 from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
-import tempfile
 import sys
+import tempfile
+from pathlib import Path
 
 # Historical evaluation benchmark evaluates held-out synthetic test set
 os.environ.setdefault("CHARGEBACK_ENV", "development")
@@ -17,16 +18,15 @@ if str(_ROOT) not in sys.path:
 
 import pandas as pd
 
-from chargeback_risk_engine.baseline import run_naive_baseline
 from chargeback_risk_engine.engine.economic_decision import calculate_economic_value
-from chargeback_risk_engine.engine.hybrid_pipeline import decide_case
 from chargeback_risk_engine.engine.evidence_score import score_evidence
+from chargeback_risk_engine.engine.hybrid_pipeline import decide_case
+from chargeback_risk_engine.engine.risk_graph import RiskGraph
 from chargeback_risk_engine.evidence import assemble
 from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer
 from chargeback_risk_engine.paths import ARTIFACTS_DIR, DATA_DIR
 from chargeback_risk_engine.policy import decide
 from chargeback_risk_engine.policy_profile import load_policy_profile
-from chargeback_risk_engine.engine.risk_graph import RiskGraph
 from chargeback_risk_engine.scorer import predict_win_probability
 
 BASELINE_PATH = ARTIFACTS_DIR / "baseline_benchmark.json"
@@ -98,7 +98,8 @@ def evaluate() -> dict:
     always_accept = ["ACCEPT-LOSS"] * len(test)
     rules_actions, logistic_actions = [], []
     for row, p in zip(rows, rule_probs):
-        packet = assemble(row); quality = score_evidence(row, packet)
+        packet = assemble(row)
+        quality = score_evidence(row, packet)
         econ = calculate_economic_value(row["amount"], p)
         rules_actions.append(
             decide(
@@ -114,7 +115,8 @@ def evaluate() -> dict:
             ).action
         )
     for row, p in zip(rows, logistic_probs):
-        packet = assemble(row); quality = score_evidence(row, packet)
+        packet = assemble(row)
+        quality = score_evidence(row, packet)
         econ = calculate_economic_value(row["amount"], p)
         logistic_actions.append(
             decide(
@@ -148,28 +150,43 @@ def evaluate() -> dict:
     candidate_actions = [r["action"] for r in candidate_results]
 
     strategies = [
-        _strategy_metrics("ALWAYS-CONTEST", test, always_contest, [None] * len(test), outcome_prior),
+        _strategy_metrics(
+            "ALWAYS-CONTEST", test, always_contest, [None] * len(test), outcome_prior
+        ),
         _strategy_metrics("ALWAYS-ACCEPT", test, always_accept, [None] * len(test), outcome_prior),
         _strategy_metrics("RULES-ONLY", test, rules_actions, rule_probs, outcome_prior),
         _strategy_metrics("LOGISTIC-ONLY", test, logistic_actions, logistic_probs, outcome_prior),
-        *([ {**baseline, "strategy": "FROZEN-PRE-CHANGE"} ] if baseline is not None else []),
-        _strategy_metrics("CHARGEBACK-RISK-ENGINE", test, candidate_actions, logistic_probs, outcome_prior),
+        *([{**baseline, "strategy": "FROZEN-PRE-CHANGE"}] if baseline is not None else []),
+        _strategy_metrics(
+            "CHARGEBACK-RISK-ENGINE", test, candidate_actions, logistic_probs, outcome_prior
+        ),
     ]
 
     case_results = []
     for i, row in enumerate(rows):
         result = candidate_results[i]
-        case_results.append({
-            "dispute_id": row["dispute_id"], "reason_code": row["reason_code"], "amount": float(row["amount"]),
-            "would_win": bool(row["would_win"]), "p_win": float(logistic_probs[i]), "action": result["action"],
-            "expected_net_value": float(result["economic_decision"]["expected_net_value"]),
-            "expected_recovery": float(result["economic_decision"]["expected_recovery"]),
-            "pass_count": int(sum(item["status"] == "PASS" for item in result["evidence"])),
-            "evidence_total": int(len(result["evidence"])),
-        })
+        case_results.append(
+            {
+                "dispute_id": row["dispute_id"],
+                "reason_code": row["reason_code"],
+                "amount": float(row["amount"]),
+                "would_win": bool(row["would_win"]),
+                "p_win": float(logistic_probs[i]),
+                "action": result["action"],
+                "expected_net_value": float(result["economic_decision"]["expected_net_value"]),
+                "expected_recovery": float(result["economic_decision"]["expected_recovery"]),
+                "pass_count": int(sum(item["status"] == "PASS" for item in result["evidence"])),
+                "evidence_total": int(len(result["evidence"])),
+            }
+        )
 
     result = {
-        "dataset": {"test_rows": len(test), "synthetic": True, "train_rows": len(train), "outcome_prior_from_train": outcome_prior},
+        "dataset": {
+            "test_rows": len(test),
+            "synthetic": True,
+            "train_rows": len(train),
+            "outcome_prior_from_train": outcome_prior,
+        },
         "strategies": strategies,
         "case_results": case_results,
         "notes": {

@@ -6,11 +6,13 @@ supposed to guarantee -- not just prose in a design note.
 
 import random
 
-import pytest
-
-from chargeback_risk_engine.config import ALL_EVIDENCE_FIELDS, RELEVANT_EVIDENCE_BY_REASON, REASON_CODES
-from scripts.generate_data import generate_dataset, CSV_COLUMNS
-from chargeback_risk_engine.synthetic_ground_truth import generate_one, MISSINGNESS_RATE
+from chargeback_risk_engine.config import (
+    ALL_EVIDENCE_FIELDS,
+    REASON_CODES,
+    RELEVANT_EVIDENCE_BY_REASON,
+)
+from chargeback_risk_engine.synthetic_ground_truth import MISSINGNESS_RATE, generate_one
+from scripts.generate_data import CSV_COLUMNS, generate_dataset
 
 
 def test_would_win_rate_is_sane():

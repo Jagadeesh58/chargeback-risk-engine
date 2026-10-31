@@ -8,10 +8,12 @@ Verifies the mathematical and accounting invariants of evaluate_strategy_outcome
 5. Contest and review fees are charged exactly once per case.
 6. Guard test asserting all strategies use the shared function without bypassing it.
 """
+
 from __future__ import annotations
 
 import json
 from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -19,8 +21,8 @@ from chargeback_risk_engine.paths import ARTIFACTS_DIR
 from scripts.generate_report import (
     CONTEST_COST,
     HUMAN_REVIEW_COST,
-    evaluate_strategy_outcome,
     compute_strategy_comparison,
+    evaluate_strategy_outcome,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -38,13 +40,13 @@ def _make_case(dispute_id: str, amount: float, would_win: bool, p_win: float = 0
 
 def test_penalty_applies_only_to_lost_contests():
     """Penalty applies exclusively to contested losses.
-    
+
     - Contested win: loss_penalty = 0.
     - Uncontested loss: loss_penalty = 0.
     - Contested loss: loss_penalty = p.
     """
     cases = [
-        _make_case("c1", amount=1000.0, would_win=True),   # Contested win
+        _make_case("c1", amount=1000.0, would_win=True),  # Contested win
         _make_case("c2", amount=2000.0, would_win=False),  # Uncontested loss
         _make_case("c3", amount=3000.0, would_win=False),  # Contested loss
     ]
@@ -96,12 +98,22 @@ def test_identical_contested_sets_produce_identical_penalty_totals():
     penalty_p = 5000.0
 
     ev_a = evaluate_strategy_outcome(
-        cases, auto_mask_a, review_mask_a, "none",
-        CONTEST_COST, HUMAN_REVIEW_COST, loss_penalty=penalty_p,
+        cases,
+        auto_mask_a,
+        review_mask_a,
+        "none",
+        CONTEST_COST,
+        HUMAN_REVIEW_COST,
+        loss_penalty=penalty_p,
     )
     ev_b = evaluate_strategy_outcome(
-        cases, auto_mask_b, review_mask_b, "observed_ground_truth",
-        CONTEST_COST, HUMAN_REVIEW_COST, loss_penalty=penalty_p,
+        cases,
+        auto_mask_b,
+        review_mask_b,
+        "observed_ground_truth",
+        CONTEST_COST,
+        HUMAN_REVIEW_COST,
+        loss_penalty=penalty_p,
     )
 
     assert ev_a["contested_count"] == ev_b["contested_count"] == 2
@@ -120,14 +132,22 @@ def test_zero_penalty_matches_committed_values_to_paisa():
 
     strat_data = json.loads(strat_file.read_text(encoding="utf-8"))
     bm_data = json.loads(bm_file.read_text(encoding="utf-8"))
-    oracle_data = json.loads(oracle_file.read_text(encoding="utf-8")) if oracle_file.exists() else {}
+    oracle_data = (
+        json.loads(oracle_file.read_text(encoding="utf-8")) if oracle_file.exists() else {}
+    )
 
     recomputed = compute_strategy_comparison(bm_data["case_results"], oracle_data)
 
     for row_c, row_r in zip(strat_data["strategy_table"], recomputed["strategy_table"]):
         assert row_c["strategy"] == row_r["strategy"]
-        assert pytest.approx(row_c["realized_net_value_p0"], abs=0.01) == row_r["realized_net_value_p0"]
-        assert pytest.approx(row_c["realized_net_value_base_p"], abs=0.01) == row_r["realized_net_value_base_p"]
+        assert (
+            pytest.approx(row_c["realized_net_value_p0"], abs=0.01)
+            == row_r["realized_net_value_p0"]
+        )
+        assert (
+            pytest.approx(row_c["realized_net_value_base_p"], abs=0.01)
+            == row_r["realized_net_value_base_p"]
+        )
 
 
 def test_slope_invariant_across_penalties():
@@ -143,8 +163,12 @@ def test_slope_invariant_across_penalties():
     p1 = 1000.0
     p2 = 7500.0
 
-    ev_1 = evaluate_strategy_outcome(cases, auto_mask, no_mask, "none", CONTEST_COST, HUMAN_REVIEW_COST, loss_penalty=p1)
-    ev_2 = evaluate_strategy_outcome(cases, auto_mask, no_mask, "none", CONTEST_COST, HUMAN_REVIEW_COST, loss_penalty=p2)
+    ev_1 = evaluate_strategy_outcome(
+        cases, auto_mask, no_mask, "none", CONTEST_COST, HUMAN_REVIEW_COST, loss_penalty=p1
+    )
+    ev_2 = evaluate_strategy_outcome(
+        cases, auto_mask, no_mask, "none", CONTEST_COST, HUMAN_REVIEW_COST, loss_penalty=p2
+    )
 
     losses = ev_1["lost_contest_count"]  # 2 losses
     delta_p = p2 - p1
@@ -167,13 +191,23 @@ def test_contest_and_review_fees_charged_once_per_case():
     review_mask = np.array([False, False, True, False], dtype=bool)
 
     # Treatment none: reviewed case is not contested
-    ev_none = evaluate_strategy_outcome(cases, auto_mask, review_mask, "none", CONTEST_COST, HUMAN_REVIEW_COST, loss_penalty=0.0)
+    ev_none = evaluate_strategy_outcome(
+        cases, auto_mask, review_mask, "none", CONTEST_COST, HUMAN_REVIEW_COST, loss_penalty=0.0
+    )
     assert ev_none["contested_count"] == 2
     assert ev_none["contest_cost"] == 2 * CONTEST_COST
     assert ev_none["review_cost"] == 0.0
 
     # Treatment observed_ground_truth: reviewed case is contested
-    ev_rev = evaluate_strategy_outcome(cases, auto_mask, review_mask, "observed_ground_truth", CONTEST_COST, HUMAN_REVIEW_COST, loss_penalty=0.0)
+    ev_rev = evaluate_strategy_outcome(
+        cases,
+        auto_mask,
+        review_mask,
+        "observed_ground_truth",
+        CONTEST_COST,
+        HUMAN_REVIEW_COST,
+        loss_penalty=0.0,
+    )
     assert ev_rev["contested_count"] == 3
     assert ev_rev["contest_cost"] == 3 * CONTEST_COST
     assert ev_rev["review_cost"] == 1 * HUMAN_REVIEW_COST
@@ -182,6 +216,7 @@ def test_contest_and_review_fees_charged_once_per_case():
 def test_guard_no_strategy_bypasses_shared_cost_model():
     """Guard test asserting every strategy in the evaluation uses the shared cost function."""
     import inspect
+
     import scripts.generate_report as gr
 
     # Inspect compute_strategy_comparison source to ensure evaluate_strategy_outcome is called
