@@ -114,6 +114,29 @@ def decide(
             ev,
         )
 
+    if policy_score <= float(accept_loss_threshold):
+        if ev > 0:
+            return PolicyDecision(
+                HUMAN_REVIEW,
+                f"Routing score {policy_score:.2f} <= {float(accept_loss_threshold):.2f}, but expected net value ₹{ev:,.2f} is positive; routing to human review rather than accepting loss.",
+                ev,
+            )
+        return PolicyDecision(
+            ACCEPT_LOSS,
+            f"Routing score {policy_score:.2f} <= {float(accept_loss_threshold):.2f}; contesting is not worthwhile at the configured threshold.",
+            ev,
+        )
+
+    # Hard stop: Any relevant field with status FAIL (False) blocks AUTO-CONTEST
+    if evidence_packet is not None:
+        failed_fields = [item.field for item in evidence_packet.items if item.status == "FAIL"]
+        if failed_fields:
+            return PolicyDecision(
+                HUMAN_REVIEW,
+                f"Evidence field '{failed_fields[0]}' has status FAIL; automatic contest is blocked regardless of win probability.",
+                ev,
+            )
+
     if policy_score >= float(auto_contest_threshold):
         if evidence_packet is None or evidence_quality is None:
             return PolicyDecision(
@@ -125,15 +148,6 @@ def decide(
             return PolicyDecision(
                 HUMAN_REVIEW,
                 f"Model confidence {model_confidence:.2f} is below the minimum {MIN_MODEL_CONFIDENCE:.2f}.",
-                ev,
-            )
-
-        # Hard stop: Any relevant field with status FAIL (False) blocks AUTO-CONTEST
-        failed_fields = [item.field for item in evidence_packet.items if item.status == "FAIL"]
-        if failed_fields:
-            return PolicyDecision(
-                HUMAN_REVIEW,
-                f"Evidence field '{failed_fields[0]}' has status FAIL; automatic contest is blocked regardless of win probability.",
                 ev,
             )
 
@@ -168,19 +182,6 @@ def decide(
         return PolicyDecision(
             AUTO_CONTEST,
             f"Routing score {policy_score:.2f} >= {float(auto_contest_threshold):.2f}; calibrated win probability is {win_probability:.2f}, evidence is sufficiently confirmed, and expected net value is {ev:.2f}.",
-            ev,
-        )
-
-    if policy_score <= float(accept_loss_threshold):
-        if ev > 0:
-            return PolicyDecision(
-                HUMAN_REVIEW,
-                f"Routing score {policy_score:.2f} <= {float(accept_loss_threshold):.2f}, but expected net value ₹{ev:,.2f} is positive; routing to human review rather than accepting loss.",
-                ev,
-            )
-        return PolicyDecision(
-            ACCEPT_LOSS,
-            f"Routing score {policy_score:.2f} <= {float(accept_loss_threshold):.2f}; contesting is not worthwhile at the configured threshold.",
             ev,
         )
 
