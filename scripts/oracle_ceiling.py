@@ -255,7 +255,7 @@ def main(output_dir: Path | None = None) -> dict:
     target_dir = Path(output_dir) if output_dir is not None else ARTIFACTS_DIR
     target_dir.mkdir(exist_ok=True, parents=True)
     out_file = target_dir / "oracle_ceiling.json"
-    out_file.write_text(json.dumps(output, indent=2), encoding="utf-8")
+    out_file.write_bytes(json.dumps(output, indent=2).encode("utf-8") + b"\n")
     print(f"Wrote oracle ceiling results to {out_file}")
     print(json.dumps(output, indent=2))
     return output
