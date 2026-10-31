@@ -1,0 +1,38 @@
+version: "3.8"
+
+services:
+  engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: chargeback-risk-engine:latest
+    container_name: chargeback-risk-engine
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - CHARGEBACK_ENV=development
+      - CHARGEBACK_API_KEY=dev-secret-key-at-least-32-chars-long
+      - CHARGEBACK_AUDIT_DB_PATH=/var/lib/chargeback/audit_log.db
+      - CHARGEBACK_RATE_LIMIT=120
+      - CHARGEBACK_REQUEST_TIMEOUT_SECONDS=5.0
+    volumes:
+      - audit_data:/var/lib/chargeback
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  audit_data:
+    driver: local

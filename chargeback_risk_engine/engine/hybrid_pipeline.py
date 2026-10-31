@@ -1,6 +1,8 @@
 """AI + evidence + economics + deterministic policy orchestration."""
 from __future__ import annotations
 
+import os
+
 
 from chargeback_risk_engine.audit_log import (
     DB_PATH,
@@ -59,13 +61,15 @@ def _score_case(
     dispute: dict,
     *,
     risk_graph: RiskGraph | None = None,
-    db_path: str = DB_PATH,
+    db_path: str | None = None,
     call_ai_analyst: bool = True,
+    actor: str = "anonymous",
 ) -> dict:
     """Score and persist one case through the canonical decision path."""
+    effective_db = db_path or os.getenv("CHARGEBACK_DB_PATH") or os.getenv("CHARGEBACK_AUDIT_DB_PATH") or DB_PATH
     dispute_id = dispute["dispute_id"]
     current_payload_hash = canonical_payload_hash(dispute)
-    existing = get_existing_decision(dispute_id, db_path)
+    existing = get_existing_decision(dispute_id, effective_db)
     if existing is not None:
         if existing.payload_hash and existing.payload_hash != current_payload_hash:
             raise PayloadConflictError(dispute_id)
@@ -74,7 +78,7 @@ def _score_case(
                 raise PayloadConflictError(dispute_id)
     ml = load_or_fit_ml_scorer()
     points = load_or_fit_calibration_points()
-    graph = risk_graph if risk_graph is not None else RiskGraph(load_graph_rows(db_path, dispute=dispute))
+    graph = risk_graph if risk_graph is not None else RiskGraph(load_graph_rows(effective_db, dispute=dispute))
 
     def compute():
         packet = assemble(dispute)
@@ -136,13 +140,14 @@ def _score_case(
             reason_code=dispute["reason_code"],
             amount=dispute["amount"],
             compute_decision_fn=compute,
-            db_path=db_path,
+            db_path=effective_db,
             model_version=MODEL_VERSION,
             feature_version=FEATURE_VERSION,
             policy_version=POLICY_VERSION,
             ai_metadata=None,
             request_id=str(dispute.get("request_id", dispute["dispute_id"])),
             payload_hash=current_payload_hash,
+            actor=str(dispute.get("actor", actor)),
         )
     else:
         logged = existing
@@ -220,16 +225,25 @@ def decide_case(
     dispute: dict,
     *,
     risk_graph: RiskGraph | None = None,
-    db_path: str = DB_PATH,
+    db_path: str | None = None,
     include_counterfactual: bool = True,
     call_ai_analyst: bool = True,
+    actor: str = "anonymous",
 ) -> dict:
     """Public canonical entry point used by API, UI, demo and evaluation."""
-    active_graph = risk_graph if risk_graph is not None else RiskGraph(load_graph_rows(db_path, dispute=dispute))
-    result = _score_case(dispute, risk_graph=active_graph, db_path=db_path, call_ai_analyst=call_ai_analyst)
+    effective_db = db_path or os.getenv("CHARGEBACK_DB_PATH") or os.getenv("CHARGEBACK_AUDIT_DB_PATH") or DB_PATH
+    active_graph = risk_graph if risk_graph is not None else RiskGraph(load_graph_rows(effective_db, dispute=dispute))
+    effective_actor = str(dispute.get("actor", actor))
+    result = _score_case(
+        dispute,
+        risk_graph=active_graph,
+        db_path=effective_db,
+        call_ai_analyst=call_ai_analyst,
+        actor=effective_actor,
+    )
     if include_counterfactual:
         from chargeback_risk_engine.engine.counterfactual import find_minimal_decision_reversal
-        original_record = get_existing_decision(dispute["dispute_id"], db_path)
+        original_record = get_existing_decision(dispute["dispute_id"], effective_db)
         counterfactual_input = _logged_dispute(original_record) if original_record is not None else dict(dispute)
         result["counterfactual"] = find_minimal_decision_reversal(
             counterfactual_input,
