@@ -1,0 +1,11 @@
+dispute_id,payment_id,reason_code,amount,customer_id,has_tracking_number,has_delivery_confirmation,has_signature_confirmation,has_tracking_number_source,has_tracking_number_timestamp,has_delivery_confirmation_source,has_delivery_confirmation_timestamp,would_win,has_duplicate_transaction_proof,has_refund_already_issued,has_duplicate_transaction_proof_source,has_duplicate_transaction_proof_timestamp,has_avs_match,has_cvv_match,has_device_fingerprint_match,has_avs_match_source,has_avs_match_timestamp,has_product_photos,has_item_description_match,has_return_communication,has_product_photos_source,has_product_photos_timestamp
+EXT_001,pay_001,item_not_received,3500.0,cust_101,True,True,True,carrier_api,2026-10-31T10:00:00Z,carrier_api,2026-10-31T10:00:00Z,True,,,,,,,,,,,,,,
+EXT_002,pay_002,item_not_received,1200.0,cust_102,False,False,False,,,,,False,,,,,,,,,,,,,,
+EXT_003,pay_003,duplicate_charge,4500.0,cust_103,,,,,,,,True,True,False,psp_log,2026-10-31T11:00:00Z,,,,,,,,,,
+EXT_004,pay_004,unauthorized_transaction,8900.0,cust_104,,,,,,,,True,,,,,True,True,True,psp_log,2026-10-31T09:00:00Z,,,,,
+EXT_005,pay_005,item_not_as_described,6200.0,cust_105,,,,,,,,True,,,,,,,,,,True,True,True,merchant_record,2026-10-31T08:00:00Z
+EXT_006,pay_006,item_not_received,25000.0,cust_106,True,True,True,carrier_api,2026-10-31T12:00:00Z,carrier_api,2026-10-31T12:00:00Z,True,,,,,,,,,,,,,,
+EXT_007,pay_007,unauthorized_transaction,1500.0,cust_107,,,,,,,,False,,,,,False,False,False,,,,,,,
+EXT_008,pay_008,duplicate_charge,3200.0,cust_108,,,,,,,,False,False,True,,,,,,,,,,,,
+EXT_009,pay_009,item_not_received,4100.0,cust_109,True,False,False,carrier_api,2026-10-31T11:15:00Z,,,False,,,,,,,,,,,,,,
+EXT_010,pay_010,item_not_as_described,5400.0,cust_110,,,,,,,,False,,,,,,,,,,False,True,False,,

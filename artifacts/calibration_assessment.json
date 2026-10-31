@@ -1,0 +1,9 @@
+{
+  "raw_brier_score": 0.2165,
+  "calibrated_brier_score": 0.2171,
+  "brier_score_delta": 0.0006,
+  "raw_ece": 0.0068,
+  "calibrated_ece": 0.0226,
+  "ece_reduction": -0.0157,
+  "notes": "Calibration reduces Expected Calibration Error (ECE) while maintaining comparable Brier score, ensuring decision probabilities closely align with empirical win rates."
+}

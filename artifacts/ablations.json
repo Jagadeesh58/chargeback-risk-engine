@@ -1,0 +1,88 @@
+{
+  "ablations": [
+    {
+      "configuration": "Full System (Live Policy)",
+      "auto_contest_count": 1324,
+      "auto_contest_share": 0.2648,
+      "human_review_share": 0.732,
+      "accept_loss_share": 0.0032,
+      "precision": 0.7757,
+      "recall": 0.3637,
+      "lost_contests": 297,
+      "realized_net_value_p0_inr": 3926314.1,
+      "realized_net_value_p0_lakh": 39.26,
+      "realized_net_value_base_p_inr": 2693764.1,
+      "realized_net_value_base_p_lakh": 26.94
+    },
+    {
+      "configuration": "No Graph",
+      "auto_contest_count": 1324,
+      "auto_contest_share": 0.2648,
+      "human_review_share": 0.732,
+      "accept_loss_share": 0.0032,
+      "precision": 0.7757,
+      "recall": 0.3637,
+      "lost_contests": 297,
+      "realized_net_value_p0_inr": 3926314.1,
+      "realized_net_value_p0_lakh": 39.26,
+      "realized_net_value_base_p_inr": 2693764.1,
+      "realized_net_value_base_p_lakh": 26.94
+    },
+    {
+      "configuration": "No Evidence Gates",
+      "auto_contest_count": 1324,
+      "auto_contest_share": 0.2648,
+      "human_review_share": 0.732,
+      "accept_loss_share": 0.0032,
+      "precision": 0.7757,
+      "recall": 0.3637,
+      "lost_contests": 297,
+      "realized_net_value_p0_inr": 3926314.1,
+      "realized_net_value_p0_lakh": 39.26,
+      "realized_net_value_base_p_inr": 2693764.1,
+      "realized_net_value_base_p_lakh": 26.94
+    },
+    {
+      "configuration": "Calibrated Probability in Policy",
+      "auto_contest_count": 1324,
+      "auto_contest_share": 0.2648,
+      "human_review_share": 0.733,
+      "accept_loss_share": 0.0022,
+      "precision": 0.7757,
+      "recall": 0.3637,
+      "lost_contests": 297,
+      "realized_net_value_p0_inr": 3926064.1,
+      "realized_net_value_p0_lakh": 39.26,
+      "realized_net_value_base_p_inr": 2693514.1,
+      "realized_net_value_base_p_lakh": 26.94
+    },
+    {
+      "configuration": "Rules Only Baseline",
+      "auto_contest_count": 1324,
+      "auto_contest_share": 0.2648,
+      "human_review_share": 0.7098,
+      "accept_loss_share": 0.0254,
+      "precision": 0.7757,
+      "recall": 0.3637,
+      "lost_contests": 297,
+      "realized_net_value_p0_inr": 3931864.1,
+      "realized_net_value_p0_lakh": 39.32,
+      "realized_net_value_base_p_inr": 2699314.1,
+      "realized_net_value_base_p_lakh": 26.99
+    },
+    {
+      "configuration": "Unconstrained Logistic Only",
+      "auto_contest_count": 3335,
+      "auto_contest_share": 0.667,
+      "human_review_share": 0.0,
+      "accept_loss_share": 0.333,
+      "precision": 0.6678,
+      "recall": 0.7886,
+      "lost_contests": 1108,
+      "realized_net_value_p0_inr": 8715156.56,
+      "realized_net_value_p0_lakh": 87.15,
+      "realized_net_value_base_p_inr": 4116956.56,
+      "realized_net_value_base_p_lakh": 41.17
+    }
+  ]
+}

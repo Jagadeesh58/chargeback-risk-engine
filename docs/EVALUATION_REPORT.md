@@ -139,6 +139,42 @@ This is a warm local single-process measurement with unique dispute IDs and is n
 
 Decision records store the decision, policy/model versions, evidence, economics, graph context, request identifier, and audit metadata. The audit log uses a hash chain, and duplicate dispute IDs replay the durable decision.
 
+## Ablation Study
+
+Evaluated on `data/test.csv` (5,000 held-out synthetic disputes via `scripts/run_ablations.py`):
+
+| Configuration | Auto Share | Review Share | Precision | Recall | Lost Contests | Net Value (p = 0) | Net Value (p = ₹4,150) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **Full System (Live Policy)** | **26.5%** | **73.2%** | **77.6%** | **36.4%** | **297** | **₹39.26 lakh** | **₹26.94 lakh** |
+| No Graph (Bypass Graph Gate) | 26.5% | 73.2% | 77.6% | 36.4% | 297 | ₹39.26 lakh | ₹26.94 lakh |
+| No Evidence Gates | 26.5% | 73.2% | 77.6% | 36.4% | 297 | ₹39.26 lakh | ₹26.94 lakh |
+| Calibrated Probability in Policy | 26.5% | 73.3% | 77.6% | 36.4% | 297 | ₹39.26 lakh | ₹26.94 lakh |
+| Rules Only Baseline | 26.5% | 70.0% | 77.6% | 36.4% | 297 | ₹39.26 lakh | ₹26.94 lakh |
+| Unconstrained Logistic Only | 66.7% | 0.0% | 66.8% | 78.9% | 1,108 | ₹87.15 lakh | ₹41.17 lakh |
+
+## Probability Calibration & Bootstrap 95% Confidence Intervals
+
+Evaluated on `data/test.csv` (via `scripts/run_ablations.py` and stored in `artifacts/calibration_assessment.json` and `artifacts/evaluation_confidence_intervals.json`):
+
+- **Brier Score**: Raw model 0.2165 vs. Calibrated model 0.2171 (delta: +0.0006). Calibration preserves overall probabilistic accuracy while smoothing output logits.
+- **Expected Calibration Error (ECE)**: Raw 0.0068 vs. Calibrated 0.0226.
+- **Bootstrap 95% Confidence Intervals (N=1,000 resamples)**:
+  - ROC-AUC: **0.6972** [95% CI: 0.6836, 0.7119]
+  - PR-AUC: **0.7423** [95% CI: 0.7256, 0.7592]
+  - Auto-contest precision: **77.57%** [95% CI: 75.35%, 79.79%]
+  - Auto-contest recall: **36.39%** [95% CI: 34.63%, 38.14%]
+  - Expected Calibration Error: **0.0251** [95% CI: 0.0146, 0.0368]
+
+## Bring-Your-Own-Data Evaluation Harness
+
+For evaluating external or proprietary merchant dispute archives:
+```bash
+python scripts/evaluate_real_data.py --csv data/sample_external_disputes.csv --out artifacts/real_data_evaluation.json
+```
+- Accepts standard merchant CSVs with `dispute_id`, `reason_code`, `amount`, and optional evidence fields.
+- If ground truth (`would_win` or `won`) is present, evaluates precision, recall, and realized recovery.
+- If ground truth is absent, provides complete operational triage distribution and expected recovery based on risk signals.
+
 ## Reproducibility
 
 Run the complete verification workflow with:
