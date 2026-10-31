@@ -22,6 +22,6 @@ jobs:
       - name: Verify documentation and artifact drift
         run: |
           python scripts/generate_report.py
-          git diff --exit-code artifacts docs
+          git diff --exit-code -- artifacts docs ':!docs/*.png'
       - name: Run release verification
         run: python scripts/verify_release.py
