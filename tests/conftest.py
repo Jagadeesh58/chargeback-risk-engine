@@ -3,6 +3,9 @@ from pathlib import Path
 import pytest
 from chargeback_risk_engine.audit_log import DB_PATH
 
+# Default to development mode for test suite unless a test explicitly overrides it
+os.environ.setdefault("CHARGEBACK_ENV", "development")
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 

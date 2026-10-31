@@ -473,9 +473,102 @@ def test_rate_limiter_evaluates_before_body_parsing(monkeypatch):
 
 def test_startup_warning_when_api_key_unset(monkeypatch, caplog):
     import logging
-    from chargeback_risk_engine.api import _log_auth_status_on_startup
+    from chargeback_risk_engine.api import _validate_startup_config
+    monkeypatch.setenv("CHARGEBACK_ENV", "development")
     monkeypatch.delenv("CHARGEBACK_API_KEY", raising=False)
     with caplog.at_level(logging.WARNING):
-        _log_auth_status_on_startup()
+        _validate_startup_config()
     assert "CHARGEBACK_API_KEY is not set" in caplog.text
+
+
+def test_production_startup_validation(monkeypatch):
+    """In production mode, API must refuse to start without a valid key (>=32 chars)."""
+    from chargeback_risk_engine.api import _validate_startup_config
+
+    monkeypatch.setenv("CHARGEBACK_ENV", "production")
+    monkeypatch.delenv("CHARGEBACK_API_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="CHARGEBACK_API_KEY must be set in production mode"):
+        _validate_startup_config()
+
+    # Too short key (<32 chars)
+    monkeypatch.setenv("CHARGEBACK_API_KEY", "short-key-123")
+    with pytest.raises(RuntimeError, match="at least 32 characters in production mode"):
+        _validate_startup_config()
+
+    # Valid key (>=32 chars) passes
+    monkeypatch.setenv("CHARGEBACK_API_KEY", "a" * 32)
+    _validate_startup_config()  # Should not raise
+
+
+def test_production_auth_protection(monkeypatch):
+    """Production mode protects /decision, /score, and /audit/verify with 401."""
+    prod_key = "a" * 32
+    monkeypatch.setenv("CHARGEBACK_ENV", "production")
+    monkeypatch.setenv("CHARGEBACK_API_KEY", prod_key)
+
+    sample = {
+        "dispute_id": "D_PROD_AUTH",
+        "payment_id": "pay_prod",
+        "reason_code": "item_not_received",
+        "amount": 1500.0,
+        "has_tracking_number": True,
+    }
+
+    # /health is open and reports production
+    h = client.get("/health")
+    assert h.status_code == 200
+    assert h.json()["environment"] == "production"
+    assert h.json()["auth"] == "api-key"
+
+    # Missing key -> 401
+    assert client.post("/decision", json=sample).status_code == 401
+    assert client.post("/score", json=sample).status_code == 401
+    assert client.get("/audit/verify").status_code == 401
+
+    # Wrong key -> 401
+    assert client.post("/decision", json=sample, headers={"X-API-Key": "wrong" * 8}).status_code == 401
+    assert client.get("/audit/verify", headers={"X-API-Key": "wrong" * 8}).status_code == 401
+
+    # Correct key -> 200
+    r_dec = client.post("/decision", json=sample, headers={"X-API-Key": prod_key})
+    assert r_dec.status_code == 200
+
+    r_audit = client.get("/audit/verify", headers={"X-API-Key": prod_key})
+    assert r_audit.status_code == 200
+
+
+def test_payload_conflict_returns_409_stable_body(monkeypatch):
+    """FastAPI TestClient: same dispute_id + different payload -> 409 with stable schema; same -> 200 replayed."""
+    monkeypatch.setenv("CHARGEBACK_ENV", "development")
+    monkeypatch.delenv("CHARGEBACK_API_KEY", raising=False)
+
+    payload_1 = {
+        "dispute_id": "D_CONFLICT_TEST",
+        "payment_id": "pay_conf_1",
+        "reason_code": "item_not_received",
+        "amount": 2500.0,
+        "has_tracking_number": True,
+        "has_delivery_confirmation": True,
+        "has_signature_confirmation": True,
+    }
+
+    r1 = client.post("/decision", json=payload_1)
+    assert r1.status_code == 200
+    assert r1.json()["replayed"] is False
+
+    # Exact replay -> 200 with replayed: True
+    r2 = client.post("/decision", json=payload_1)
+    assert r2.status_code == 200
+    assert r2.json()["replayed"] is True
+
+    # Conflicting payload -> 409 with stable JSON body
+    payload_conflicting = dict(payload_1)
+    payload_conflicting["amount"] = 8888.0
+    payload_conflicting["has_tracking_number"] = False
+
+    r3 = client.post("/decision", json=payload_conflicting)
+    assert r3.status_code == 409
+    body = r3.json()
+    assert body["error"] == "payload_conflict"
+    assert body["dispute_id"] == "D_CONFLICT_TEST"
 

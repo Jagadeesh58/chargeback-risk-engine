@@ -19,16 +19,33 @@ from chargeback_risk_engine.engine.hybrid_pipeline import decide_case
 logger = logging.getLogger("chargeback_risk_engine")
 
 
-def _log_auth_status_on_startup():
-    if not os.getenv("CHARGEBACK_API_KEY"):
-        logger.warning(
-            "SECURITY WARNING: CHARGEBACK_API_KEY is not set. API is running in development mode without authentication."
+def _validate_startup_config():
+    env = os.getenv("CHARGEBACK_ENV", "production").lower().strip()
+    if env not in ("production", "development", "demo"):
+        raise RuntimeError(
+            f"Invalid CHARGEBACK_ENV '{env}'. Must be one of: production, development, demo."
         )
+    api_key = os.getenv("CHARGEBACK_API_KEY")
+    if env == "production":
+        if not api_key:
+            raise RuntimeError(
+                "CHARGEBACK_API_KEY must be set in production mode. Set CHARGEBACK_ENV=development for local testing."
+            )
+        if len(api_key) < 32:
+            raise RuntimeError(
+                "CHARGEBACK_API_KEY must be at least 32 characters in production mode."
+            )
+    else:
+        if not api_key:
+            logger.warning(
+                "SECURITY WARNING: CHARGEBACK_API_KEY is not set. API is running in %s mode without authentication.",
+                env,
+            )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    _log_auth_status_on_startup()
+    _validate_startup_config()
     yield
 
 
@@ -44,25 +61,51 @@ def _reset_rate_limiter():
 
 
 def require_api_key(x_api_key: str | None = Header(default=None, alias="X-API-Key")):
-    """Optional API key authentication dependency."""
+    """API key authentication dependency."""
+    env = os.getenv("CHARGEBACK_ENV", "production").lower().strip()
     expected_key = os.getenv("CHARGEBACK_API_KEY")
+
+    if env == "production":
+        if not expected_key or len(expected_key) < 32:
+            raise HTTPException(status_code=500, detail="API key misconfigured in production")
+        if not x_api_key or not hmac.compare_digest(x_api_key.encode("utf-8"), expected_key.encode("utf-8")):
+            raise HTTPException(status_code=401, detail="Invalid or missing API key")
+        return True
+
+    # In development or demo mode
     if expected_key:
         if not x_api_key or not hmac.compare_digest(x_api_key.encode("utf-8"), expected_key.encode("utf-8")):
             raise HTTPException(status_code=401, detail="Invalid or missing API key")
     return True
 
 
+@app.exception_handler(PayloadConflictError)
+async def payload_conflict_handler(request: Request, exc: PayloadConflictError):
+    return JSONResponse(
+        status_code=409,
+        content={
+            "error": "payload_conflict",
+            "dispute_id": exc.dispute_id,
+            "detail": f"Conflict: dispute_id '{exc.dispute_id}' already exists with a different payload",
+        },
+    )
+
+
 @app.middleware("http")
 async def security_middleware(request: Request, call_next):
     # 1. Rate limiting evaluated BEFORE reading body or allocating memory
     if request.url.path != "/health":
-        rate_limit = int(os.getenv("CHARGEBACK_RATE_LIMIT", "0"))
+        env = os.getenv("CHARGEBACK_ENV", "production").lower().strip()
+        default_limit = "60" if env == "production" else "0"
+        rate_limit = int(os.getenv("CHARGEBACK_RATE_LIMIT", default_limit))
         if rate_limit > 0:
             client_ip = request.client.host if request.client else "unknown"
+            x_api_key = request.headers.get("X-API-Key")
+            key_id = f"key:{x_api_key[:8]}" if x_api_key else f"ip:{client_ip}"
             if os.getenv("CHARGEBACK_ALLOW_TEST_CLIENT_HEADER") == "1":
-                client_id = request.headers.get("X-Client-Id", client_ip)
+                client_id = request.headers.get("X-Client-Id", key_id)
             else:
-                client_id = client_ip
+                client_id = key_id
             now = time.time()
             cutoff = now - 60.0
             history = [t for t in _client_request_times[client_id] if t > cutoff]
@@ -164,8 +207,9 @@ class DecisionResponse(BaseModel):
 
 @app.get("/health")
 def health():
-    auth_mode = "api-key" if os.getenv("CHARGEBACK_API_KEY") else "demo-open"
-    return {"status": "ok", "auth": auth_mode}
+    env = os.getenv("CHARGEBACK_ENV", "production").lower().strip()
+    auth_mode = "api-key" if os.getenv("CHARGEBACK_API_KEY") else ("demo-open" if env in ("development", "demo") else "unconfigured")
+    return {"status": "ok", "auth": auth_mode, "environment": env}
 
 
 def _score(request: DisputeRequest, request_id: str | None = None) -> DecisionResponse:
@@ -176,13 +220,7 @@ def _score(request: DisputeRequest, request_id: str | None = None) -> DecisionRe
         )
     dispute = request.model_dump() if hasattr(request, "model_dump") else request.dict()
     dispute["request_id"] = request_id or dispute["dispute_id"]
-    try:
-        return DecisionResponse(**decide_case(dispute))
-    except PayloadConflictError as exc:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Conflict: dispute_id '{exc.dispute_id}' already exists with a different payload",
-        )
+    return DecisionResponse(**decide_case(dispute))
 
 
 @app.post("/decision", response_model=DecisionResponse, dependencies=[Depends(require_api_key)])
