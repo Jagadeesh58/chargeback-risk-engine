@@ -9,6 +9,7 @@ from chargeback_risk_engine.engine.economic_decision import calculate_economic_v
 MONETARY_CEILING = 50_000.0
 AUTO_CONTEST_THRESHOLD = 0.65
 ACCEPT_LOSS_THRESHOLD = 0.30
+# Semantics: pass_fraction must be strictly greater than (>) MIN_PASS_FRACTION_FOR_AUTO_CONTEST (i.e. > 50%)
 MIN_PASS_FRACTION_FOR_AUTO_CONTEST = 0.5
 CONTEST_COST = 150.0
 MIN_MODEL_CONFIDENCE = 0.60
@@ -126,12 +127,36 @@ def decide(
                 f"Model confidence {model_confidence:.2f} is below the minimum {MIN_MODEL_CONFIDENCE:.2f}.",
                 ev,
             )
+
+        # Hard stop: Any relevant field with status FAIL (False) blocks AUTO-CONTEST
+        failed_fields = [item.field for item in evidence_packet.items if item.status == "FAIL"]
+        if failed_fields:
+            return PolicyDecision(
+                HUMAN_REVIEW,
+                f"Evidence field '{failed_fields[0]}' has status FAIL; automatic contest is blocked regardless of win probability.",
+                ev,
+            )
+
+        # Unverified source check: Any True evidence value whose source is manual_upload/unknown
+        # or whose timestamp is missing counts as UNVERIFIED (treated as WARN for auto-contest gate).
+        unverified_items = [
+            item.field for item in evidence_quality.items
+            if not getattr(item, "verified", True)
+        ]
+        if unverified_items:
+            return PolicyDecision(
+                HUMAN_REVIEW,
+                f"Evidence field '{unverified_items[0]}' is unverified; manual review required before contesting.",
+                ev,
+            )
+
         if evidence_packet is not None and evidence_packet.total > 0:
             pass_fraction = evidence_packet.pass_count / evidence_packet.total
+            # MIN_PASS_FRACTION_FOR_AUTO_CONTEST semantics: strictly greater than (>) is required (> 50%)
             if pass_fraction <= MIN_PASS_FRACTION_FOR_AUTO_CONTEST:
                 return PolicyDecision(
                     HUMAN_REVIEW,
-                    f"Win probability clears the threshold, but only {evidence_packet.pass_count}/{evidence_packet.total} relevant fields are confirmed; the {MIN_PASS_FRACTION_FOR_AUTO_CONTEST:.0%} confirmation bar is not met.",
+                    f"Win probability clears the threshold, but only {evidence_packet.pass_count}/{evidence_packet.total} ({pass_fraction:.1%}) relevant fields are confirmed; strictly greater than {MIN_PASS_FRACTION_FOR_AUTO_CONTEST:.0%} confirmation is required.",
                     ev,
                 )
         if ev <= 0:

@@ -6,11 +6,12 @@ import os
 import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Header, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from chargeback_risk_engine.config import REASON_CODES
 from chargeback_risk_engine.audit_log import verify_audit_integrity, DB_PATH, PayloadConflictError
@@ -149,7 +150,46 @@ async def security_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+def _validate_iso_timestamp(ts_str: str | None) -> str | None:
+    if ts_str is None:
+        return None
+    try:
+        clean_ts = ts_str.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(clean_ts)
+    except Exception as e:
+        raise ValueError(f"Invalid ISO-8601 timestamp: '{ts_str}'") from e
+
+    now = datetime.now(timezone.utc)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+
+    # Future check (allow 300 seconds clock skew)
+    if (dt - now).total_seconds() > 300:
+        raise ValueError(f"Timestamp cannot be in the future: '{ts_str}'")
+
+    # Stale check
+    max_age_days = float(os.getenv("CHARGEBACK_MAX_EVIDENCE_AGE_DAYS", "365"))
+    if (now - dt).total_seconds() > max_age_days * 86400:
+        raise ValueError(f"Timestamp is older than allowed maximum age of {max_age_days} days: '{ts_str}'")
+
+    return ts_str
+
+
+class EvidenceMeta(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    source: str | None = Field(default=None, max_length=128)
+    timestamp: str | None = Field(default=None, max_length=64)
+    consistent: bool | None = True
+
+    @field_validator("timestamp")
+    @classmethod
+    def check_meta_timestamp(cls, v: str | None) -> str | None:
+        return _validate_iso_timestamp(v)
+
+
 class DisputeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     dispute_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
     payment_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
     reason_code: str
@@ -161,6 +201,10 @@ class DisputeRequest(BaseModel):
     card_fingerprint: str | None = Field(default=None, max_length=128)
     merchant_id: str | None = Field(default=None, max_length=128)
 
+    # Freeform narrative / prompt context (treated as raw untrusted data, never instructions)
+    evidence_text: str | None = Field(default=None, max_length=10000)
+
+    # Evidence boolean fields
     has_tracking_number: bool | None = None
     has_delivery_confirmation: bool | None = None
     has_signature_confirmation: bool | None = None
@@ -172,6 +216,74 @@ class DisputeRequest(BaseModel):
     has_device_fingerprint_match: bool | None = None
     has_duplicate_transaction_proof: bool | None = None
     has_refund_already_issued: bool | None = None
+
+    # Provenance fields per evidence item
+    has_tracking_number_source: str | None = Field(default=None, max_length=128)
+    has_tracking_number_timestamp: str | None = Field(default=None, max_length=64)
+    has_tracking_number_consistent: bool | None = None
+
+    has_delivery_confirmation_source: str | None = Field(default=None, max_length=128)
+    has_delivery_confirmation_timestamp: str | None = Field(default=None, max_length=64)
+    has_delivery_confirmation_consistent: bool | None = None
+
+    has_signature_confirmation_source: str | None = Field(default=None, max_length=128)
+    has_signature_confirmation_timestamp: str | None = Field(default=None, max_length=64)
+    has_signature_confirmation_consistent: bool | None = None
+
+    has_product_photos_source: str | None = Field(default=None, max_length=128)
+    has_product_photos_timestamp: str | None = Field(default=None, max_length=64)
+    has_product_photos_consistent: bool | None = None
+
+    has_item_description_match_source: str | None = Field(default=None, max_length=128)
+    has_item_description_match_timestamp: str | None = Field(default=None, max_length=64)
+    has_item_description_match_consistent: bool | None = None
+
+    has_return_communication_source: str | None = Field(default=None, max_length=128)
+    has_return_communication_timestamp: str | None = Field(default=None, max_length=64)
+    has_return_communication_consistent: bool | None = None
+
+    has_avs_match_source: str | None = Field(default=None, max_length=128)
+    has_avs_match_timestamp: str | None = Field(default=None, max_length=64)
+    has_avs_match_consistent: bool | None = None
+
+    has_cvv_match_source: str | None = Field(default=None, max_length=128)
+    has_cvv_match_timestamp: str | None = Field(default=None, max_length=64)
+    has_cvv_match_consistent: bool | None = None
+
+    has_device_fingerprint_match_source: str | None = Field(default=None, max_length=128)
+    has_device_fingerprint_match_timestamp: str | None = Field(default=None, max_length=64)
+    has_device_fingerprint_match_consistent: bool | None = None
+
+    has_duplicate_transaction_proof_source: str | None = Field(default=None, max_length=128)
+    has_duplicate_transaction_proof_timestamp: str | None = Field(default=None, max_length=64)
+    has_duplicate_transaction_proof_consistent: bool | None = None
+
+    has_refund_already_issued_source: str | None = Field(default=None, max_length=128)
+    has_refund_already_issued_timestamp: str | None = Field(default=None, max_length=64)
+    has_refund_already_issued_consistent: bool | None = None
+
+    # Global evidence provenance fields
+    evidence_timestamp: str | None = Field(default=None, max_length=64)
+    evidence_source_reliability: float | None = Field(default=None, ge=0.0, le=1.0)
+    evidence_meta: dict[str, EvidenceMeta] | None = None
+
+    @field_validator(
+        "has_tracking_number_timestamp",
+        "has_delivery_confirmation_timestamp",
+        "has_signature_confirmation_timestamp",
+        "has_product_photos_timestamp",
+        "has_item_description_match_timestamp",
+        "has_return_communication_timestamp",
+        "has_avs_match_timestamp",
+        "has_cvv_match_timestamp",
+        "has_device_fingerprint_match_timestamp",
+        "has_duplicate_transaction_proof_timestamp",
+        "has_refund_already_issued_timestamp",
+        "evidence_timestamp",
+    )
+    @classmethod
+    def check_timestamp(cls, v: str | None) -> str | None:
+        return _validate_iso_timestamp(v)
 
 
 class EvidenceItemResponse(BaseModel):

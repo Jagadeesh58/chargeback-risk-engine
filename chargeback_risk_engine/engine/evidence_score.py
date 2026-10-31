@@ -18,6 +18,7 @@ class EvidenceIntelligenceItem:
     source: str
     consistent: bool
     status: str
+    verified: bool = True
 
 
 @dataclass(frozen=True)
@@ -45,22 +46,57 @@ def score_evidence(dispute: dict, evidence_packet=None) -> EvidenceScore:
     packet_by_field = {item.field: item for item in packet.items}
     items: list[EvidenceIntelligenceItem] = []
 
+    meta_dict = dispute.get("evidence_meta") if isinstance(dispute.get("evidence_meta"), dict) else {}
+    has_any_provenance = any(
+        (k.endswith("_source") or k.endswith("_timestamp") or k == "evidence_timestamp")
+        and dispute.get(k) is not None
+        for k in dispute.keys()
+    ) or bool(meta_dict)
+
     for field in RELEVANT_EVIDENCE_BY_REASON[reason]:
         value = dispute.get(field)
         item = packet_by_field[field]
         available = isinstance(value, bool)
         valid = isinstance(value, bool) or value is None
         confidence = 0.95 if value is True and valid else 0.80 if value is False and valid else 0.25
+
+        field_meta = meta_dict.get(field) if isinstance(meta_dict, dict) else None
+        if hasattr(field_meta, "model_dump"):
+            field_meta = field_meta.model_dump()
+        elif hasattr(field_meta, "dict"):
+            field_meta = field_meta.dict()
+        elif not isinstance(field_meta, dict):
+            field_meta = {}
+
+        field_source = dispute.get(f"{field}_source") or field_meta.get("source")
+        field_ts = dispute.get(f"{field}_timestamp") or field_meta.get("timestamp") or dispute.get("evidence_timestamp")
+        field_consistent = dispute.get(f"{field}_consistent")
+        if field_consistent is None:
+            field_consistent = field_meta.get("consistent", True)
+
+        source_str = str(field_source or "merchant_record")
+
+        # Provenance verification rule:
+        # Any True evidence value whose source is "manual_upload" or "unknown"
+        # or whose timestamp is missing counts as UNVERIFIED (treated as WARN for auto-contest gate).
+        is_verified = True
+        if value is True:
+            if field_source in ("manual_upload", "unknown") or source_str in ("manual_upload", "unknown"):
+                is_verified = False
+            elif has_any_provenance and (not field_ts or not field_source):
+                is_verified = False
+
         items.append(
             EvidenceIntelligenceItem(
                 field=field,
                 available=available,
                 valid=valid,
                 confidence=confidence,
-                timestamp=dispute.get(f"{field}_timestamp") or dispute.get("evidence_timestamp"),
-                source=str(dispute.get(f"{field}_source") or "merchant_record"),
-                consistent=dispute.get(f"{field}_consistent", True) is not False,
+                timestamp=field_ts,
+                source=source_str,
+                consistent=field_consistent is not False,
                 status=item.status,
+                verified=is_verified,
             )
         )
 
