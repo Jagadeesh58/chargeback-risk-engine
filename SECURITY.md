@@ -1,79 +1,119 @@
-# Security Notes
+# Security Policy & Architecture
 
-## Decision boundary
+## 1. Responsible Disclosure Policy
 
-- The ML model is advisory.
-- The graph is advisory.
-- Economics is advisory.
-- Deterministic policy is the only component that selects a final action.
-- The payment-gateway adapter produces a draft and has no live submission path in the demo or benchmark.
+The `chargeback-risk-engine` project values the contributions of the security research community. If you discover a vulnerability or potential security risk, please report it privately and responsibly so we can resolve the issue before public disclosure.
 
-## Input handling, rate limiting, and size boundaries
+### Reporting a Vulnerability
 
-- Dispute IDs are constrained to a safe identifier pattern at the API boundary.
-- Unknown reason codes are rejected.
-- Request body size is capped by default at 64 KB (configurable via `CHARGEBACK_MAX_BODY_BYTES`), rejecting larger payloads with 413. For chunked transfer-encoding, payloads are streamed and aborted immediately as soon as byte accumulation exceeds the threshold without buffering full inputs.
-- Rate limiting is evaluated prior to reading or buffering request bodies, protecting server memory from unauthenticated payload floods. In-memory per-client tracking is memory-bounded with LRU eviction of expired clients (`_MAX_CLIENT_ENTRIES = 5000`).
-- **Reverse-Proxy Client IP Boundary**: The in-memory rate limiter inspects `request.client.host`. In production environments operating behind a CDN, API gateway, or reverse proxy (e.g., Cloudflare, AWS ALB, NGINX), `request.client.host` reflects the internal reverse proxy IP unless trusted proxy middleware explicitly parses `X-Forwarded-For`. Blindly trusting `X-Forwarded-For` without upstream proxy validation exposes the service to IP spoofing and rate limit bypasses. In distributed production, rate limiting and DDoS mitigation should be offloaded to an edge gateway (e.g. Redis-backed Token Bucket or Envoy filter).
-- Amounts, model scores and graph scores are checked for finite valid ranges before policy evaluation.
-- Evidence values are explicit booleans or unknown values; unknown is not treated as a positive result.
-- Extra text fields are not interpreted as instructions by the decision engine.
+- **Preferred Reporting Path**: Use GitHub Private Vulnerability Reporting on this repository.
+- **Security Contact**: Email `security@example.com` with the subject line `[SECURITY] chargeback-risk-engine Vulnerability Report`.
+- **GPG Key**: Available upon request or via public keyservers.
 
-## Authentication and API access
+Please include the following information in your report:
+1. Detailed description of the vulnerability, including affected endpoints or modules.
+2. Step-by-step reproduction instructions or a minimal proof-of-concept script.
+3. Potential impact assessment (e.g., authorization bypass, integrity failure, denial of service).
+4. Any potential mitigations or remediations identified.
 
-- API authentication is optional for local development/demo: when `CHARGEBACK_API_KEY` is unset, the engine runs in demo mode (`auth: "demo-open"` on `/health`), logging a visible warning on startup.
-- When `CHARGEBACK_API_KEY` is configured, `/decision`, `/score`, and `/audit/verify` enforce the `X-API-Key` header with constant-time comparison (`hmac.compare_digest`). `/health` remains accessible for liveness checks.
+### Response Timelines & SLAs
 
-## Safety invariants under test
+- **Initial Acknowledgment**: Within 48 hours of report receipt.
+- **Triage & Severity Assessment**: Within 5 business days.
+- **Fix & Patch Deployment**: Targeted within 14 business days for critical vulnerabilities.
+- **Public Disclosure**: Coordinated disclosure after release of fix or 90 days following initial report, whichever occurs first.
 
-The regression suite verifies that:
+---
 
-- monetary ceilings cannot be bypassed by high model confidence
-- missing evidence cannot become sufficient because the model score is high
-- `UNKNOWN` evidence does not become `PASS`
-- contradictory/invalid evidence cannot silently become safe evidence
-- graph escalation can force `HUMAN-REVIEW`
-- economics cannot override safety gates, and policy does not trust a caller-supplied expected value
-- duplicate requests replay the stored decision
-- malformed input cannot force `AUTO-CONTEST`
-- model output does not directly execute a financial action
+## 2. Core Decision Boundary
 
-## Model artifacts & integrity verification
+- **Machine Learning is Advisory**: The ML win probability score is strictly an advisory signal.
+- **Graph Clustering is Advisory**: Risk graph entity clustering produces risk scores that may escalate disputes to review, but cannot approve an automated contest.
+- **Economics is Advisory**: Expected net value calculations are advisory filters; high EV cannot bypass safety or evidence gates.
+- **AI Analyst is Advisory**: External LLM case analyses produce notes and counterfactuals but cannot alter decision outcomes.
+- **Deterministic Policy is Sole Authority**: Only `chargeback_risk_engine.policy.decide()` can select a final financial action (`AUTO-CONTEST`, `HUMAN-REVIEW`, `ACCEPT-LOSS`).
+- **Payment Gateway Adapter**: Produces representment packet drafts; no direct money movements are executed in demo, evaluation, or benchmark modes.
 
-Pickle deserialization executes arbitrary code and is only safe for trusted, hash-verified files. Model artifacts are accompanied by a `.sha256` sidecar file containing their SHA-256 digest. When loading `ml_scorer_model.pkl`, the SHA-256 checksum is verified before unpickling; mismatches raise a ValueError.
-- **Threat Model**: Loading pickled model weights is secure against external runtime attackers because the model file and sidecar are local filesystem artifacts. Tampering with the model requires either direct write access to the host repository/filesystem or compromise of the CI/CD artifact pipeline. Setting `CHARGEBACK_REQUIRE_MODEL_HASH=1` (or loading the committed production model) strictly enforces hash presence and rejects missing sidecars. For multi-tenant or untrusted model distribution, models should be exported as raw parameters (weights and biases in JSON) rather than serialized Python object graphs.
-The live scorer additionally records model version, feature version, and scikit-learn version and rejects incompatible metadata.
+---
 
-## Audit hash chain boundaries & concurrency
+## 3. Input Handling, Rate Limiting, and Size Boundaries
 
-The SQLite audit log links decisions into a SHA-256 hash chain. Writes are serialized via thread locks and database-level `BEGIN IMMEDIATE` transactions to prevent chain forking under concurrency.
-- **Tamper Evidence Boundary**: The hash chain provides tamper-evidence against partial edits, in-place record mutations, and retroactive modifications.
-- **Threat Boundary**: An adversary with unrestricted filesystem or SQLite database write access could recompute the entire hash chain from scratch, and tail deletion is undetectable without external anchoring. Production systems should periodically publish the head digest to an external append-only log or write-once ledger.
+- **Dispute Identifiers**: Dispute IDs are constrained to a safe alphanumeric pattern at the API boundary (`^[A-Za-z0-9_-]{1,64}$`).
+- **Reason Codes**: Only recognized card-brand reason codes are accepted; unknown reason codes are rejected with HTTP 422.
+- **Payload Size Caps**: Request bodies are capped by default at 64 KB (configurable via `CHARGEBACK_MAX_BODY_BYTES`), rejecting oversized payloads with HTTP 413. For chunked transfer-encoding, payloads are streamed and aborted immediately upon exceeding the threshold without buffering full inputs into memory.
+- **Rate Limiting**: Evaluated prior to reading or buffering request bodies, protecting server memory from unauthenticated payload floods (`CHARGEBACK_RATE_LIMIT_RPS`). In-memory tracking uses an LRU-evicted client cache (`_MAX_CLIENT_ENTRIES = 5000`).
+- **Reverse-Proxy Client IP Boundary**: The in-memory rate limiter inspects direct socket connection (`request.client.host`). In production deployments behind a CDN, API gateway, or reverse proxy (e.g., Cloudflare, AWS ALB, NGINX), `request.client.host` reflects the internal reverse proxy IP unless trusted proxy middleware parses upstream headers. Edge rate limiting (e.g. Redis Token Bucket or Envoy filter) is recommended for distributed multi-instance clusters.
+- **Score and Amount Boundaries**: Amounts, model scores, and graph scores are validated for finite numeric ranges before policy evaluation.
+- **Evidence Verification**: Evidence values must be explicit booleans or missing; unverified or missing evidence is never treated as a positive result.
 
-## PII storage and data retention (GDPR & Indian DPDP Act)
+---
 
-The persistent audit database (`audit_log.db`) records:
+## 4. Authentication, Roles, and Key Rotation
+
+- **Authentication Modes**:
+  - In local development or demo environments where `CHARGEBACK_API_KEY` is unset, the engine runs in demo mode (`auth: "demo-open"` on `/health`), logging a visible warning on startup.
+  - When configured, `/decision`, `/score`, `/audit/verify`, and `/metrics` enforce the `X-API-Key` header with constant-time comparison (`hmac.compare_digest`).
+- **Multi-Key Configuration & Rotation**:
+  - `CHARGEBACK_API_KEYS` supports multiple active credentials formatted as `key_id:secret:role[,key_id:secret:role,...]`.
+  - Zero-downtime key rotation is achieved by deploying both old and new keys simultaneously during transition windows.
+- **Role-Based Access Control**:
+  - `read`: Can inspect health and calculate advisory scores (`/score`).
+  - `write`: Can submit disputes for policy decision (`/decision`).
+  - `admin`: Can execute integrity verifications (`/audit/verify`), export signed head anchors (`/audit/head/anchor`), and scrape telemetry (`/metrics`).
+
+---
+
+## 5. Safety Invariants Under Test
+
+The automated regression suite verifies that:
+1. Monetary ceilings (`₹50,000`) cannot be bypassed by high model confidence.
+2. Missing evidence cannot become sufficient because the model win probability is high.
+3. `UNKNOWN` or unverified evidence does not become `PASS`.
+4. Contradictory or invalid evidence cannot silently become safe evidence.
+5. Graph risk escalation can force `HUMAN-REVIEW`.
+6. Economics cannot override safety gates; policy does not trust caller-supplied expected value.
+7. Duplicate requests replay the original stored decision.
+8. Malformed or out-of-bounds input cannot force `AUTO-CONTEST`.
+9. Model output does not directly execute a financial action.
+
+---
+
+## 6. Model Artifacts & Integrity Verification
+
+- **Elimination of Pickle**: Serialized Python pickle files (`.pkl`) are strictly prohibited in production runtimes due to arbitrary code execution risks.
+- **Transparent JSON Weights**: Model parameters (feature coefficients, intercept, scaling factors) are stored as human-readable JSON files (`ml_scorer_model.json`).
+- **Cryptographic Digest Sidecars**: Model files are accompanied by a `.sha256` digest sidecar. The SHA-256 checksum is strictly validated at server startup (`CHARGEBACK_REQUIRE_MODEL_HASH=1`).
+- **Metadata Compatibility**: Scorer initialization verifies model version, feature version, and runtime schema compatibility.
+
+---
+
+## 7. Audit Hash Chain Boundaries & Concurrency
+
+- **SHA-256 Hash Chaining**: Every decision record links to the previous entry's SHA-256 digest (`record_hash = SHA256(prev_hash + canonical_json)`).
+- **Concurrency & WAL Mode**: SQLite runs in Write-Ahead Logging mode (`PRAGMA journal_mode = WAL`) with busy timeouts (`PRAGMA busy_timeout = 5000`) and serialized in-process mutexes (`_AUDIT_WRITE_LOCK`) to prevent chain forking under concurrent writes.
+- **External Head Anchoring**: To protect against complete tail deletion by an adversary with database filesystem access, the current head hash can be exported via `GET /audit/head/anchor`. This emits an HMAC-SHA256 signature signed with `CHARGEBACK_ANCHOR_SECRET`, suitable for publishing to an append-only transparency log or write-once ledger.
+
+---
+
+## 8. PII Storage & Data Privacy (GDPR & Indian DPDP Act 2023)
+
+The persistent audit database stores:
 - **Identifiers**: `dispute_id`, `payment_id`, `customer_id`, `device_id`, `ip_address`, `card_fingerprint`.
 - **Decision Context**: Dispute amount, reason code, evidence checklist items, win probability, and financial action.
 
-**Regulatory Considerations (GDPR Article 17 / Indian DPDP Act 2023)**:
-Data principals have statutory rights to request erasure of personal data. However, in an immutable cryptographic audit chain, mutating or deleting a historical record breaks the SHA-256 hash linkage for all subsequent records, making native row deletion incompatible with tamper-evident auditing.
+### Privacy Remediation Recommendations:
+1. **Pseudonymization**: Buyer identifiers (`customer_id`, `ip_address`, `card_fingerprint`) should be hashed using a keyed HMAC before persistence.
+2. **Crypto-Shredding**: For statutory Right to Erasure requests (GDPR Art. 17 / Indian DPDP Act 2023), store sensitive fields encrypted with a per-customer encryption key. Deleting the customer key makes historical PII unrecoverable without breaking cryptographic audit chain linkage.
+3. **Data Retention**: Partition and archive audit logs after applicable card-brand representment windows expire (typically 180 to 540 days).
 
-**Architectural Remediation**:
-1. **Identifier Pseudonymization**: In production, buyer identifiers (`customer_id`, `ip_address`, `card_fingerprint`) should be passed through a keyed HMAC or salted cryptographic hash before entering the audit log.
-2. **Cryptographic Erasure (Crypto-Shredding)**: Sensitive fields can be encrypted with a per-customer key. To fulfill a "Right to Erasure" request, deleting the customer's encryption key renders the ciphertext permanently unrecoverable without modifying historical database rows or breaking audit chain integrity.
-3. **Retention Windows**: Audit databases should be partitioned and pruned after the applicable card brand chargeback representment window (typically 180 to 540 days under card network operating rules).
+---
 
-## Privacy & third-party AI disclosure
+## 9. Privacy & Third-Party AI Egress
 
-When `CHARGEBACK_AI_ANALYST_URL` is configured, unstructured dispute notes (`evidence_text`), reason codes, and assembled evidence lists are transmitted via HTTP POST to the external service. Deployments processing production cardholder data or sensitive PII must ensure the target URL is an internal, authorized service compliant with data governance rules, or redact sensitive customer details before forwarding.
+When `CHARGEBACK_AI_ANALYST_URL` is configured, dispute notes and evidence details are sent via HTTP POST to the external analysis service. Deployments processing production cardholder data or sensitive PII must ensure the target URL is an internal, authorized service compliant with data governance policies, or redact sensitive customer details before forwarding.
 
-## Secrets and credentials
+---
 
-Do not commit credentials, API keys, tokens, or private keys. The repository's test/demo adapter does not require them.
+## 10. Secrets & Credentials Management
 
-## Deployment scope & limitations
-
-- Synthetic benchmark results are not production performance claims.
-- SQLite is suitable for this local/demo repository but is not presented as a distributed production data store.
-- The in-memory rate limiter is per-process and intended for local daemon protection. Distributed deployments should enforce rate limits and DDoS mitigation at the edge/gateway layer.
+Do not commit API keys, secrets, or certificates to source control. The repository relies entirely on environment variable configuration (`CHARGEBACK_API_KEYS`, `CHARGEBACK_ANCHOR_SECRET`). Production deployments should inject secrets from a dedicated secrets manager (e.g. HashiCorp Vault, AWS Secrets Manager, or Kubernetes Secrets).
