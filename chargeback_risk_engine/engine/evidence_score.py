@@ -2,10 +2,46 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+import os
 from typing import Any
 
 from chargeback_risk_engine.config import RELEVANT_EVIDENCE_BY_REASON
 from chargeback_risk_engine.evidence import assemble
+
+TRUSTED_SOURCES = frozenset({"carrier_api", "psp_log", "merchant_record"})
+
+
+def validate_evidence_timestamp(ts_str: str | None) -> bool:
+    """Validate ISO-8601 timestamp against in-window bounds.
+
+    Must not be in the future (> 300s clock skew) and must not be older than
+    CHARGEBACK_MAX_EVIDENCE_AGE_DAYS (default 365 days).
+    """
+    if not ts_str:
+        return False
+    try:
+        clean_ts = str(ts_str).replace("Z", "+00:00")
+        dt = datetime.fromisoformat(clean_ts)
+    except Exception:
+        return False
+    now = datetime.now(timezone.utc)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+
+    # Future check with 300s clock skew
+    if (dt - now).total_seconds() > 300:
+        return False
+
+    try:
+        max_age_days = float(os.getenv("CHARGEBACK_MAX_EVIDENCE_AGE_DAYS", "365"))
+    except ValueError:
+        max_age_days = 365.0
+
+    if (now - dt).total_seconds() > max_age_days * 86400:
+        return False
+
+    return True
 
 
 @dataclass(frozen=True)
@@ -53,6 +89,12 @@ def score_evidence(dispute: dict, evidence_packet=None) -> EvidenceScore:
         for k in dispute.keys()
     ) or bool(meta_dict)
 
+    env = os.getenv("CHARGEBACK_ENV", "production").lower().strip()
+    allow_unverified = (
+        env in ("development", "demo")
+        and os.getenv("CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE", "0").lower().strip() in ("1", "true")
+    )
+
     for field in RELEVANT_EVIDENCE_BY_REASON[reason]:
         value = dispute.get(field)
         item = packet_by_field[field]
@@ -74,17 +116,21 @@ def score_evidence(dispute: dict, evidence_packet=None) -> EvidenceScore:
         if field_consistent is None:
             field_consistent = field_meta.get("consistent", True)
 
-        source_str = str(field_source or "merchant_record")
+        source_str = str(field_source or ("unspecified" if not allow_unverified else "merchant_record"))
 
         # Provenance verification rule:
-        # Any True evidence value whose source is "manual_upload" or "unknown"
-        # or whose timestamp is missing counts as UNVERIFIED (treated as WARN for auto-contest gate).
+        # Evidence value True counts as VERIFIED only if it has an allowed trusted source
+        # (carrier_api, psp_log, merchant_record) AND a valid in-window timestamp.
+        # In development/demo, CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE=1 relaxes omission only
+        # when no provenance is tracked on the request; partial or untrusted provenance is always unverified.
         is_verified = True
         if value is True:
-            if field_source in ("manual_upload", "unknown") or source_str in ("manual_upload", "unknown"):
-                is_verified = False
-            elif has_any_provenance and (not field_ts or not field_source):
-                is_verified = False
+            if allow_unverified and not has_any_provenance:
+                is_verified = True
+            else:
+                has_trusted_source = bool(field_source and str(field_source).lower() in TRUSTED_SOURCES)
+                valid_ts = validate_evidence_timestamp(field_ts)
+                is_verified = has_trusted_source and valid_ts
 
         items.append(
             EvidenceIntelligenceItem(

@@ -45,3 +45,7 @@ These monetary values are modeled expected values from synthetic data, not reali
 ## Integrity artifacts
 
 `artifacts/baseline_manifest.json` records the baseline source-archive hash, commit, runtime/dependency versions, dataset hashes, model-artifact hashes, and frozen system benchmark.
+
+## Historical Candidate Evolution & Provenance Hardening Note
+
+In early iterations of the candidate decision engine on 5,000 synthetic test cases, the system permitted auto-contesting of 2,133 cases with ~72.9% precision. Following the implementation of strict fail-closed evidence provenance (`TRUSTED_SOURCES` validation and mandatory timestamp freshness windows), disputes with unverified or unannotated evidence fields are deterministically diverted to `HUMAN-REVIEW`. This reduces automated contesting to 1,324 cases (26.5% auto share) while increasing automated precision to 77.6% (reducing synthetic false-positive lost contests from 578 down to 297). This intentional trade-off reflects production financial safety: when evidence integrity cannot be proven, the engine fails closed to human review rather than risking automated loss fines and dispute monitoring escalation.

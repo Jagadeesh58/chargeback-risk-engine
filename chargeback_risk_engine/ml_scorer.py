@@ -14,7 +14,6 @@ import json
 import logging
 import math
 import os
-import pickle
 
 import numpy as np
 import pandas as pd
@@ -33,7 +32,6 @@ from chargeback_risk_engine.paths import ARTIFACTS_DIR, DATA_DIR
 logger = logging.getLogger("chargeback_risk_engine")
 
 MODEL_PATH = str(ARTIFACTS_DIR / "ml_scorer_model.json")
-LEGACY_MODEL_PATH = str(ARTIFACTS_DIR / "ml_scorer_model.pkl")
 _cached_scorer = None
 
 
@@ -121,14 +119,17 @@ def load_or_fit_ml_scorer(path: str = MODEL_PATH, train_csv: str | None = None) 
 
     env = os.getenv("CHARGEBACK_ENV", "production").lower().strip()
 
-    # If default json path does not exist, check for legacy pkl in dev or fit fresh
+    if path.endswith(".pkl"):
+        raise RuntimeError(
+            f"Legacy pickle model artifacts are disallowed: '{path}'. "
+            "Re-train with safe JSON representation via 'make train'."
+        )
+
+    # If default json path does not exist, fit fresh and save
     effective_path = path
     if not os.path.exists(effective_path):
-        if effective_path == MODEL_PATH and os.path.exists(LEGACY_MODEL_PATH):
-            effective_path = LEGACY_MODEL_PATH
-        else:
-            _cached_scorer = save_ml_scorer(path, train_csv)
-            return _cached_scorer
+        _cached_scorer = save_ml_scorer(path, train_csv)
+        return _cached_scorer
 
     with open(effective_path, "rb") as f:
         raw_bytes = f.read()
@@ -155,7 +156,7 @@ def load_or_fit_ml_scorer(path: str = MODEL_PATH, train_csv: str | None = None) 
             )
         logger.warning("SECURITY WARNING: Missing integrity sidecar hash for %s", effective_path)
 
-    # Check serialization format: safe JSON vs legacy pickle
+    # Check serialization format: safe JSON only
     is_json = False
     bundle = None
     try:
@@ -166,24 +167,10 @@ def load_or_fit_ml_scorer(path: str = MODEL_PATH, train_csv: str | None = None) 
         is_json = False
 
     if not is_json:
-        # Legacy pickle artifact
-        if env == "production":
-            raise RuntimeError(
-                f"Refusing to load untrusted legacy .pkl model artifact '{effective_path}' in production mode. "
-                "Use safe JSON model artifact."
-            )
-        logger.warning(
-            "DEPRECATION WARNING: Loading legacy pickle model artifact '%s'. "
-            "Re-train or migrate to safe JSON representation.",
-            effective_path,
+        raise RuntimeError(
+            f"Legacy pickle or invalid model artifact format in '{effective_path}'. "
+            "Re-train with safe JSON representation via 'make train'."
         )
-        with open(effective_path, "rb") as pf:
-            legacy_bundle = pickle.load(pf)
-        if isinstance(legacy_bundle, dict) and "scorer" in legacy_bundle:
-            _cached_scorer = legacy_bundle["scorer"]
-        else:
-            _cached_scorer = legacy_bundle
-        return _cached_scorer
 
     # Safe JSON reconstruction
     if bundle.get("model_version") not in (None, LIVE_MODEL_VERSION):

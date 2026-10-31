@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+from pathlib import Path
 import tempfile
 import pytest
 import pandas as pd
@@ -173,7 +174,7 @@ def test_round_trip_prediction_equality_to_1e_9():
 
 
 def test_production_mode_refuses_legacy_pkl(monkeypatch):
-    """Production mode refuses to deserialize legacy .pkl artifacts."""
+    """Any attempt to load legacy .pkl artifacts is refused."""
     with tempfile.TemporaryDirectory() as tmp:
         pkl_path = os.path.join(tmp, "legacy.pkl")
         with open(pkl_path, "wb") as f:
@@ -185,5 +186,25 @@ def test_production_mode_refuses_legacy_pkl(monkeypatch):
         monkeypatch.setenv("CHARGEBACK_ENV", "production")
         import chargeback_risk_engine.ml_scorer as ml_module
         ml_module._cached_scorer = None
-        with pytest.raises(RuntimeError, match="Refusing to load untrusted legacy .pkl model artifact"):
+        with pytest.raises(RuntimeError, match="Legacy pickle model artifacts are disallowed"):
             load_or_fit_ml_scorer(path=pkl_path)
+
+
+def test_no_pickle_imported_in_package_or_scripts():
+    """Verify via AST analysis that pickle is never imported in chargeback_risk_engine or scripts."""
+    import ast
+    repo_root = Path(__file__).resolve().parents[1]
+    targets = [repo_root / "chargeback_risk_engine", repo_root / "scripts"]
+    violations = []
+    for target in targets:
+        for py_file in target.rglob("*.py"):
+            tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=str(py_file))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        if alias.name == "pickle" or alias.name.startswith("pickle."):
+                            violations.append((str(py_file), node.lineno))
+                elif isinstance(node, ast.ImportFrom):
+                    if node.module == "pickle" or (node.module and node.module.startswith("pickle.")):
+                        violations.append((str(py_file), node.lineno))
+    assert not violations, f"Forbidden pickle imports found: {violations}"

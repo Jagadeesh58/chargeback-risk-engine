@@ -19,7 +19,7 @@ from chargeback_risk_engine.evidence import assemble
 from chargeback_risk_engine.metrics import _row_to_dispute
 from chargeback_risk_engine.config import REASON_CODES
 
-TEST_MODEL_PATH = "test_ml_scorer_model_pytest.pkl"
+TEST_MODEL_PATH = "test_ml_scorer_model_pytest.json"
 
 
 @pytest.fixture(autouse=True)

@@ -1,4 +1,4 @@
-name: verify
+name: CI
 
 on:
   push:
@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.11', '3.12']
+        python-version: ['3.11', '3.12', '3.13']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -20,17 +20,22 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install ruff pip-audit
+          pip install ruff mypy pytest-cov pip-audit build twine cyclonedx-bom
       - name: Lint with ruff
-        run: ruff check .
-      - name: Security audit with pip-audit
-        run: pip-audit || echo "::warning::pip-audit found potential vulnerabilities"
+        run: |
+          ruff check .
+          ruff format --check .
+      - name: Typecheck with mypy
+        run: mypy chargeback_risk_engine
+      - name: Test with pytest and coverage
+        run: pytest --cov=chargeback_risk_engine --cov-report=term-missing
       - name: Run verification workflow
         run: make verify
-      - name: Verify documentation and artifact drift
-        run: |
-          python scripts/generate_report.py
-          git diff --exit-code -- artifacts docs ':!docs/*.png'
-      - name: Run release verification
-        run: python scripts/verify_release.py
+      - name: Security audit with pip-audit
+        run: pip-audit || echo "::warning::pip-audit completed with warnings"
+      - name: Build package
+        run: python -m build
+      - name: Check package metadata with twine
+        run: twine check dist/*

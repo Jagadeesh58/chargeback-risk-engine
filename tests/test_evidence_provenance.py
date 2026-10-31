@@ -245,3 +245,130 @@ def test_structured_evidence_meta_support():
     }
     resp_extra = client.post("/decision", json=payload_extra)
     assert resp_extra.status_code == 422
+
+
+def test_omission_of_provenance_in_production_routes_to_human_review(monkeypatch):
+    """In production mode, omitting provenance fields marks positive evidence unverified and routes to HUMAN-REVIEW."""
+    monkeypatch.setenv("CHARGEBACK_ENV", "production")
+    monkeypatch.setenv("CHARGEBACK_API_KEY", "prod_super_secret_api_key_32chars_min_length!!")
+    monkeypatch.delenv("CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE", raising=False)
+
+    payload = {
+        "dispute_id": "D_OMIT_PROD_001",
+        "payment_id": "pay_omit_1",
+        "reason_code": "item_not_received",
+        "amount": 2000.0,
+        "has_tracking_number": True,
+        "has_delivery_confirmation": True,
+        "has_signature_confirmation": True,
+    }
+    headers = {"X-API-Key": "prod_super_secret_api_key_32chars_min_length!!"}
+    response = client.post("/decision", json=payload, headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["action"] == HUMAN_REVIEW
+    assert "unverified" in data["reason"].lower()
+
+
+def test_verified_provenance_in_production_routes_to_auto_contest(monkeypatch):
+    """In production mode, full verified provenance allows auto-contest."""
+    monkeypatch.setenv("CHARGEBACK_ENV", "production")
+    monkeypatch.setenv("CHARGEBACK_API_KEY", "prod_super_secret_api_key_32chars_min_length!!")
+    monkeypatch.delenv("CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE", raising=False)
+
+    valid_ts = _now_iso(offset_days=-1.0)
+    payload = {
+        "dispute_id": "D_VERIFY_PROD_001",
+        "payment_id": "pay_ver_1",
+        "reason_code": "item_not_received",
+        "amount": 2000.0,
+        "has_tracking_number": True,
+        "has_tracking_number_source": "carrier_api",
+        "has_tracking_number_timestamp": valid_ts,
+        "has_delivery_confirmation": True,
+        "has_delivery_confirmation_source": "carrier_api",
+        "has_delivery_confirmation_timestamp": valid_ts,
+        "has_signature_confirmation": True,
+        "has_signature_confirmation_source": "carrier_api",
+        "has_signature_confirmation_timestamp": valid_ts,
+    }
+    headers = {"X-API-Key": "prod_super_secret_api_key_32chars_min_length!!"}
+    response = client.post("/decision", json=payload, headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["action"] == AUTO_CONTEST
+
+
+def test_dev_override_works_and_is_reported_by_health(monkeypatch):
+    """In development mode, CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE=1 relaxes provenance and is reported by /health."""
+    monkeypatch.setenv("CHARGEBACK_ENV", "development")
+    monkeypatch.setenv("CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE", "1")
+
+    # Verify /health reports it
+    health_resp = client.get("/health")
+    assert health_resp.status_code == 200
+    health_data = health_resp.json()
+    assert health_data["allow_unverified_evidence"] is True
+    assert health_data["environment"] == "development"
+
+    # Request without provenance can AUTO-CONTEST in dev when override is active
+    payload = {
+        "dispute_id": "D_DEV_OVERRIDE_001",
+        "payment_id": "pay_dev_1",
+        "reason_code": "item_not_received",
+        "amount": 2000.0,
+        "has_tracking_number": True,
+        "has_delivery_confirmation": True,
+        "has_signature_confirmation": True,
+    }
+    resp = client.post("/decision", json=payload)
+    assert resp.status_code == 200
+    assert resp.json()["action"] == AUTO_CONTEST
+
+
+from unittest import mock
+from hypothesis import given, settings
+import hypothesis.strategies as st
+
+
+@settings(max_examples=25, deadline=None)
+@given(
+    source=st.sampled_from([None, "", "manual_upload", "unknown", "arbitrary_user_upload", "untrusted"]),
+    timestamp_offset=st.sampled_from([None, 10.0, -500.0]),  # None, future, stale (>365d)
+)
+def test_hypothesis_no_unverified_provenance_ever_auto_contests_in_production(source, timestamp_offset):
+    """Property-based test: in production, no dispute with missing/untrusted/out-of-window provenance ever yields AUTO-CONTEST."""
+    env_patch = {
+        "CHARGEBACK_ENV": "production",
+        "CHARGEBACK_API_KEY": "prod_super_secret_api_key_32chars_min_length!!",
+    }
+    with mock.patch.dict(os.environ, env_patch):
+        os.environ.pop("CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE", None)
+        ts_str = _now_iso(offset_days=timestamp_offset) if timestamp_offset is not None else None
+        dispute = {
+            "dispute_id": "D_HYPO_TEST",
+            "payment_id": "pay_hypo",
+            "reason_code": "item_not_received",
+            "amount": 2000.0,
+            "has_tracking_number": True,
+            "has_delivery_confirmation": True,
+            "has_signature_confirmation": True,
+        }
+        if source is not None:
+            dispute["has_tracking_number_source"] = source
+        if ts_str is not None:
+            dispute["has_tracking_number_timestamp"] = ts_str
+
+        packet = assemble(dispute)
+        quality = score_evidence(dispute, packet)
+
+        # Even with an artificially high win_probability of 0.99 and expected value of 1800,
+        # policy.decide must reject AUTO-CONTEST.
+        decision = decide(
+            win_probability=0.99,
+            amount=2000.0,
+            evidence_packet=packet,
+            evidence_quality=quality,
+            expected_net_value=1800.0,
+        )
+        assert decision.action != AUTO_CONTEST, f"Unverified source={source}, ts={ts_str} unexpectedly reached AUTO-CONTEST"

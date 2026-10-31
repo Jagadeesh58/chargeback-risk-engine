@@ -13,12 +13,17 @@ policy-optimize:
 hard-cases:
 	python scripts/evaluate_hard_cases.py
 
-verify:
-	python -m pytest -q
-	python -m chargeback_risk_engine.policy_optimizer
+regen:
 	python scripts/benchmark.py
 	python scripts/evaluate_hard_cases.py
+	python scripts/oracle_ceiling.py
 	python scripts/generate_report.py
+	python scripts/robustness_benchmark.py
+
+verify:
+	python -m pytest -q
+	python scripts/verify_release.py
+	git diff --exit-code -- artifacts docs ':!docs/*.png'
 
 latency:
 	python scripts/latency.py

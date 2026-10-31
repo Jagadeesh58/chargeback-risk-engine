@@ -2,9 +2,14 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import tempfile
 import sys
+
+# Historical evaluation benchmark evaluates held-out synthetic test set
+os.environ.setdefault("CHARGEBACK_ENV", "development")
+os.environ.setdefault("CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE", "1")
 
 _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:

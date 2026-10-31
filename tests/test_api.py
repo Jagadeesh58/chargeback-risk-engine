@@ -415,23 +415,25 @@ def test_model_hash_verification(tmp_path, monkeypatch):
     import chargeback_risk_engine.ml_scorer as ml_mod
     monkeypatch.setattr(ml_mod, "_cached_scorer", None)
 
-    fake_model = tmp_path / "test_model.pkl"
+    fake_model = tmp_path / "test_model.json"
     fake_model.write_bytes(b"dummy model bytes")
 
-    sidecar = tmp_path / "test_model.pkl.sha256"
+    sidecar = tmp_path / "test_model.json.sha256"
     sidecar.write_text("invalid_hash_value\n")
 
     with pytest.raises(ValueError, match="Model integrity failure"):
         ml_mod.load_or_fit_ml_scorer(path=str(fake_model))
 
-    # Correct hash allows load to proceed (will fail later on pickle format, but integrity passes)
+    # Correct hash allows load to proceed (will fail on format, but integrity passes)
     import hashlib
     correct_hash = hashlib.sha256(b"dummy model bytes").hexdigest()
     sidecar.write_text(correct_hash + "\n")
+    with pytest.raises(RuntimeError, match="invalid model artifact format"):
+        ml_mod.load_or_fit_ml_scorer(path=str(fake_model))
 
     # Requiring hash sidecar when missing
-    missing_sidecar_model = tmp_path / "no_sidecar.pkl"
-    missing_sidecar_model.write_bytes(b"test")
+    missing_sidecar_model = tmp_path / "no_sidecar.json"
+    missing_sidecar_model.write_bytes(b"{}")
     monkeypatch.setenv("CHARGEBACK_REQUIRE_MODEL_HASH", "1")
     with pytest.raises(ValueError, match="missing required sidecar hash"):
         ml_mod.load_or_fit_ml_scorer(path=str(missing_sidecar_model))

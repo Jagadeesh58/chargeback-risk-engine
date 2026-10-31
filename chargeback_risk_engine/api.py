@@ -27,6 +27,7 @@ def _validate_startup_config():
             f"Invalid CHARGEBACK_ENV '{env}'. Must be one of: production, development, demo."
         )
     api_key = os.getenv("CHARGEBACK_API_KEY")
+    allow_unverified_str = os.getenv("CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE", "0").lower().strip()
     if env == "production":
         if not api_key:
             raise RuntimeError(
@@ -36,10 +37,21 @@ def _validate_startup_config():
             raise RuntimeError(
                 "CHARGEBACK_API_KEY must be at least 32 characters in production mode."
             )
+        if allow_unverified_str in ("1", "true"):
+            logger.warning(
+                "SECURITY WARNING: CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE is ignored in production mode. "
+                "Fail-closed provenance is strictly enforced."
+            )
     else:
         if not api_key:
             logger.warning(
                 "SECURITY WARNING: CHARGEBACK_API_KEY is not set. API is running in %s mode without authentication.",
+                env,
+            )
+        if allow_unverified_str in ("1", "true"):
+            logger.warning(
+                "SECURITY WARNING: CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE=1 is active in %s mode. "
+                "Evidence provenance verification is relaxed for local testing.",
                 env,
             )
 
@@ -320,8 +332,17 @@ class DecisionResponse(BaseModel):
 @app.get("/health")
 def health():
     env = os.getenv("CHARGEBACK_ENV", "production").lower().strip()
+    allow_unverified = (
+        env in ("development", "demo")
+        and os.getenv("CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE", "0").lower().strip() in ("1", "true")
+    )
     auth_mode = "api-key" if os.getenv("CHARGEBACK_API_KEY") else ("demo-open" if env in ("development", "demo") else "unconfigured")
-    return {"status": "ok", "auth": auth_mode, "environment": env}
+    return {
+        "status": "ok",
+        "auth": auth_mode,
+        "environment": env,
+        "allow_unverified_evidence": allow_unverified,
+    }
 
 
 def _score(request: DisputeRequest, request_id: str | None = None) -> DecisionResponse:

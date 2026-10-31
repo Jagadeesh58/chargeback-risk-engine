@@ -600,7 +600,7 @@ def compute_penalty_sweep(cases: list[dict], oracle_data: dict, output_dir: Path
         ("Theoretical Oracle Ceiling", oracle_contested_mask, no_mask, "none"),
     ]
 
-    penalties = [float(x) for x in range(0, 15001, 250)]
+    penalties = [float(x) for x in range(0, 25001, 250)]
 
     sweep_results = {}
     for name, c_mask, r_mask, treat in strategies_spec:
