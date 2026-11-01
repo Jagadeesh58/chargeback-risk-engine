@@ -2,12 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [1.0.0] - 2026-11-01
+## Unreleased
 
 ### Added
 - **Production Readiness & Audit Probes**: Hardened `/readyz` probe to verify database connectivity, JSON model loading and SHA-256 checksum verification, audit chain head readability, and cryptographic verification of the last N rows (returns 503 Service Unavailable with machine-readable diagnostic errors on failure).
@@ -19,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Working Tree Cleanliness Enforcement**: Added conftest session tracking and `tests/test_working_tree_clean.py` ensuring test execution never modifies tracked repository files in place.
 - **Packaging Verification**: Added `tests/test_packaging_deps.py` verifying AST-based third-party imports match `pyproject.toml`, version synchronization, and single-source package metadata.
 - **Unified Operational CLI (`chargeback-cli`)**: Introduced entry point supporting `serve`, `verify-audit`, `train`, and `evaluate` subcommands.
-- **Enterprise Settings & Key Management**: Added `pydantic-settings` integration with support for multi-key authentication (`CHARGEBACK_API_KEYS`), zero-downtime key rotation, and role-based access control (`read`, `write`, `admin`).
+- **Settings and key management**: Added `pydantic-settings` integration with support for multi-key authentication (`CHARGEBACK_API_KEYS`), zero-downtime key rotation, and role-based access control (`read`, `write`, `admin`).
 - **Code of Conduct**: Added Contributor Covenant 2.1 in `CODE_OF_CONDUCT.md`.
 
 ### Changed

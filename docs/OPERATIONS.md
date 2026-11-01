@@ -1,4 +1,4 @@
-# Operations & Production Runbook
+# Deployment and Operations Notes
 
 This runbook covers deployment, environment configuration, monitoring, secret management, backup/restore, audit log verification, incident response, and capacity planning for `chargeback-risk-engine`.
 
@@ -45,7 +45,7 @@ uvicorn chargeback_risk_engine.api:app --host 0.0.0.0 --port 8000 --workers 2
 The engine provides dedicated probe endpoints for health checkers and load balancers:
 
 - **Liveness Probe (`/healthz`)**:
-  Returns HTTP 200 `{"status": "ok", "version": "1.0.0"}` confirming the process is alive.
+  Returns HTTP 200 confirming the process is alive.
   ```bash
   curl -f http://localhost:8000/healthz
   ```

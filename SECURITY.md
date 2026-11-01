@@ -1,13 +1,6 @@
 # Security Policy & Architecture
 
-## 1. Responsible Disclosure Policy & Supported Versions
-
-### Supported Versions
-
-| Version | Supported | Notes |
-|---|---|---|
-| `1.0.x` | :white_check_mark: | Current active release with cryptographic audit chain and fail-closed policy. |
-| `< 1.0` | :x: | Legacy development prototypes; no security patches provided. |
+## 1. Responsible Disclosure Policy
 
 The `chargeback-risk-engine` project values the contributions of the security research community. If you discover a vulnerability or potential security risk, please report it privately and responsibly so we can resolve the issue before public disclosure.
 
@@ -112,7 +105,7 @@ The persistent audit database stores:
 
 ## 9. Privacy & Third-Party AI Egress
 
-When `CHARGEBACK_AI_ANALYST_URL` is configured, dispute notes and evidence details are sent via HTTP POST to the external analysis service. Deployments processing production cardholder data or sensitive PII must ensure the target URL is an internal, authorized service compliant with data governance policies, or redact sensitive customer details before forwarding.
+When `CHARGEBACK_AI_ANALYST_URL` is configured, dispute notes and evidence details are sent via HTTP POST to the external analysis service. Deployments processing production cardholder data or sensitive PII must ensure the target URL is an internal, authorized service aligned with internal data governance policies, or redact sensitive customer details before forwarding.
 
 ---
 

@@ -263,7 +263,7 @@ def test_version_string_matches_across_repo():
 
     assert chargeback_risk_engine.__version__ == pyproject_version
     changelog = (REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert f"## [{pyproject_version}]" in changelog
+    assert "## Unreleased" in changelog
 
 
 def test_env_vars_documented_match_settings():
