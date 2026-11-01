@@ -48,7 +48,7 @@ flowchart TD
 In unconstrained spreadsheet arithmetic, contesting every dispute appears attractive whenever expected value exceeds the nominal gateway fee ($p \times \text{amount} - \text{fee} > 0$, typically $p > 3.75\%$). However, production dispute operations are not risk-free bets:
 
 1. **Dispute Monitoring Programs**: Payment networks operate merchant monitoring programs that apply operational surcharges or remediation requirements when dispute or fraud ratios exceed established thresholds.
-2. **Arbitration Exposure**: Unsubstantiated representments escalated to network arbitration incur substantial non-refundable review fees regardless of case amount.
+2. **Arbitration Exposure**: Representments that escalate to network arbitration can carry additional fees and operational cost; amounts and terms vary by network and acquirer contract.
 3. **Acquiring Termination**: Persistent adverse dispute loss rates risk processor termination and merchant account closure.
 
 For these reasons, the engine enforces strict, evidence-backed gating: only claims with verified, high-quality documentation are auto-contested, while ambiguous or high-risk cases fail closed to human review.
@@ -66,7 +66,7 @@ result = decide_case(dispute)
 The following components all call `decide_case(...)`:
 
 - FastAPI `/decision` endpoint
-- CLI evaluation and demo scripts (`scripts/demo.py`, `scripts/evaluate_hard_cases.py`)
+- CLI evaluation and demo scripts (`scripts/demo.py`, `scripts/evaluate_real_data.py`)
 - Strategy benchmark (`scripts/benchmark.py`)
 
 ## Core Module Boundaries

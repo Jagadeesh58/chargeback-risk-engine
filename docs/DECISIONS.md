@@ -32,7 +32,7 @@ Raw classification scores from Logistic Regression or rules baselines reflect un
 3. **Isotonic Regression / Pool Adjacent Violators Algorithm (PAVA) (Selected):** Fit a non-parametric, monotonic step function using PAVA on held-out development set predictions.
 
 ### Why This Was Chosen
-- **Non-Parametric Flexibility:** Platt scaling assumes a sigmoidal distortion of probabilities. Chargeback dispute outcomes often exhibit non-sigmoidal empirical win curves due to non-linear card network evidence requirements and dispute thresholds.
+- **Non-Parametric Flexibility:** Platt scaling assumes a sigmoidal distortion of probabilities. Chargeback dispute outcomes often exhibit non-sigmoidal empirical win curves due to non-linear dispute evidence requirements and operational thresholds.
 - **Preservation of Monotonic Ranking:** PAVA strictly enforces monotonicity ($\hat{y}_{i} \le \hat{y}_{j}$ whenever $x_i \le x_j$), ensuring that higher evidence scores never produce lower win probabilities.
 - **Measured Empirical Superiority:** On the held-out test set, isotonic regression calibrated on the live model's development set predictions achieved a lower Brier score (**0.2171** vs **0.2175** raw), eliminating the calibration bug where previous implementations fitted on rules scorers distorted live model probabilities.
 
