@@ -10,6 +10,7 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ['3.11', '3.12', '3.13']
     steps:
@@ -34,6 +35,7 @@ jobs:
         run: |
           python scripts/generate_report.py
           git diff --exit-code -- README.md artifacts docs ':!docs/*.png'
+          git checkout -- docs/*.png || true
       - name: Run verification workflow
         run: make verify
       - name: Security audit with pip-audit
@@ -50,7 +52,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Run Gitleaks secret scan
-        uses: gitleaks/gitleaks-action@7f35734e700b46e01a881cb5175402636a0d4c13 # v2.3.8
+        uses: gitleaks/gitleaks-action@f586c14365d4643c6aa59d472ae6e984bf47bb34 # v2.3.8
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Check markdown links
