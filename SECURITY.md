@@ -90,16 +90,17 @@ The automated regression suite verifies that:
 
 ---
 
-## 8. PII Storage & Data Privacy (GDPR & Indian DPDP Act 2023)
+## 8. Data Privacy Design Notes
 
 The persistent audit database stores:
 - **Identifiers**: `dispute_id`, `payment_id`, `customer_id`, `device_id`, `ip_address`, `card_fingerprint`.
 - **Decision Context**: Dispute amount, reason code, evidence checklist items, win probability, and financial action.
 
-### Privacy Remediation Recommendations:
-1. **Pseudonymization**: Buyer identifiers (`customer_id`, `ip_address`, `card_fingerprint`) should be hashed using a keyed HMAC before persistence.
-2. **Crypto-Shredding**: For statutory Right to Erasure requests (GDPR Art. 17 / Indian DPDP Act 2023), store sensitive fields encrypted with a per-customer encryption key. Deleting the customer key makes historical PII unrecoverable without breaking cryptographic audit chain linkage.
-3. **Data Retention**: Partition and archive audit logs after applicable card-brand representment windows expire (typically 180 to 540 days).
+The reference engine does not implement an erasure mechanism or claim compliance with data protection regulations such as GDPR or the Indian DPDP Act 2023. The following notes outline suggested architectural designs that operators should evaluate with their own legal and compliance counsel:
+
+1. **Pseudonymization**: Buyer identifiers (`customer_id`, `ip_address`, `card_fingerprint`) can be hashed using a keyed HMAC before persistence or tokenized upstream.
+2. **Crypto-Shredding**: Where erasure or right-to-be-forgotten workflows apply, sensitive fields can be encrypted with a per-customer key. Deleting the customer encryption key renders the stored identifiers unrecoverable without breaking cryptographic hash-chain linkage across historical records.
+3. **Data Retention**: Operators should establish partition and archiving policies aligned with their acquirer representment windows (typically 180 to 540 days) and regulatory obligations.
 
 ---
 

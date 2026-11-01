@@ -78,7 +78,7 @@ Runtime configuration via environment variables (`Settings` class):
 - **What this is not**: Not an automated gateway payment executor (creates structured contest drafts, does not auto-submit externally); not a payment processor or acquirer; not legal or compliance advice.
 - **Synthetic Circularity**: The bundled dataset is synthetic; models learn distributions embedded in the data generator. Real validation requires processor outcome logs.
 - **Storage & Rate Limiting**: The SQLite WAL audit log is optimized for single-host deployments (~50-100 writes/sec); rate limiting is local in-memory per process.
-- **Fail-Closed Guarantees**: Any malformed, missing, unverified, or ambiguous input routes to `HUMAN-REVIEW`, never `AUTO-CONTEST`.
+- **Fail-closed behavior**: Any malformed, missing, unverified, or ambiguous input routes to `HUMAN-REVIEW`, never `AUTO-CONTEST`; this behavior is enforced by [tests/test_evidence_provenance.py](tests/test_evidence_provenance.py) and [tests/test_safety_regression.py](tests/test_safety_regression.py).
 
 ---
 
@@ -170,6 +170,7 @@ This verifies formatting (`ruff check`), type safety (`mypy`), unit and safety t
 ## Documentation Links
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — System boundaries, data flow, and threat model integration
+- [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) — Threat model, security boundaries, and STRIDE analysis
 - [docs/EVALUATION.md](docs/EVALUATION.md) — Full benchmark methodology, ablations, robustness tests, and BYOD harness
 - [docs/OPERATIONS.md](docs/OPERATIONS.md) — Deployment and operations notes, backups, anchoring, and measured load tests
 - [docs/MODEL_CARD.md](docs/MODEL_CARD.md) — ML model characteristics, features, training data, and offline challengers

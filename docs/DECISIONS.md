@@ -16,7 +16,7 @@ In automated financial decision systems, machine learning models (e.g., Logistic
 
 ### Why This Was Chosen
 - **Financial Fiduciary Boundary:** ML models and LLMs are vulnerable to distributional drift, hallucinations, adversarial perturbations, and prompt injections. An LLM must never be given authority to authorize financial actions or move funds.
-- **Compliance & Defensibility:** Card networks and acquiring processors require structured, reason-code-specific documentation for dispute representation. Deterministic policy guarantees that mandatory evidence gates (e.g., proof of delivery for Item Not Received), internal monetary risk ceilings (₹50,000 internal risk limit), and contest count limits are strictly enforced with zero probability of model bypass.
+- **Compliance & Defensibility:** Operators often need to explain automated decisions to acquirers and customers; a deterministic policy with recorded reasons makes that easier. Deterministic policy ensures that mandatory evidence gates (e.g., proof of delivery for Item Not Received), internal monetary risk ceilings (₹50,000 internal risk limit), and contest count limits are strictly enforced without risk of statistical model bypass.
 - **Auditability & Explainability:** A deterministic rule engine provides exact, rule-by-rule audit explanations (e.g., *"Evidence completeness 0.33 is below required 0.50"*), satisfying dispute representment transparency and internal audit requirements.
 
 ---
@@ -84,5 +84,5 @@ When a dispute is routed to `HUMAN-REVIEW` or `ACCEPT-LOSS`, merchants need acti
 
 ### Why This Was Chosen
 - **Actionability Over Abstract Mathematics:** In reality, a merchant cannot "un-deliver" an item or reverse a confirmed tracking number. A counterfactual stating *"Decision changes to AUTO-CONTEST if tracking changes from True to False"* is mathematically possible in unconstrained models but nonsensical to a dispute manager. Flipping only $None/False \to True$ ensures every suggestion is a concrete evidence document the merchant can obtain (e.g., uploading a delivery signature).
-- **Zero Graph Mutation / State Isolation:** Candidate counterfactual simulations run against cloned graph views (`RiskGraph.clone()`). This guarantees that candidate test nodes (e.g., `CF_has_signature`) never contaminate the live relationship graph or cross-pollinate subsequent decisions.
+- **Zero Graph Mutation / State Isolation:** Candidate counterfactual simulations run against cloned graph views (`RiskGraph.clone()`), ensuring that candidate test nodes (e.g., `CF_has_signature`) never contaminate the live relationship graph or cross-pollinate subsequent decisions; this isolation is covered by `tests/test_hybrid_safety.py`.
 - **Latency & Predictability:** Evaluating single-feature additions ($O(K)$ where $K \le 4$ missing fields) executes in $< 1\text{ ms}$, avoiding the combinatorial explosion of full optimization searches while providing clear, single-sentence guidance to dispute operators.

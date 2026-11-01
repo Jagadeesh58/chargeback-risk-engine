@@ -14,14 +14,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Measured Production Load Test Benchmark**: Added real ASGI load testing across 1,000, 10,000, and 100,000 pre-seeded audit/graph rows with 16 concurrent workers, demonstrating sub-linear graph retrieval scaling (~35 ms 2-hop CTE execution; 0.67x P95 ratio at 100k vs 1k) recorded in `artifacts/load_test_report.json` and `docs/OPERATIONS.md`.
 - **Prometheus Alert Rules**: Added `deploy/alert_rules.yml` defining production firing rules for error rate surges, latency spikes, rate limiting, and audit integrity verification failures, verified against live metric names in `tests/test_prometheus_alerts.py`.
 - **Examples & Quickstart**: Added `examples/request_verified.json`, `examples/request_unverified.json`, `examples/python_client.py`, and `examples/quickstart.sh`, backed by automated verification in `tests/test_examples.py`.
-- **Regression Hardening Test Suite**: Converted ad-hoc hardening probes into automated pytest test cases in `tests/test_hardening_probes.py` (replay conflicts, oversized body rejection, unauthenticated rejection, audit tampering, concurrent writes).
-- **Working Tree Cleanliness Enforcement**: Added conftest session tracking and `tests/test_working_tree_clean.py` ensuring test execution never modifies tracked repository files in place.
+- **Production Hardening Test Suite**: Added automated tests covering production-mode request handling, replay conflicts, oversized body rejection, unauthenticated request handling, audit tampering detection, and concurrent writes.
+- **Test Isolation Enforcement**: Enforced test isolation ensuring automated test runs never modify tracked repository artifacts in place.
 - **Packaging Verification**: Added `tests/test_packaging_deps.py` verifying AST-based third-party imports match `pyproject.toml`, version synchronization, and single-source package metadata.
 - **Unified Operational CLI (`chargeback-cli`)**: Introduced entry point supporting `serve`, `verify-audit`, `train`, and `evaluate` subcommands.
 - **Settings and key management**: Added `pydantic-settings` integration with support for multi-key authentication (`CHARGEBACK_API_KEYS`), zero-downtime key rotation, and role-based access control (`read`, `write`, `admin`).
 - **Code of Conduct**: Added Contributor Covenant 2.1 in `CODE_OF_CONDUCT.md`.
 
 ### Changed
+- **Scikit-Learn Version Compatibility**: Constrained runtime dependency to `scikit-learn>=1.9,<1.10` and trained model artifact under 1.9.1. Added major.minor compatibility checking in the model loader with explicit instructions to retrain via `make train` whenever scikit-learn's minor version changes.
+- **Documentation and Safety Framing**: Softened regulatory assertions, documented data privacy architectural design notes, and linked covering safety tests across documentation.
 - **Documentation Consolidation**: Consolidated repository documentation into `docs/` (`ARCHITECTURE.md`, `DECISIONS.md`, `MODEL_CARD.md`, `EVALUATION.md`, `OPERATIONS.md`, `THREAT_MODEL.md`, `DATA_DICTIONARY.md`). Merged baseline and evaluation protocol into `docs/EVALUATION.md`. Folded "Why Not Contest Everything" into `docs/ARCHITECTURE.md`.
 - **Performance Documentation**: Replaced unmeasured throughput and latency targets in `docs/OPERATIONS.md` with empirical load test tables and suggested example SLOs.
 - **Dependency Segregation**: Slimmed core dependencies in `pyproject.toml` to runtime necessities (`fastapi`, `uvicorn`, `pydantic`, `pydantic-settings`, `scikit-learn`, `numpy`, `pandas`, `prometheus-client`), moving `matplotlib` to optional extra `[reports]`.
