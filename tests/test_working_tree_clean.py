@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from tests import conftest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -23,11 +25,14 @@ def test_tracked_files_unmodified_by_tests():
         check=False,
     )
     assert result.returncode == 0, f"git status failed: {result.stderr}"
-    modified = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    current_lines = set(result.stdout.splitlines())
+    newly_modified = [
+        line.strip() for line in (current_lines - conftest.INITIAL_GIT_STATUS) if line.strip()
+    ]
 
-    # Protect against any test modifying artifacts/, docs/, data/ in-place
+    # Protect against any test modifying artifacts/, docs/, data/ in-place during the test run
     dirtied_protected_dirs = [
-        line for line in modified if any(d in line for d in ("artifacts/", "docs/", "data/"))
+        line for line in newly_modified if any(d in line for d in ("artifacts/", "docs/", "data/"))
     ]
     assert not dirtied_protected_dirs, (
         f"Protected artifacts/docs/data modified during tests: {dirtied_protected_dirs}. "
@@ -36,4 +41,4 @@ def test_tracked_files_unmodified_by_tests():
 
     # In CI or clean clone, absolutely no tracked file should be modified
     if os.environ.get("CI"):
-        assert not modified, f"Tracked files modified during tests in CI: {modified}."
+        assert not current_lines, f"Tracked files modified during tests in CI: {current_lines}."

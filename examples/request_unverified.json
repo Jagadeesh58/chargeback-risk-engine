@@ -1,0 +1,10 @@
+{
+  "dispute_id": "EX_UNVERIFIED_001",
+  "payment_id": "pay_ex_002",
+  "reason_code": "item_not_received",
+  "amount": 3500.0,
+  "customer_id": "cust_unverified_1",
+  "has_tracking_number": true,
+  "has_delivery_confirmation": true,
+  "has_signature_confirmation": true
+}

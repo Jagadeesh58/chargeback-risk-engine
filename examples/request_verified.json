@@ -1,0 +1,16 @@
+{
+  "dispute_id": "EX_VERIFIED_001",
+  "payment_id": "pay_ex_001",
+  "reason_code": "item_not_received",
+  "amount": 3500.0,
+  "customer_id": "cust_verified_1",
+  "has_tracking_number": true,
+  "has_tracking_number_source": "carrier_api",
+  "has_tracking_number_timestamp": "2026-10-31T12:00:00Z",
+  "has_delivery_confirmation": true,
+  "has_delivery_confirmation_source": "carrier_api",
+  "has_delivery_confirmation_timestamp": "2026-10-31T12:00:00Z",
+  "has_signature_confirmation": true,
+  "has_signature_confirmation_source": "carrier_api",
+  "has_signature_confirmation_timestamp": "2026-10-31T12:00:00Z"
+}

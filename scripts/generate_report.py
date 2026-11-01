@@ -1068,10 +1068,6 @@ def main(output_dir: Path | None = None) -> dict:
         },
     }
 
-    json_path = target_dir / "verification_report.json"
-    html_path = target_dir / "verification_report.html"
-    _write_lf(json_path, json.dumps(report, indent=2))
-    _write_lf(html_path, _html(report))
     _write_lf(target_dir / "strategy_comparison.json", json.dumps(strat_comp, indent=2))
     sync_documentation(report)
 
@@ -1079,10 +1075,9 @@ def main(output_dir: Path | None = None) -> dict:
         json.dumps(
             {
                 "headline": report["headline"],
-                "files": [
-                    str(json_path.relative_to(ROOT)),
-                    str(html_path.relative_to(ROOT)),
-                ],
+                "strategy_comparison": str(
+                    (target_dir / "strategy_comparison.json").relative_to(ROOT)
+                ),
             },
             indent=2,
         )
@@ -1170,8 +1165,10 @@ Evaluated on `data/test.csv` (5,000 held-out disputes) under identical operation
                     mc += "\n" + strat_mc_section
         _write_lf(model_card_path, mc)
 
-    # 2. Update docs/EVALUATION_REPORT.md
-    eval_report_path = ROOT / "docs" / "EVALUATION_REPORT.md"
+    # 2. Update docs/EVALUATION.md
+    eval_report_path = ROOT / "docs" / "EVALUATION.md"
+    if not eval_report_path.exists():
+        eval_report_path = ROOT / "docs" / "EVALUATION_REPORT.md"
     if eval_report_path.exists():
         er = eval_report_path.read_text(encoding="utf-8")
         er = re.sub(

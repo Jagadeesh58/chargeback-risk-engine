@@ -116,8 +116,9 @@ def main() -> int:
         "decisions": results,
         "audit": audit,
     }
-    ARTIFACTS_DIR.mkdir(exist_ok=True)
-    (ARTIFACTS_DIR / "release_verification.json").write_text(json.dumps(report, indent=2))
+    if "--write-artifact" in sys.argv:
+        ARTIFACTS_DIR.mkdir(exist_ok=True)
+        (ARTIFACTS_DIR / "release_verification.json").write_text(json.dumps(report, indent=2))
     print(json.dumps(report, indent=2))
     return 0 if report["valid"] else 1
 

@@ -96,13 +96,16 @@ def test_model_card_metrics_match_artifacts(artifacts):
 
 
 def test_evaluation_report_metrics_match_artifacts(artifacts):
-    eval_report = (REPO_ROOT / "docs" / "EVALUATION_REPORT.md").read_text(encoding="utf-8")
+    eval_doc = REPO_ROOT / "docs" / "EVALUATION.md"
+    if not eval_doc.exists():
+        eval_doc = REPO_ROOT / "docs" / "EVALUATION_REPORT.md"
+    eval_report = eval_doc.read_text(encoding="utf-8")
     strategy = artifacts["strategy"]
     profile = artifacts["profile"]
 
     # Threshold
     match_thresh = re.search(r"- auto-contest threshold: `([0-9.]+)`", eval_report)
-    assert match_thresh, "Threshold not found in EVALUATION_REPORT.md"
+    assert match_thresh, f"Threshold not found in {eval_doc.name}"
     assert (
         pytest.approx(float(match_thresh.group(1)), abs=1e-3) == profile["auto_contest_threshold"]
     )
@@ -136,17 +139,20 @@ def test_strategy_comparison_table_matches_docs(artifacts):
     )
     strat_comp = json.loads(strategy_comp_path.read_text(encoding="utf-8"))
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-    eval_report = (REPO_ROOT / "docs" / "EVALUATION_REPORT.md").read_text(encoding="utf-8")
+    eval_doc = REPO_ROOT / "docs" / "EVALUATION.md"
+    if not eval_doc.exists():
+        eval_doc = REPO_ROOT / "docs" / "EVALUATION_REPORT.md"
+    eval_report = eval_doc.read_text(encoding="utf-8")
     model_card = (REPO_ROOT / "docs" / "MODEL_CARD.md").read_text(encoding="utf-8")
 
-    # Check each strategy row's net values (p=0 and base-case p), precision, and lost count in README, EVALUATION_REPORT, and MODEL_CARD
+    # Check each strategy row's net values (p=0 and base-case p), precision, and lost count in README, EVALUATION, and MODEL_CARD
     for row in strat_comp["strategy_table"]:
         net_p0_str = f"₹{row['realized_net_value_p0_lakh']:.2f} lakh"
         net_base_p_str = f"₹{row['realized_net_value_base_p_lakh']:.2f} lakh"
         prec_str = f"{row['contested_precision'] * 100:.1f}%"
         for doc_name, doc_text in [
             ("README.md", readme),
-            ("EVALUATION_REPORT.md", eval_report),
+            (eval_doc.name, eval_report),
             ("MODEL_CARD.md", model_card),
         ]:
             assert net_p0_str in doc_text, (
@@ -168,7 +174,7 @@ def test_strategy_comparison_table_matches_docs(artifacts):
 
     for doc_name, doc_text in [
         ("README.md", readme),
-        ("EVALUATION_REPORT.md", eval_report),
+        (eval_doc.name, eval_report),
         ("MODEL_CARD.md", model_card),
     ]:
         assert ci_auto_0 in doc_text, f"Bootstrap CI {ci_auto_0} missing in {doc_name}"
@@ -183,7 +189,7 @@ def test_strategy_comparison_table_matches_docs(artifacts):
 
     for doc_name, doc_text in [
         ("README.md", readme),
-        ("EVALUATION_REPORT.md", eval_report),
+        (eval_doc.name, eval_report),
         ("MODEL_CARD.md", model_card),
     ]:
         assert thresh_auto in doc_text, f"Threshold {thresh_auto} missing in {doc_name}"
