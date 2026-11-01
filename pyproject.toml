@@ -9,7 +9,7 @@ description = "AI-assisted, evidence-aware chargeback risk and decision engine"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
-  { name = "Jagadeesh58" },
+  { name = "Jagadeesh" },
 ]
 requires-python = ">=3.11"
 keywords = ["chargeback", "fraud-prevention", "risk-engine", "fastapi", "machine-learning"]
