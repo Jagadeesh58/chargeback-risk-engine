@@ -14,7 +14,7 @@ authors = [
 requires-python = ">=3.11"
 keywords = ["chargeback", "fraud-prevention", "risk-engine", "fastapi", "machine-learning"]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 3 - Alpha",
   "Intended Audience :: Financial and Insurance Industry",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
