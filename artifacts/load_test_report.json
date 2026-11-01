@@ -1,0 +1,56 @@
+{
+  "suite": "production_asgi_load_test",
+  "description": "Measured latency and throughput across pre-seeded database scales with auth, audit hashing, and provenance verification",
+  "hardware": {
+    "python_version": "3.11.9",
+    "platform": "Windows-10-10.0.19045-SP0",
+    "system": "Windows",
+    "processor": "Intel64 Family 6 Model 58 Stepping 9, GenuineIntel",
+    "cpu_count_logical": 2
+  },
+  "concurrency": 16,
+  "configured_duration_seconds_per_scale": 30.0,
+  "scaling_ratio_p95_100k_vs_1k": 0.67,
+  "sublinear_scaling_verified": true,
+  "results": [
+    {
+      "pre_seeded_rows": 1000,
+      "concurrency": 16,
+      "duration_seconds": 30.43,
+      "total_requests": 355,
+      "successful_requests": 355,
+      "error_count": 0,
+      "throughput_rps": 11.67,
+      "latency_p50_ms": 1202.2,
+      "latency_p95_ms": 2265.38,
+      "latency_p99_ms": 2923.35,
+      "latency_mean_ms": 1296.76
+    },
+    {
+      "pre_seeded_rows": 10000,
+      "concurrency": 16,
+      "duration_seconds": 30.95,
+      "total_requests": 370,
+      "successful_requests": 370,
+      "error_count": 0,
+      "throughput_rps": 11.95,
+      "latency_p50_ms": 1202.66,
+      "latency_p95_ms": 2584.41,
+      "latency_p99_ms": 3632.99,
+      "latency_mean_ms": 1302.03
+    },
+    {
+      "pre_seeded_rows": 100000,
+      "concurrency": 16,
+      "duration_seconds": 30.46,
+      "total_requests": 445,
+      "successful_requests": 445,
+      "error_count": 0,
+      "throughput_rps": 14.61,
+      "latency_p50_ms": 1087.39,
+      "latency_p95_ms": 1513.09,
+      "latency_p99_ms": 1989.91,
+      "latency_mean_ms": 1085.19
+    }
+  ]
+}

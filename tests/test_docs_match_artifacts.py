@@ -227,3 +227,21 @@ def test_fees_and_penalties_have_rupee_or_source_citation():
     assert not violations, (
         "Found fee/penalty amounts without rupee or source citation:\n" + "\n".join(violations)
     )
+
+
+def test_operations_doc_matches_load_test_report():
+    """Assert measured load test latency and throughput in OPERATIONS.md match load_test_report.json."""
+    ops_path = REPO_ROOT / "OPERATIONS.md"
+    if not ops_path.exists():
+        ops_path = REPO_ROOT / "docs" / "OPERATIONS.md"
+    load_test_path = ARTIFACTS_DIR / "load_test_report.json"
+    if not load_test_path.exists() or not ops_path.exists():
+        return
+
+    ops_text = ops_path.read_text(encoding="utf-8")
+    lt_data = json.loads(load_test_path.read_text(encoding="utf-8"))
+    for row in lt_data.get("results", []):
+        row_str = f"| {row['pre_seeded_rows']:,} | {row['concurrency']} | {row['duration_seconds']:.2f} | {row['total_requests']} | {row['error_count']} | {row['throughput_rps']:.2f} | {row['latency_p50_ms']:.2f} | {row['latency_p95_ms']:.2f} |"
+        assert row_str in ops_text, (
+            f"Load test row for scale {row['pre_seeded_rows']} missing from OPERATIONS.md:\nExpected: {row_str}"
+        )

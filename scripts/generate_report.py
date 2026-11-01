@@ -1404,6 +1404,35 @@ This repository implements safety-critical architectural controls beyond tabular
 
         _write_lf(readme_path, rm)
 
+    # 4. Update OPERATIONS.md with measured load test results
+    ops_path = ROOT / "OPERATIONS.md"
+    if not ops_path.exists():
+        ops_path = ROOT / "docs" / "OPERATIONS.md"
+    load_test_path = ARTIFACTS_DIR / "load_test_report.json"
+    if ops_path.exists() and load_test_path.exists():
+        lt_data = json.loads(load_test_path.read_text(encoding="utf-8"))
+        rows = lt_data.get("results", [])
+        table_lines = [
+            "<!-- LOAD_TEST_RESULTS_START -->",
+            "| Pre-seeded Rows | Concurrency | Duration (s) | Total Requests | Error Count | Throughput (req/s) | P50 Latency (ms) | P95 Latency (ms) | P99 Latency (ms) | Mean Latency (ms) |",
+            "|---|---|---|---|---|---|---|---|---|---|",
+        ]
+        for r in rows:
+            table_lines.append(
+                f"| {r['pre_seeded_rows']:,} | {r['concurrency']} | {r['duration_seconds']:.2f} | {r['total_requests']} | {r['error_count']} | {r['throughput_rps']:.2f} | {r['latency_p50_ms']:.2f} | {r['latency_p95_ms']:.2f} | {r['latency_p99_ms']:.2f} | {r['latency_mean_ms']:.2f} |"
+            )
+        table_lines.append("<!-- LOAD_TEST_RESULTS_END -->")
+        new_table = "\n".join(table_lines)
+        ops_content = ops_path.read_text(encoding="utf-8")
+        if "<!-- LOAD_TEST_RESULTS_START -->" in ops_content:
+            ops_content = re.sub(
+                r"<!-- LOAD_TEST_RESULTS_START -->.*?<!-- LOAD_TEST_RESULTS_END -->",
+                new_table,
+                ops_content,
+                flags=re.DOTALL,
+            )
+            _write_lf(ops_path, ops_content)
+
 
 if __name__ == "__main__":
     out_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else None
