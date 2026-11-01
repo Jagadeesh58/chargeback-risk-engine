@@ -1,4 +1,4 @@
-"""Generate a judge-facing, reproducible proof package for the risk engine."""
+"""Generate an auditable, reproducible evaluation report for the risk engine."""
 
 from __future__ import annotations
 
@@ -976,7 +976,7 @@ def _html(report):
         + "</tr>"
         for r in report["review_budget"]
     )
-    return f"""<!doctype html><html><head><meta charset='utf-8'><title>Chargeback Risk Engine — Judge Proof</title><style>body{{font-family:system-ui;max-width:1180px;margin:32px auto;padding:0 18px;line-height:1.45}}table{{border-collapse:collapse;width:100%;margin:12px 0 28px}}th,td{{border:1px solid #ddd;padding:7px;font-size:14px}}th{{text-align:left}}code,pre{{background:#f6f6f6;padding:4px}}.hero{{padding:18px;border:2px solid #222;border-radius:14px}}</style></head><body><div class='hero'><h1>Chargeback Risk Engine</h1><p><b>Track 02 — AI Risk Manager</b></p><p><b>Claim:</b> AI-assisted chargeback decisions where the model proposes evidence-weighted risk, economics quantifies value, and deterministic policy controls the final financial action.</p></div><h2>Held-out headline</h2><pre>{json.dumps(report["headline"], indent=2)}</pre><h2>Strategy comparison</h2><table><tr><th>Strategy</th><th>Auto</th><th>Precision</th><th>Recall</th><th>Realized net value</th></tr>{srows}</table><h2>True ablation</h2><table><tr><th>Variant</th><th>Auto</th><th>Precision</th><th>Recall</th><th>Realized net value</th></tr>{abrows}</table><h2>Analyst capacity</h2><table><tr><th>Budget</th><th>Capacity</th><th>Precision</th><th>Incremental recall</th><th>Incremental net value</th></tr>{rrows}</table><h2>Per reason</h2><pre>{json.dumps(report["per_reason"], indent=2)}</pre><h2>Risk/calibration</h2><pre>{json.dumps(report["risk_metrics"], indent=2)}</pre><h2>Uncertainty</h2><pre>{json.dumps(report["confidence_intervals"], indent=2)}</pre><h2>Latency</h2><pre>{json.dumps(report["latency"], indent=2)}</pre><h2>Hard cases</h2><pre>{json.dumps(report["hard_cases"], indent=2)}</pre><h2>Security boundaries</h2><pre>{json.dumps(report["security"], indent=2)}</pre><h2>Reproducibility contract</h2><pre>{json.dumps(report["reproducibility"], indent=2)}</pre></body></html>"""
+    return f"""<!doctype html><html><head><meta charset='utf-8'><title>Chargeback Risk Engine — Evaluation Report</title><style>body{{font-family:system-ui;max-width:1180px;margin:32px auto;padding:0 18px;line-height:1.45}}table{{border-collapse:collapse;width:100%;margin:12px 0 28px}}th,td{{border:1px solid #ddd;padding:7px;font-size:14px}}th{{text-align:left}}code,pre{{background:#f6f6f6;padding:4px}}.hero{{padding:18px;border:2px solid #222;border-radius:14px}}</style></head><body><div class='hero'><h1>Chargeback Risk Engine</h1><p><b>Architecture:</b> AI-assisted chargeback decisions where advisory models propose evidence-weighted risk and economics quantifies value, while a deterministic policy alone controls the final financial action.</p></div><h2>Held-out headline</h2><pre>{json.dumps(report["headline"], indent=2)}</pre><h2>Strategy comparison</h2><table><tr><th>Strategy</th><th>Auto</th><th>Precision</th><th>Recall</th><th>Realized net value</th></tr>{srows}</table><h2>True ablation</h2><table><tr><th>Variant</th><th>Auto</th><th>Precision</th><th>Recall</th><th>Realized net value</th></tr>{abrows}</table><h2>Analyst capacity</h2><table><tr><th>Budget</th><th>Capacity</th><th>Precision</th><th>Incremental recall</th><th>Incremental net value</th></tr>{rrows}</table><h2>Per reason</h2><pre>{json.dumps(report["per_reason"], indent=2)}</pre><h2>Risk/calibration</h2><pre>{json.dumps(report["risk_metrics"], indent=2)}</pre><h2>Uncertainty</h2><pre>{json.dumps(report["confidence_intervals"], indent=2)}</pre><h2>Latency</h2><pre>{json.dumps(report["latency"], indent=2)}</pre><h2>Hard cases</h2><pre>{json.dumps(report["hard_cases"], indent=2)}</pre><h2>Security boundaries</h2><pre>{json.dumps(report["security"], indent=2)}</pre><h2>Reproducibility contract</h2><pre>{json.dumps(report["reproducibility"], indent=2)}</pre></body></html>"""
 
 
 def main(output_dir: Path | None = None) -> dict:
@@ -1329,10 +1329,10 @@ Computed via `scripts/oracle_ceiling.py` on `data/test.csv` (synthetic ground tr
 
 ## AI Analyst Safety Evaluation
 
-Evaluated against the bounded adversarial test suite in `tests/test_ai_analyst_evaluation.py`:
-- Rejection rate on invalid/adversarial claims: 100%
-- Fallback rate on malformed/unreachable API: 100%
-- Hallucination-catch rate (invented/contradictory evidence): 100%
+Evaluated against a targeted regression suite of 25 adversarial and boundary test cases crafted by the project author in `tests/test_ai_analyst_evaluation.py`:
+- Rejection rate on invalid/adversarial claims: 100% (on 25 author-crafted test cases; reflects regression gate coverage rather than generalized out-of-distribution robustness)
+- Fallback rate on malformed/unreachable API: 100% (deterministic offline fallback when external endpoint fails or times out)
+- Hallucination-catch rate (invented/contradictory evidence): 100% (validated against schema and evidence packet bounds)
 - Safety Invariant: The AI analyst can never alter final financial actions, routing scores, or policy decisions.
 """
             er = er + oracle_section
@@ -1388,7 +1388,9 @@ Evaluated against the bounded adversarial test suite in `tests/test_ai_analyst_e
             f"₹{auto_bp:.2f} lakh vs ₹{ce_bp:.2f} lakh at base-case penalty $p = ₹{base_p:,.0f})."
         )
         if "Contesting every dispute earns higher raw value" in rm:
-            rm = re.sub(r"Contesting every dispute earns higher raw value.*?\.", tradeoff_sentence, rm)
+            rm = re.sub(
+                r"Contesting every dispute earns higher raw value[^\n]+", tradeoff_sentence, rm
+            )
         else:
             rm = re.sub(
                 r"(\|\s*Selected policy threshold\s*\|\s*\*\*[0-9.]+\*\*\s*from `dev.csv`\s*\|\n)",
@@ -1426,7 +1428,9 @@ Evaluated on `data/test.csv` (5,000 held-out disputes) under identical operation
 
 {sweep_md}
 """
-            if re.search(r"(?:##|###) Comprehensive Strategy Comparison & Economic Trade-off Analysis", rm):
+            if re.search(
+                r"(?:##|###) Comprehensive Strategy Comparison & Economic Trade-off Analysis", rm
+            ):
                 rm = re.sub(
                     r"(?:##|###) Comprehensive Strategy Comparison & Economic Trade-off Analysis.*?(?=\n---\n|\Z)",
                     lambda _: strat_readme_section.strip() + "\n\n",

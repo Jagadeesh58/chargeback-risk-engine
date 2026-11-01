@@ -199,11 +199,11 @@ Computed via `scripts/oracle_ceiling.py` on `data/test.csv` (synthetic ground tr
 
 ## AI Analyst Safety Evaluation
 
-Evaluated against the bounded adversarial test suite in `tests/test_ai_analyst_evaluation.py`:
-- Rejection rate on invalid/adversarial claims: 100%
-- Fallback rate on malformed/unreachable API: 100%
-- Hallucination-catch rate (invented/contradictory evidence): 100%
-- Safety Invariant: The AI analyst can never alter final financial actions, routing scores, or policy decisions.
+Evaluated against a targeted regression suite of 25 adversarial and boundary test cases crafted by the project author in `tests/test_ai_analyst_evaluation.py`:
+- Rejection rate on invalid/adversarial claims: 100% (on 25 author-crafted test cases; reflects regression gate coverage rather than generalized out-of-distribution robustness)
+- Fallback rate on malformed/unreachable API: 100% (deterministic offline fallback when external endpoint fails or times out)
+- Hallucination-catch rate (invented/contradictory evidence): 100% (validated against schema whitelist and ground-truth evidence checklist)
+- Safety Invariant: The AI analyst can never alter final financial actions, routing scores, or policy decisions (`policy.decide()` alone selects financial actions).
 
 ---
 

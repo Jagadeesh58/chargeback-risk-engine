@@ -47,9 +47,9 @@ flowchart TD
 
 In unconstrained spreadsheet arithmetic, contesting every dispute appears attractive whenever expected value exceeds the nominal gateway fee ($p \times \text{amount} - \text{fee} > 0$, typically $p > 3.75\%$). However, production dispute operations are not risk-free bets:
 
-1. **Dispute Monitoring Programs**: Visa VAMP and Mastercard Excessive Dispute Programs penalize high dispute rates with monthly monitoring assessments, mandatory remediation audits, and higher processing surcharges.
-2. **Arbitration Fees**: Unsubstantiated representments escalated by cardholders incur non-refundable card network arbitration fees that dwarf typical dispute amounts.
-3. **Acquiring Termination**: Excessive dispute loss rates risk payment processing termination and placement on the Mastercard MATCH / Terminated Merchant File (TMF) list, effectively barring credit card acceptance globally for up to 5 years.
+1. **Dispute Monitoring Programs**: Payment networks operate merchant monitoring programs that apply operational surcharges or remediation requirements when dispute or fraud ratios exceed established thresholds.
+2. **Arbitration Exposure**: Unsubstantiated representments escalated to network arbitration incur substantial non-refundable review fees regardless of case amount.
+3. **Acquiring Termination**: Persistent adverse dispute loss rates risk processor termination and merchant account closure.
 
 For these reasons, the engine enforces strict, evidence-backed gating: only claims with verified, high-quality documentation are auto-contested, while ambiguous or high-risk cases fail closed to human review.
 

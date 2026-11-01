@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 ### Added
-- **Production Readiness & Audit Probes**: Hardened `/readyz` probe to verify database connectivity, JSON model loading and SHA-256 checksum verification, audit chain head readability, and cryptographic verification of the last N rows (returns 503 Service Unavailable with machine-readable diagnostic errors on failure).
+- **Readiness Probe and Integrity Checks**: Added `/readyz` probe to verify database connectivity, JSON model loading and SHA-256 checksum verification, audit chain head readability, and cryptographic verification of the last N rows (returns 503 Service Unavailable with machine-readable diagnostic errors on failure).
 - **Authenticated Metrics**: Secured `/metrics` Prometheus endpoint in production mode with API key authentication or dedicated `CHARGEBACK_METRICS_KEY` (returns 401 Unauthorized without credentials).
 - **Measured Production Load Test Benchmark**: Added real ASGI load testing across 1,000, 10,000, and 100,000 pre-seeded audit/graph rows with 16 concurrent workers, demonstrating sub-linear graph retrieval scaling (~35 ms 2-hop CTE execution; 0.67x P95 ratio at 100k vs 1k) recorded in `artifacts/load_test_report.json` and `docs/OPERATIONS.md`.
 - **Prometheus Alert Rules**: Added `deploy/alert_rules.yml` defining production firing rules for error rate surges, latency spikes, rate limiting, and audit integrity verification failures, verified against live metric names in `tests/test_prometheus_alerts.py`.
@@ -22,8 +22,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Code of Conduct**: Added Contributor Covenant 2.1 in `CODE_OF_CONDUCT.md`.
 
 ### Changed
-- **Lean Documentation Hierarchy**: Streamlined repository documentation into `docs/` (`ARCHITECTURE.md`, `DECISIONS.md`, `MODEL_CARD.md`, `EVALUATION.md`, `OPERATIONS.md`, `THREAT_MODEL.md`, `DATA_DICTIONARY.md`). Merged `BASELINE.md`, `EVALUATION_PROTOCOL.md`, and `EVALUATION_REPORT.md` into a single canonical `docs/EVALUATION.md`. Folded "Why Not Contest Everything" into `docs/ARCHITECTURE.md`.
-- **Honesty & Measurement Gating**: Removed all unmeasured "throughput >= 1,000/s" and "P95 < 8 ms" claims from `docs/OPERATIONS.md`, replacing them with empirical load test tables and clearly labelled suggested SLOs.
+- **Documentation Consolidation**: Consolidated repository documentation into `docs/` (`ARCHITECTURE.md`, `DECISIONS.md`, `MODEL_CARD.md`, `EVALUATION.md`, `OPERATIONS.md`, `THREAT_MODEL.md`, `DATA_DICTIONARY.md`). Merged baseline and evaluation protocol into `docs/EVALUATION.md`. Folded "Why Not Contest Everything" into `docs/ARCHITECTURE.md`.
+- **Performance Documentation**: Replaced unmeasured throughput and latency targets in `docs/OPERATIONS.md` with empirical load test tables and suggested example SLOs.
 - **Dependency Segregation**: Slimmed core dependencies in `pyproject.toml` to runtime necessities (`fastapi`, `uvicorn`, `pydantic`, `pydantic-settings`, `scikit-learn`, `numpy`, `pandas`, `prometheus-client`), moving `matplotlib` to optional extra `[reports]`.
 - **Eliminated Arbitrary Deserialization**: Removed all pickle-based model weights in favor of transparent, human-readable JSON parameters (`ml_scorer_model.json`) verified against SHA-256 sidecar hashes at startup.
 - **Currency & Economic Alignment**: Standardized all monetary figures across documentation, scripts, and tests to Indian Rupees (`₹`), enforcing symmetric lost-contest penalties.

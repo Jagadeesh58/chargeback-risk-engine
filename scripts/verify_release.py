@@ -1,4 +1,4 @@
-"""Fast, judge-friendly release verification without the LLM/API path."""
+"""Fast, standalone release verification without the LLM/API path."""
 
 from __future__ import annotations
 

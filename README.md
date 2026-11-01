@@ -82,7 +82,7 @@ Runtime configuration via environment variables (`Settings` class):
 | Realized net value | **₹41.09 lakh (synthetic-only)** |
 | Selected policy threshold | **0.65** from `dev.csv` |
 
-Contesting every dispute earns higher raw value at zero loss penalty ($p=0$, ₹108.95 lakh vs ₹41.09 lakh), but the Live Policy wins when the per-lost-contest penalty exceeds the break-even threshold of ₹3,611.18 (yielding ₹28.77 lakh vs ₹18.64 lakh at base-case penalty $p = ₹4,150).95 lakh vs ₹41.09 lakh), but the Live Policy wins when the per-lost-contest penalty exceeds the break-even threshold of ₹3,611.18 (yielding ₹28.77 lakh vs ₹18.64 lakh at base-case penalty $p = ₹4,150).
+Contesting every dispute earns higher raw value at zero loss penalty ($p=0$, ₹108.95 lakh vs ₹41.09 lakh), but the Live Policy wins when the per-lost-contest penalty exceeds the break-even threshold of ₹3,611.18 (yielding ₹28.77 lakh vs ₹18.64 lakh at base-case penalty $p = ₹4,150).
 
 ---
 

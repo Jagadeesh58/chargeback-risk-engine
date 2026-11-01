@@ -16,7 +16,7 @@ In automated financial decision systems, machine learning models (e.g., Logistic
 
 ### Why This Was Chosen
 - **Financial Fiduciary Boundary:** ML models and LLMs are vulnerable to distributional drift, hallucinations, adversarial perturbations, and prompt injections. An LLM must never be given authority to authorize financial actions or move funds.
-- **Compliance & Defensibility:** Card brand guidelines and acquiring banks mandate explicit reason-code representment rules. Deterministic policy guarantees that mandatory evidence gates (e.g., proof of delivery for Item Not Received), internal monetary risk ceilings (₹50,000 internal risk limit), and contest count limits are strictly enforced with zero probability of model bypass.
+- **Compliance & Defensibility:** Card networks and acquiring processors require structured, reason-code-specific documentation for dispute representation. Deterministic policy guarantees that mandatory evidence gates (e.g., proof of delivery for Item Not Received), internal monetary risk ceilings (₹50,000 internal risk limit), and contest count limits are strictly enforced with zero probability of model bypass.
 - **Auditability & Explainability:** A deterministic rule engine provides exact, rule-by-rule audit explanations (e.g., *"Evidence completeness 0.33 is below required 0.50"*), satisfying dispute representment transparency and internal audit requirements.
 
 ---

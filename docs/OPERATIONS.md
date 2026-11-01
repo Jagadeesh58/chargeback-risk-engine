@@ -234,11 +234,11 @@ python scripts/load_test.py --duration 30 --concurrency 16 --scales 1000,10000,1
 - Ratio of P95 latency at 100,000 rows to 1,000 rows: **0.67x** ($\le 2.0\text{x}$ requirement verified).
 - Error rate under sustained load across all database scales: **0.00%**.
 
-### Suggested Production SLOs
+### Suggested SLO Examples (Non-Binding Examples)
 
-The following suggested service level objectives (SLOs) are informed by the measured benchmark results and can be tuned for production hardware configurations:
+The following service level objectives (SLOs) are provided as illustrative operational examples informed by the benchmark measurements above, not performance guarantees:
 
-- **Target Availability**: ≥ 99.9% successful decisions (excluding client 4xx authentication/validation errors).
-- **Target Latency (2 vCPU reference)**: P50 < 1,500 ms, P95 < 3,000 ms under peak 16-worker concurrency.
-- **Audit Logging Reliability**: 100% tamper-evident SHA-256 chain persistence (zero silent write drops).
-- **Rate Limit Resilience**: Max 60 req/min per unprivileged client key (configurable via `CHARGEBACK_RATE_LIMIT`).
+- **Availability Target**: ≥ 99.9% successful decisions (excluding client 4xx authentication/validation errors).
+- **Latency Target (Reference 2-Core Hardware)**: P50 < 1,500 ms, P95 < 3,000 ms under peak 16-worker concurrency.
+- **Audit Integrity Limitation & Mitigation**: The hash chain detects modification or truncation of historical records. However, an actor with direct database write access can recompute the chain hashes; periodic external head anchoring (`scripts/export_audit_head.py`) to an independent append-only log is the necessary mitigation.
+- **Rate Limiting Target**: Default 60 req/min per client key (configurable via `CHARGEBACK_RATE_LIMIT`).

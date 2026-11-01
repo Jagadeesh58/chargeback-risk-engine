@@ -72,7 +72,7 @@ The chargeback risk engine processes financial dispute data from upstream mercha
 
 | Threat | Impact | Mitigations & Controls | Implementation File | Verification Test |
 |---|---|---|---|---|
-| **PII Leakage in Audit Trail** | Medium | Architectural remediation documented for GDPR Art. 17 and Indian DPDP Act 2023: keyed HMAC pseudonymization, per-customer encryption keys for crypto-shredding, and defined data retention windows. | `docs/OPERATIONS.md` | `tests/test_docs_match_artifacts.py` |
+| **PII Leakage in Audit Trail** | Medium | *Design notes, not legal advice*: Keyed HMAC pseudonymization and per-customer crypto-shredding (for GDPR Art. 17 / Indian DPDP Act 2023 compliance) are documented architectural design proposals; the current engine stores raw payloads. Production deployments must integrate pre-ingestion tokenization or field-level encryption. | Design Proposal (`docs/THREAT_MODEL.md`) | `tests/test_audit_store.py` |
 | **Stack Trace & Internal Path Leakage** | Low | Global FastAPI exception handlers sanitize error responses into standardized JSON messages, withholding internal traces. Production settings suppress debug output. | `chargeback_risk_engine/api.py` | `tests/test_api_production.py` |
 | **Third-Party AI Analyst Egress** | Medium | AI analyst is optional and disabled by default. When enabled, requests require explicit internal URL configuration (`CHARGEBACK_AI_ANALYST_URL`). | `chargeback_risk_engine/ai_analyst.py` | `tests/test_ai_analyst_evaluation.py` |
 

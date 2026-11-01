@@ -66,6 +66,7 @@ def test_strategy_penalty_sweep_reproducibility(tmp_path):
 def test_candidate_benchmark_strategy_rows_mathematically_consistent():
     """Assert for every strategy row in candidate_benchmark.json, count * precision / recall equals positive count."""
     import pandas as pd
+
     from chargeback_risk_engine.paths import DATA_DIR
 
     test_df = pd.read_csv(DATA_DIR / "test.csv")
