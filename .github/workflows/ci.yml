@@ -39,7 +39,7 @@ jobs:
       - name: Run verification workflow
         run: make verify
       - name: Security audit with pip-audit
-        run: pip-audit
+        run: pip-audit -r requirements.lock
       - name: Build package
         run: python -m build
       - name: Check package metadata with twine

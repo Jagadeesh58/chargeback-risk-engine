@@ -169,7 +169,7 @@ pytest --cov=chargeback_risk_engine --cov-report=term-missing
 python scripts/generate_report.py
 git diff --exit-code -- README.md artifacts docs ':!docs/*.png'
 make verify
-pip-audit
+pip-audit -r requirements.lock
 python -m build
 twine check dist/*
 ```
