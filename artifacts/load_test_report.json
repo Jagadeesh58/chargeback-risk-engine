@@ -10,47 +10,83 @@
   },
   "concurrency": 16,
   "configured_duration_seconds_per_scale": 30.0,
-  "scaling_ratio_p95_100k_vs_1k": 0.67,
+  "scaling_ratio_p95_100k_vs_1k": 1.21,
   "sublinear_scaling_verified": true,
   "results": [
     {
       "pre_seeded_rows": 1000,
       "concurrency": 16,
-      "duration_seconds": 30.43,
-      "total_requests": 355,
-      "successful_requests": 355,
-      "error_count": 0,
-      "throughput_rps": 11.67,
-      "latency_p50_ms": 1202.2,
-      "latency_p95_ms": 2265.38,
-      "latency_p99_ms": 2923.35,
-      "latency_mean_ms": 1296.76
+      "duration_seconds": 32.57,
+      "total_requests": 192,
+      "successful_requests": 191,
+      "error_count": 1,
+      "throughput_rps": 5.9,
+      "latency_p50_ms": 2433.6,
+      "latency_p50_ci_95": [
+        2325.13,
+        2514.59
+      ],
+      "latency_p95_ms": 3347.62,
+      "latency_p95_ci_95": [
+        3186.07,
+        3532.94
+      ],
+      "latency_p99_ms": 3814.88,
+      "latency_p99_ci_95": [
+        3509.18,
+        5005.63
+      ],
+      "latency_mean_ms": 2448.43
     },
     {
       "pre_seeded_rows": 10000,
       "concurrency": 16,
-      "duration_seconds": 30.95,
-      "total_requests": 370,
-      "successful_requests": 370,
+      "duration_seconds": 30.24,
+      "total_requests": 185,
+      "successful_requests": 185,
       "error_count": 0,
-      "throughput_rps": 11.95,
-      "latency_p50_ms": 1202.66,
-      "latency_p95_ms": 2584.41,
-      "latency_p99_ms": 3632.99,
-      "latency_mean_ms": 1302.03
+      "throughput_rps": 6.12,
+      "latency_p50_ms": 2478.78,
+      "latency_p50_ci_95": [
+        2395.38,
+        2613.64
+      ],
+      "latency_p95_ms": 4037.44,
+      "latency_p95_ci_95": [
+        3514.97,
+        4220.54
+      ],
+      "latency_p99_ms": 4507.77,
+      "latency_p99_ci_95": [
+        4118.34,
+        4816.62
+      ],
+      "latency_mean_ms": 2508.21
     },
     {
       "pre_seeded_rows": 100000,
       "concurrency": 16,
-      "duration_seconds": 30.46,
-      "total_requests": 445,
-      "successful_requests": 445,
-      "error_count": 0,
-      "throughput_rps": 14.61,
-      "latency_p50_ms": 1087.39,
-      "latency_p95_ms": 1513.09,
-      "latency_p99_ms": 1989.91,
-      "latency_mean_ms": 1085.19
+      "duration_seconds": 32.26,
+      "total_requests": 189,
+      "successful_requests": 188,
+      "error_count": 1,
+      "throughput_rps": 5.86,
+      "latency_p50_ms": 2447.4,
+      "latency_p50_ci_95": [
+        2385.28,
+        2559.78
+      ],
+      "latency_p95_ms": 4041.65,
+      "latency_p95_ci_95": [
+        3714.7,
+        4275.07
+      ],
+      "latency_p99_ms": 4953.08,
+      "latency_p99_ci_95": [
+        4225.54,
+        5083.8
+      ],
+      "latency_mean_ms": 2511.12
     }
   ]
 }

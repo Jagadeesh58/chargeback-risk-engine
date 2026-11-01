@@ -131,6 +131,43 @@ def _run_single_request(port: int, dispute_id: str, cust_id: str) -> tuple[bool,
         return (False, elapsed, 500)
 
 
+def _bootstrap_latency_cis(
+    latencies: list[float],
+    n_boot: int = 1000,
+    seed: int = 42,
+) -> dict[str, list[float]]:
+    """Compute 95% bootstrap confidence intervals for p50, p95, and p99 latency."""
+    if not latencies:
+        return {
+            "latency_p50_ci_95": [0.0, 0.0],
+            "latency_p95_ci_95": [0.0, 0.0],
+            "latency_p99_ci_95": [0.0, 0.0],
+        }
+    import numpy as np
+
+    arr = np.array(latencies, dtype=float)
+    n = len(arr)
+    rng = np.random.default_rng(seed)
+    boot_idx = rng.integers(0, n, size=(n_boot, n))
+    boot_samples = arr[boot_idx]
+    boot_percs = np.percentile(boot_samples, [50.0, 95.0, 99.0], axis=1)
+
+    return {
+        "latency_p50_ci_95": [
+            round(float(np.percentile(boot_percs[0], 2.5)), 2),
+            round(float(np.percentile(boot_percs[0], 97.5)), 2),
+        ],
+        "latency_p95_ci_95": [
+            round(float(np.percentile(boot_percs[1], 2.5)), 2),
+            round(float(np.percentile(boot_percs[1], 97.5)), 2),
+        ],
+        "latency_p99_ci_95": [
+            round(float(np.percentile(boot_percs[2], 2.5)), 2),
+            round(float(np.percentile(boot_percs[2], 97.5)), 2),
+        ],
+    }
+
+
 def benchmark_scale(
     n_rows: int,
     concurrency: int,
@@ -194,10 +231,13 @@ def benchmark_scale(
     p99 = round(sorted_lats[int(0.99 * len(sorted_lats))], 2) if sorted_lats else 0.0
     mean_lat = round(statistics.mean(sorted_lats), 2) if sorted_lats else 0.0
 
+    cis = _bootstrap_latency_cis(latencies)
+
     print(f"[LoadTest] Results for scale={n_rows:,}:")
     print(f"  Requests:   {total_reqs} ({throughput:.1f} req/s)")
     print(f"  Success:    {success_count} | Errors: {error_count}")
     print(f"  Latency:    p50={p50} ms, p95={p95} ms, p99={p99} ms (mean={mean_lat} ms)")
+    print(f"  95% CIs:    p50={cis['latency_p50_ci_95']}, p95={cis['latency_p95_ci_95']}, p99={cis['latency_p99_ci_95']}")
 
     return {
         "pre_seeded_rows": n_rows,
@@ -208,8 +248,11 @@ def benchmark_scale(
         "error_count": error_count,
         "throughput_rps": throughput,
         "latency_p50_ms": p50,
+        "latency_p50_ci_95": cis["latency_p50_ci_95"],
         "latency_p95_ms": p95,
+        "latency_p95_ci_95": cis["latency_p95_ci_95"],
         "latency_p99_ms": p99,
+        "latency_p99_ci_95": cis["latency_p99_ci_95"],
         "latency_mean_ms": mean_lat,
     }
 
@@ -219,8 +262,8 @@ def main() -> None:
     parser.add_argument(
         "--duration",
         type=float,
-        default=30.0,
-        help="Test duration in seconds per scale (default: 30.0)",
+        default=60.0,
+        help="Test duration in seconds per scale (default: 60.0)",
     )
     parser.add_argument(
         "--concurrency",
