@@ -159,13 +159,20 @@ Based on the empirical penalty sweep across penalties from ₹0 to ₹15,000 (ve
 
 ## How to Reproduce
 
-Run the full local validation suite:
+Run the full local validation suite via `make check`, or run the exact sequence executed in CI:
 
 ```bash
-make check
+ruff check .
+ruff format --check .
+mypy chargeback_risk_engine
+pytest --cov=chargeback_risk_engine --cov-report=term-missing
+python scripts/generate_report.py
+git diff --exit-code -- README.md artifacts docs ':!docs/*.png'
+make verify
+pip-audit
+python -m build
+twine check dist/*
 ```
-
-This verifies formatting (`ruff check`), type safety (`mypy`), unit and safety tests (`pytest`), drift gating, and release criteria.
 
 ---
 
