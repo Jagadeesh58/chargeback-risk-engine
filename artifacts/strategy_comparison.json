@@ -151,7 +151,7 @@
     }
   },
   "break_even_analysis": {
-    "raw_value_winner": "Contest Everything wins on unpenalized raw value (p=0): \u20b9108.95L vs \u20b949.73L (auto-only) and \u20b9107.29L (scenario b).",
+    "raw_value_winner": "Contest Everything wins on unpenalized raw value (p=0): \u20b9108.95L vs \u20b941.09L (auto-only) and \u20b9107.12L (scenario b).",
     "ranking_flip_vs_auto_only_threshold_inr": 3611.184513038851,
     "ranking_flip_vs_scenario_b_threshold_inr": 15189.392500000075,
     "notes": "When both strategies pay penalty p on lost contests, Live Policy Automated-Only beats Contest Everything when p > \u20b93,611.18. At the base-case sensitivity assumption of p=\u20b94,150.00, Automated-Only yields \u20b928.77L vs Contest Everything's \u20b918.64L (+\u20b910.12L advantage). Scenario b requires an extreme penalty of >\u20b915,189.39 because contesting virtually all reviewed cases only avoids 12 losses while incurring review fees."

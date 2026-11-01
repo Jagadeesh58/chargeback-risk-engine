@@ -30,6 +30,10 @@ jobs:
         run: mypy chargeback_risk_engine
       - name: Test with pytest and coverage
         run: pytest --cov=chargeback_risk_engine --cov-report=term-missing
+      - name: Verify report generation and documentation drift
+        run: |
+          python scripts/generate_report.py
+          git diff --exit-code -- README.md artifacts docs ':!docs/*.png'
       - name: Run verification workflow
         run: make verify
       - name: Security audit with pip-audit

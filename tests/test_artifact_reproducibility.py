@@ -61,3 +61,24 @@ def test_strategy_penalty_sweep_reproducibility(tmp_path):
     )
     assert generated == committed
     assert (tmp_path / "net_value_vs_penalty.png").exists()
+
+
+def test_candidate_benchmark_strategy_rows_mathematically_consistent():
+    """Assert for every strategy row in candidate_benchmark.json, count * precision / recall equals positive count."""
+    import pandas as pd
+    from chargeback_risk_engine.paths import DATA_DIR
+
+    test_df = pd.read_csv(DATA_DIR / "test.csv")
+    total_positives = int(test_df["would_win"].sum())
+
+    bm_data = json.loads((ARTIFACTS_DIR / "candidate_benchmark.json").read_text(encoding="utf-8"))
+    for strategy in bm_data["strategies"]:
+        count = strategy["auto_contest_count"]
+        prec = strategy["auto_contest_precision"]
+        rec = strategy["auto_contest_recall"]
+        if rec > 0:
+            calc_positives = count * prec / rec
+            assert abs(calc_positives - total_positives) <= 1.0, (
+                f"Strategy {strategy['strategy']} is inconsistent: "
+                f"{count} * {prec} / {rec} = {calc_positives} != {total_positives}"
+            )

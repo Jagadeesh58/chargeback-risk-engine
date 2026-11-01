@@ -2582,9 +2582,9 @@
     }
   },
   "sweep_findings": {
-    "human_review_bounds_note": "Scenarios a and b are theoretical upper bounds because reviewers are assumed to contest 100% of reviewed cases. At base-case p=\u20b94,150, Scenario b nets \u20b917.49L, falling below Contest Everything (\u20b918.64L) because contesting virtually all cases incurs \u20b9166,350 in review fees while avoiding only 12 losses.",
+    "human_review_bounds_note": "Scenarios a and b are theoretical upper bounds because reviewers are assumed to contest 100% of reviewed cases. At base-case p=\u20b94,150, Scenario b nets \u20b917.32L, falling below Contest Everything (\u20b918.64L) because contesting virtually all cases incurs \u20b9183,000 in review fees while avoiding only 12 losses.",
     "policy_beats_contest_everything_threshold_inr": 3611.18,
     "winner_at_base_p": "Live Policy (Automated-Only) achieves \u20b928.77L, beating Contest Everything (\u20b918.64L) by +\u20b910.12L at base-case penalty p=\u20b94,150.00.",
-    "winner_at_p0": "Contest Everything (Unconstrained) achieves the highest unpenalized recovery (\u20b9108.95L) because filing cost (\u20b9150) is trivial relative to dispute size (~\u20b94,000)."
+    "winner_at_p0": "Contest Everything (Unconstrained) achieves the highest unpenalized recovery (\u20b9108.95L) because filing cost (\u20b9150) is trivial relative to dispute size (~\u20b94,161)."
   }
 }

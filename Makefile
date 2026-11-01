@@ -23,7 +23,7 @@ regen:
 verify:
 	python -m pytest -q
 	python scripts/verify_release.py
-	git diff --exit-code -- artifacts docs ':!docs/*.png'
+	git diff --exit-code -- README.md artifacts docs ':!docs/*.png'
 
 latency:
 	python scripts/latency.py

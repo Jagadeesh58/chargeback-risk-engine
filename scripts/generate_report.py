@@ -472,7 +472,7 @@ def compute_strategy_comparison(cases: list[dict], oracle_data: dict, seed: int 
     auto_net_0 = evaluations["Live Policy (Automated-Only)"]["p0"]["realized_net_value"]
     auto_losses = evaluations["Live Policy (Automated-Only)"]["p0"]["lost_contest_count"]
 
-    delta_losses_auto = ce_losses - auto_losses  # 2176 - 417 = 1759
+    delta_losses_auto = ce_losses - auto_losses
     break_even_vs_auto = (
         float((ce_net_0 - auto_net_0) / delta_losses_auto) if delta_losses_auto else 0.0
     )
@@ -484,7 +484,7 @@ def compute_strategy_comparison(cases: list[dict], oracle_data: dict, seed: int 
         "lost_contest_count"
     ]
 
-    delta_losses_scenb = ce_losses - scenb_losses  # 2176 - 2164 = 12
+    delta_losses_scenb = ce_losses - scenb_losses
     break_even_vs_scenb = (
         float((ce_net_0 - scenb_net_0) / delta_losses_scenb) if delta_losses_scenb else 0.0
     )
@@ -504,14 +504,19 @@ def compute_strategy_comparison(cases: list[dict], oracle_data: dict, seed: int 
             "scenario_b_vs_contest_everything_base_p": boot_scenb_base_p,
         },
         "break_even_analysis": {
-            "raw_value_winner": "Contest Everything wins on unpenalized raw value (p=0): ₹108.95L vs ₹49.73L (auto-only) and ₹107.29L (scenario b).",
+            "raw_value_winner": (
+                f"Contest Everything wins on unpenalized raw value (p=0): "
+                f"₹{evaluations['Contest Everything']['p0']['realized_net_value_lakh']:.2f}L vs "
+                f"₹{evaluations['Live Policy (Automated-Only)']['p0']['realized_net_value_lakh']:.2f}L (auto-only) and "
+                f"₹{evaluations['Live Policy + Human Review (Scenario b: Observed Rate)']['p0']['realized_net_value_lakh']:.2f}L (scenario b)."
+            ),
             "ranking_flip_vs_auto_only_threshold_inr": break_even_vs_auto,
             "ranking_flip_vs_scenario_b_threshold_inr": break_even_vs_scenb,
             "notes": (
                 f"When both strategies pay penalty p on lost contests, Live Policy Automated-Only beats Contest Everything when p > ₹{break_even_vs_auto:,.2f}. "
                 f"At the base-case sensitivity assumption of p=₹{base_p:,.2f}, Automated-Only yields ₹{evaluations['Live Policy (Automated-Only)']['base_p']['realized_net_value_lakh']:.2f}L "
                 f"vs Contest Everything's ₹{evaluations['Contest Everything']['base_p']['realized_net_value_lakh']:.2f}L (+₹{evaluations['Live Policy (Automated-Only)']['base_p']['realized_net_value_lakh'] - evaluations['Contest Everything']['base_p']['realized_net_value_lakh']:.2f}L advantage). "
-                f"Scenario b requires an extreme penalty of >₹{break_even_vs_scenb:,.2f} because contesting virtually all reviewed cases only avoids 12 losses while incurring review fees."
+                f"Scenario b requires an extreme penalty of >₹{break_even_vs_scenb:,.2f} because contesting virtually all reviewed cases only avoids {int(round(delta_losses_scenb))} losses while incurring review fees."
             ),
         },
     }
@@ -549,7 +554,7 @@ def format_strategy_table_markdown(strat_comp: dict) -> str:
 
 def format_penalty_sweep_markdown(sweep_data: dict, is_readme: bool = False) -> str:
     img_path = "docs/net_value_vs_penalty.png" if is_readme else "net_value_vs_penalty.png"
-    _ = sweep_data["sweep_findings"]
+    findings = sweep_data["sweep_findings"]
     b_even = sweep_data["break_even_verification"]["ranking_flip_vs_auto_only"]
     base_p = sweep_data["base_case_penalty_inr"]
 
@@ -558,15 +563,36 @@ def format_penalty_sweep_markdown(sweep_data: dict, is_readme: bool = False) -> 
 ![Net Value vs Penalty Sweep]({img_path})
 
 Based on the empirical penalty sweep across penalties from ₹0 to ₹15,000 (verified against `artifacts/strategy_penalty_sweep.json`):
-- **Winner at p = 0 (Unpenalized Baseline)**: Contest Everything wins on raw gross recovery (**₹108.95 lakh**) because the fixed ₹150 filing fee is trivial relative to dispute amounts (~₹4,000). The Live Policy achieves **₹49.73 lakh** in conservative automated-only recovery.
-- **Winner at Base-Case p = ₹{base_p:,.0f}**: Live Policy (Automated-Only) achieves **₹32.42 lakh**, beating Contest Everything (**₹18.64 lakh**) by **+₹13.78 lakh** (+73.9%) because its 74.8% precision avoids 1,759 lost-contest penalties.
+- **Winner at p = 0 (Unpenalized Baseline)**: {findings["winner_at_p0"]}
+- **Winner at Base-Case p = ₹{base_p:,.0f}**: {findings["winner_at_base_p"]}
 - **Penalty Above Which Policy Beats Contest Everything**: The Live Policy (Automated-Only) surpasses Contest Everything for all penalties above **₹{b_even["analytic_threshold_inr"]:,.2f}** per lost contest.
-- **Human Review Bounds**: Scenarios a and b represent theoretical upper bounds because reviewers are assumed to contest 100% of reviewed cases. At the base-case penalty (p = ₹4,150), Scenario b nets **₹17.49 lakh**, falling below Contest Everything (**₹18.64 lakh**) because contesting virtually all reviewed cases incurs ₹166,350 in review fees while avoiding only 12 losses relative to Contest Everything."""
+- **Human Review Bounds**: {findings["human_review_bounds_note"]}"""
 
 
 def format_strategy_analysis_markdown(strat_comp: dict) -> str:
     boots = strat_comp["bootstrap_comparisons"]
     b_even = strat_comp["break_even_analysis"]
+    table = {r["strategy"]: r for r in strat_comp["strategy_table"]}
+    ce = table["Contest Everything"]
+    auto = table["Live Policy (Automated-Only)"]
+    scenb = table["Live Policy + Human Review (Scenario b: Observed Rate)"]
+
+    ce_losses = int(round(ce["lost_contest_count"]))
+    auto_losses = int(round(auto["lost_contest_count"]))
+    scenb_losses = int(round(scenb["lost_contest_count"]))
+    losses_avoided_auto = ce_losses - auto_losses
+    losses_avoided_scenb = ce_losses - scenb_losses
+
+    ce_p0_lakh = ce["realized_net_value_p0_lakh"]
+    auto_p0_lakh = auto["realized_net_value_p0_lakh"]
+    scenb_p0_lakh = scenb["realized_net_value_p0_lakh"]
+    auto_base_p_lakh = auto["realized_net_value_base_p_lakh"]
+    ce_base_p_lakh = ce["realized_net_value_base_p_lakh"]
+    auto_adv_lakh = auto_base_p_lakh - ce_base_p_lakh
+    auto_share_pct = auto["auto_contest_share"] * 100
+    auto_prec_pct = auto["contested_precision"] * 100
+    scenb_contested = scenb["contested_count"]
+    base_p = strat_comp.get("assumed_loss_penalty_inr", 4150.0)
 
     b_auto_0 = boots["auto_only_vs_contest_everything_p0"]
     b_auto_p = boots["auto_only_vs_contest_everything_base_p"]
@@ -593,19 +619,19 @@ def format_strategy_analysis_markdown(strat_comp: dict) -> str:
     return f"""### Statistical Comparison & Break-Even Analysis
 
 - **Raw Value Comparison (Unpenalized Baseline, $p=0$)**:
-  Contest Everything (unconstrained) achieves the highest raw financial recovery (**₹108.95 lakh**) because the fixed contest cost (₹150) is very low relative to dispute amounts (~₹4,000). The Live Policy achieves **₹49.73 lakh** in conservative automated-only recovery (contesting 33.1% of cases with 74.8% precision) and **₹107.29 lakh** under review scenario b.
+  Contest Everything (unconstrained) achieves the highest raw financial recovery (**₹{ce_p0_lakh:.2f} lakh**) because the fixed contest cost (₹150) is very low relative to dispute amounts (~₹4,000). The Live Policy achieves **₹{auto_p0_lakh:.2f} lakh** in conservative automated-only recovery (contesting {auto_share_pct:.1f}% of cases with {auto_prec_pct:.1f}% precision) and **₹{scenb_p0_lakh:.2f} lakh** under review scenario b.
 
 - **Bootstrap 95% Confidence Intervals (Resampling Disputes, N=1,000)**:
   1. **Live Policy (Automated-Only) vs. Contest Everything**:
      - At $p = 0$: difference is **{diff_auto_0}** with 95% CI **{ci_auto_0}**.
-     - At base-case $p = ₹4,150$: difference is **{diff_auto_p}** with 95% CI **{ci_auto_p}**.
+     - At base-case $p = ₹{base_p:,.0f}$: difference is **{diff_auto_p}** with 95% CI **{ci_auto_p}**.
   2. **Live Policy (Scenario b) vs. Contest Everything**:
      - At $p = 0$: difference is **{diff_scenb_0}** with 95% CI **{ci_scenb_0}**.
-     - At base-case $p = ₹4,150$: difference is **{diff_scenb_p}** with 95% CI **{ci_scenb_p}**.
+     - At base-case $p = ₹{base_p:,.0f}$: difference is **{diff_scenb_p}** with 95% CI **{ci_scenb_p}**.
 
 - **Symmetric Break-Even Loss Penalty Level**:
-  - **Ranking Flip vs. Automated-Only**: Contest Everything incurs 2,176 lost disputes whereas the Live Policy Automated-Only incurs only 417 (avoiding 1,759 losses). When a symmetric penalty per lost contest is applied to both strategies, Contest Everything falls below Live Policy Automated-Only when the penalty exceeds **{thresh_auto}**. At the base-case sensitivity parameter of $p = ₹4,150$ (rupee modelling assumption), the Live Policy yields **₹32.42 lakh** vs Contest Everything's **₹18.64 lakh** (an advantage of **+₹13.78 lakh**).
-  - **Ranking Flip vs. Policy with Review (Scenario b)**: In Scenario b, reviewed cases are contested, resulting in 4,984 contested disputes and 2,164 losses (avoiding only 12 losses relative to Contest Everything). Because it incurs ₹166,350 in human review costs and misses 4 wins, Contest Everything falls below Scenario b only if the loss penalty exceeds **{thresh_scenb}**. Scenarios a and b represent operational upper/lower bounds under full contestation, not proof of review lift."""
+  - **Ranking Flip vs. Automated-Only**: Contest Everything incurs {ce_losses:,} lost disputes whereas the Live Policy Automated-Only incurs only {auto_losses:,} (avoiding {losses_avoided_auto:,} losses). When a symmetric penalty per lost contest is applied to both strategies, Contest Everything falls below Live Policy Automated-Only when the penalty exceeds **{thresh_auto}**. At the base-case sensitivity parameter of $p = ₹{base_p:,.0f}$ (rupee modelling assumption), the Live Policy yields **₹{auto_base_p_lakh:.2f} lakh** vs Contest Everything's **₹{ce_base_p_lakh:.2f} lakh** (an advantage of **+₹{auto_adv_lakh:.2f} lakh**).
+  - **Ranking Flip vs. Policy with Review (Scenario b)**: In Scenario b, reviewed cases are contested, resulting in {scenb_contested:,} contested disputes and {scenb_losses:,} losses (avoiding only {losses_avoided_scenb:,} losses relative to Contest Everything). Contest Everything falls below Scenario b only if the loss penalty exceeds **{thresh_scenb}**. Scenarios a and b represent operational upper/lower bounds under full contestation, not proof of review lift."""
 
 
 def _generate_penalty_chart(sweep_data: dict, output_file: Path) -> None:
@@ -832,7 +858,10 @@ def compute_penalty_sweep(
     ev_base_auto = evaluate_strategy_outcome(
         cases, auto_mask, rev_mask, "none", contest_cost, review_cost, loss_penalty=base_p
     )
-    _ = evaluate_strategy_outcome(
+    ev_0_ce = evaluate_strategy_outcome(
+        cases, all_mask, no_mask, "none", contest_cost, review_cost, loss_penalty=0.0
+    )
+    ev_base_scenb = evaluate_strategy_outcome(
         cases,
         auto_mask,
         rev_mask,
@@ -841,6 +870,11 @@ def compute_penalty_sweep(
         review_cost,
         loss_penalty=base_p,
     )
+    avg_dispute_amount = float(np.mean(amounts))
+    delta_losses_scenb_val = int(
+        round(ev_base_ce["lost_contest_count"] - ev_base_scenb["lost_contest_count"])
+    )
+    scenb_review_cost_val = int(round(rev_mask.sum() * review_cost))
 
     sweep_payload = {
         "grid_step_inr": 250.0,
@@ -864,10 +898,24 @@ def compute_penalty_sweep(
             },
         },
         "sweep_findings": {
-            "winner_at_p0": "Contest Everything (Unconstrained) achieves the highest unpenalized recovery (₹108.95L) because filing cost (₹150) is trivial relative to dispute size (~₹4,000).",
-            "winner_at_base_p": f"Live Policy (Automated-Only) achieves ₹{ev_base_auto['realized_net_value_lakh']:.2f}L, beating Contest Everything (₹{ev_base_ce['realized_net_value_lakh']:.2f}L) by +₹{ev_base_auto['realized_net_value_lakh'] - ev_base_ce['realized_net_value_lakh']:.2f}L at base-case penalty p=₹{base_p:,.2f}.",
+            "winner_at_p0": (
+                f"Contest Everything (Unconstrained) achieves the highest unpenalized recovery "
+                f"(₹{ev_0_ce['realized_net_value_lakh']:.2f}L) because filing cost (₹{contest_cost:,.0f}) "
+                f"is trivial relative to dispute size (~₹{avg_dispute_amount:,.0f})."
+            ),
+            "winner_at_base_p": (
+                f"Live Policy (Automated-Only) achieves ₹{ev_base_auto['realized_net_value_lakh']:.2f}L, "
+                f"beating Contest Everything (₹{ev_base_ce['realized_net_value_lakh']:.2f}L) by "
+                f"+₹{ev_base_auto['realized_net_value_lakh'] - ev_base_ce['realized_net_value_lakh']:.2f}L "
+                f"at base-case penalty p=₹{base_p:,.2f}."
+            ),
             "policy_beats_contest_everything_threshold_inr": round(analytic_auto, 2),
-            "human_review_bounds_note": "Scenarios a and b are theoretical upper bounds because reviewers are assumed to contest 100% of reviewed cases. At base-case p=₹4,150, Scenario b nets ₹17.49L, falling below Contest Everything (₹18.64L) because contesting virtually all cases incurs ₹166,350 in review fees while avoiding only 12 losses.",
+            "human_review_bounds_note": (
+                f"Scenarios a and b are theoretical upper bounds because reviewers are assumed to contest 100% of reviewed cases. "
+                f"At base-case p=₹{base_p:,.0f}, Scenario b nets ₹{ev_base_scenb['realized_net_value_lakh']:.2f}L, "
+                f"falling below Contest Everything (₹{ev_base_ce['realized_net_value_lakh']:.2f}L) because contesting virtually all cases "
+                f"incurs ₹{scenb_review_cost_val:,} in review fees while avoiding only {delta_losses_scenb_val} losses."
+            ),
         },
         "strategies": sweep_results,
     }
@@ -955,11 +1003,6 @@ def main(output_dir: Path | None = None) -> dict:
         item for item in benchmark["strategies"] if item["strategy"] == "CHARGEBACK-RISK-ENGINE"
     )
 
-    frozen_baseline = next(
-        (item for item in benchmark["strategies"] if item["strategy"] == "FROZEN-PRE-CHANGE"),
-        None,
-    )
-
     per_case_net = np.where(
         (result_df["action"] == "AUTO-CONTEST") & (result_df["would_win"].astype(bool)),
         result_df["amount"],
@@ -987,10 +1030,8 @@ def main(output_dir: Path | None = None) -> dict:
         "ALWAYS-ACCEPT",
         "RULES-ONLY",
         "LOGISTIC-ONLY",
+        "CHARGEBACK-RISK-ENGINE",
     ]
-    if frozen_baseline is not None:
-        wanted.append("FROZEN-PRE-CHANGE")
-    wanted.append("CHARGEBACK-RISK-ENGINE")
 
     strategy_map = {item["strategy"]: item for item in benchmark["strategies"]}
     strategies = [strategy_map[name] for name in wanted]
@@ -1057,12 +1098,7 @@ def main(output_dir: Path | None = None) -> dict:
             "command": "make verify",
         },
         "comparison_notes": {
-            "frozen_baseline": (
-                "Historical versioned artifact from the original pre-change evaluation. "
-                "It is not treated as a like-for-like current 5,000-row benchmark."
-                if frozen_baseline is not None
-                else "No historical frozen baseline artifact is present."
-            ),
+            "frozen_baseline": "Not included; all current benchmark strategies evaluated on held-out test split.",
             "realized_value": "Synthetic ground truth only; not a production recovery claim.",
             "graph_ablation": "The tabular benchmark has no network identifiers, so graph stress testing is separately reported rather than invented as a lift.",
         },
@@ -1329,6 +1365,37 @@ Evaluated against the bounded adversarial test suite in `tests/test_ai_analyst_e
             f"| Selected policy threshold | **{threshold:.2f}** from `dev.csv` |",
             rm,
         )
+
+        strat_comp = report.get("strategy_comparison", {})
+        sweep_data = report.get("strategy_penalty_sweep", {})
+
+        b_even_val = strat_comp.get("break_even_analysis", {}).get(
+            "ranking_flip_vs_auto_only_threshold_inr", 3611.18
+        )
+        table_dict = {r["strategy"]: r for r in strat_comp.get("strategy_table", [])}
+        ce_row = table_dict.get("Contest Everything", {})
+        auto_row = table_dict.get("Live Policy (Automated-Only)", {})
+        ce_p0 = ce_row.get("realized_net_value_p0_lakh", 108.95)
+        auto_p0 = auto_row.get("realized_net_value_p0_lakh", 41.09)
+        auto_bp = auto_row.get("realized_net_value_base_p_lakh", 28.77)
+        ce_bp = ce_row.get("realized_net_value_base_p_lakh", 18.64)
+        base_p = strat_comp.get("assumed_loss_penalty_inr", 4150.0)
+
+        tradeoff_sentence = (
+            f"Contesting every dispute earns higher raw value at zero loss penalty ($p=0$, "
+            f"₹{ce_p0:.2f} lakh vs ₹{auto_p0:.2f} lakh), but the Live Policy wins when the per-lost-contest "
+            f"penalty exceeds the break-even threshold of ₹{b_even_val:,.2f} (yielding "
+            f"₹{auto_bp:.2f} lakh vs ₹{ce_bp:.2f} lakh at base-case penalty $p = ₹{base_p:,.0f})."
+        )
+        if "Contesting every dispute earns higher raw value" in rm:
+            rm = re.sub(r"Contesting every dispute earns higher raw value.*?\.", tradeoff_sentence, rm)
+        else:
+            rm = re.sub(
+                r"(\|\s*Selected policy threshold\s*\|\s*\*\*[0-9.]+\*\*\s*from `dev.csv`\s*\|\n)",
+                rf"\1\n{tradeoff_sentence}\n",
+                rm,
+            )
+
         rev_share_pct = strategy.get("human_review_rate", 0.6654) * 100.0
         auto_share_pct = (strategy.get("auto_contest_count", 1657) / 5000.0) * 100.0
         accept_share_pct = 100.0 - auto_share_pct - rev_share_pct
@@ -1343,15 +1410,13 @@ Evaluated against the bounded adversarial test suite in `tests/test_ai_analyst_e
             rm,
         )
 
-        strat_comp = report.get("strategy_comparison", {})
-        sweep_data = report.get("strategy_penalty_sweep", {})
         if strat_comp:
             strat_table_md = format_strategy_table_markdown(strat_comp)
             strat_analysis_md = format_strategy_analysis_markdown(strat_comp)
             sweep_md = (
                 format_penalty_sweep_markdown(sweep_data, is_readme=True) if sweep_data else ""
             )
-            strat_readme_section = f"""### Comprehensive Strategy Comparison & Economic Trade-off Analysis
+            strat_readme_section = f"""## Comprehensive Strategy Comparison & Economic Trade-off Analysis
 
 Evaluated on `data/test.csv` (5,000 held-out disputes) under identical operational cost assumptions (`CONTEST_COST = ₹150`, `HUMAN_REVIEW_COST = ₹50`).
 
@@ -1361,9 +1426,9 @@ Evaluated on `data/test.csv` (5,000 held-out disputes) under identical operation
 
 {sweep_md}
 """
-            if "### Comprehensive Strategy Comparison & Economic Trade-off Analysis" in rm:
+            if re.search(r"(?:##|###) Comprehensive Strategy Comparison & Economic Trade-off Analysis", rm):
                 rm = re.sub(
-                    r"### Comprehensive Strategy Comparison & Economic Trade-off Analysis.*?(?=\n---\n|\Z)",
+                    r"(?:##|###) Comprehensive Strategy Comparison & Economic Trade-off Analysis.*?(?=\n---\n|\Z)",
                     lambda _: strat_readme_section.strip() + "\n\n",
                     rm,
                     flags=re.DOTALL,
@@ -1379,25 +1444,6 @@ Evaluated on `data/test.csv` (5,000 held-out disputes) under identical operation
                         rm += "\n\n" + strat_readme_section
                 else:
                     rm += "\n\n" + strat_readme_section
-
-        if "## What goes beyond a basic scorer" not in rm:
-            beyond_section = """
-## What goes beyond a basic scorer
-
-This repository implements safety-critical architectural controls beyond tabular probability scoring:
-
-1. **Deterministic Safety Authority**: The AI analyst and ML models provide signals only. Only deterministic policy can select financial actions (enforced by `tests/test_ai_analyst_evaluation.py` and `tests/test_safety_regression.py`).
-2. **Cryptographic Audit Log**: Every decision is persisted in a local SQLite hash chain using SHA-256 links, guaranteeing tamper evidence and idempotent decision replays.
-3. **Actionable Counterfactuals**: Automatically determines the minimal evidence reversal required to flip an adverse decision.
-4. **Distribution Drift Guard**: Continuous monitoring of incoming feature distributions and output risk scores.
-5. **Operational Review-Budget Optimizer**: Knapsack optimization that prioritizes human-review capacity toward maximum marginal financial recovery.
-6. **Leakage Verification Tooling**: Enforces strict separation between ground-truth training variables and live runtime features.
-7. **API Hardening & Model Integrity**: Constant-time API-key verification (`hmac.compare_digest`), request payload limits (413), rate limiting (429), and SHA-256 sidecar model hash verification before deserialization.
-"""
-            if "## Testing" in rm:
-                rm = rm.replace("## Testing", beyond_section + "\n## Testing")
-            else:
-                rm += beyond_section
 
         _write_lf(readme_path, rm)
 
