@@ -6,7 +6,7 @@
 
 > **Status**: Reference implementation evaluated on synthetic data only. Not validated on real payment outcomes. Not legal or compliance advice.
 
-Auditable, evidence-aware chargeback dispute decision system where machine learning and heuristic models provide advisory signals, while a deterministic policy alone routes financial actions (`AUTO-CONTEST`, `HUMAN-REVIEW`, `ACCEPT-LOSS`). All monetary values and evaluations are synthetic.
+Auditable, evidence-aware chargeback dispute decision system where machine learning and heuristic models provide advisory signals, while a deterministic policy alone routes financial actions (`AUTO-CONTEST`, `HUMAN-REVIEW`, `ACCEPT-LOSS`). All monetary values and evaluations are synthetic. When unpenalized ($p = 0$), contesting every dispute blindly earns higher raw financial recovery (₹108.95 lakh vs ₹41.09 lakh) due to low filing fees; however, under a symmetric per-lost-contest loss penalty, the conservative Live Policy wins once the penalty exceeds ₹3,611.18 (yielding ₹28.77 lakh vs ₹18.64 lakh at base-case penalty $p = ₹4,150).
 
 ```mermaid
 flowchart LR
@@ -20,12 +20,15 @@ flowchart LR
 
 ---
 
-## 60-Second Quickstart
+## Quickstart
 
 ```bash
-# 1. Clean environment install
+# 1. Clean environment install (plain install for runtime; use ".[dev]" for testing)
 python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
+pip install -e .
+
+# Optional for development and running test suites:
+# pip install -e ".[dev]"
 
 # 2. Start API server in development mode
 CHARGEBACK_ENV=development uvicorn chargeback_risk_engine.api:app --host 127.0.0.1 --port 8000
@@ -67,6 +70,15 @@ Runtime configuration via environment variables (`Settings` class):
 | `CHARGEBACK_CORS_ORIGINS` | `http://localhost:3000...` | Explicit allowed origins (wildcards like `*` are rejected in production). |
 | `CHARGEBACK_RATE_LIMIT` | `60` | In-memory requests/minute limit per client key (tunable). |
 | `CHARGEBACK_REQUEST_TIMEOUT_SECONDS` | `5.0` | Maximum request execution window in seconds. |
+
+---
+
+## Known Limitations and What This Is Not
+
+- **What this is not**: Not an automated gateway payment executor (creates structured contest drafts, does not auto-submit externally); not a payment processor or acquirer; not legal or compliance advice.
+- **Synthetic Circularity**: The bundled dataset is synthetic; models learn distributions embedded in the data generator. Real validation requires processor outcome logs.
+- **Storage & Rate Limiting**: The SQLite WAL audit log is optimized for single-host deployments (~50-100 writes/sec); rate limiting is local in-memory per process.
+- **Fail-Closed Guarantees**: Any malformed, missing, unverified, or ambiguous input routes to `HUMAN-REVIEW`, never `AUTO-CONTEST`.
 
 ---
 
@@ -128,12 +140,30 @@ Based on the empirical penalty sweep across penalties from ₹0 to ₹15,000 (ve
 
 ---
 
-## Known Limitations and What This Is Not
+## Project Layout
 
-- **What this is not**: Not an automated gateway payment executor (creates structured contest drafts, does not auto-submit externally); not a payment processor or acquirer; not legal or compliance advice.
-- **Synthetic Circularity**: The bundled dataset is synthetic; models learn distributions embedded in the data generator. Real validation requires processor outcome logs.
-- **Storage & Rate Limiting**: The SQLite WAL audit log is optimized for single-host deployments (~50-100 writes/sec); rate limiting is local in-memory per process.
-- **Fail-Closed Guarantees**: Any malformed, missing, unverified, or ambiguous input routes to `HUMAN-REVIEW`, never `AUTO-CONTEST`.
+- `chargeback_risk_engine/` — Core package: advisory ML, evidence assembly, risk graph, deterministic policy, and FastAPI service.
+- `tests/` — Test suite: unit, safety invariant, provenance gating, property-based, and integration tests.
+- `scripts/` — Evaluation, synthetic data generation, benchmarking, load testing, and report generation utilities.
+- `docs/` — Architecture specifications, ADRs, model card, evaluation report, and operational guides.
+- `data/` — Synthetic benchmark datasets (`train.csv`, `dev.csv`, `test.csv`, `sample_external_disputes.csv`).
+- `artifacts/` — Deterministic model weights, policy profiles, and generated benchmark reports.
+- `deploy/` — Production deployment assets, including Prometheus alert rules (`deploy/alert_rules.yml`).
+- `examples/` — API request payloads, shell execution scripts, and client integration examples.
+- `training/` — Offline model training and temporal evaluation scripts.
+- `.github/` — CI/CD workflows (`ci.yml`, `release.yml`), PR/issue templates, and Dependabot config.
+
+---
+
+## How to Reproduce
+
+Run the full local validation suite:
+
+```bash
+make check
+```
+
+This verifies formatting (`ruff check`), type safety (`mypy`), unit and safety tests (`pytest`), drift gating, and release criteria.
 
 ---
 
@@ -146,3 +176,9 @@ Based on the empirical penalty sweep across penalties from ₹0 to ₹15,000 (ve
 - [docs/DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md) — Schema reference for dispute inputs, evidence items, and decisions
 - [docs/DECISIONS.md](docs/DECISIONS.md) — Architecture decision records (ADRs)
 - [SECURITY.md](SECURITY.md) — Security policy, vulnerability reporting, and hardening checklist
+
+---
+
+## License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.

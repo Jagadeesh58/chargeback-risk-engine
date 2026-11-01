@@ -20,6 +20,15 @@ regen:
 	python scripts/generate_report.py
 	python scripts/robustness_benchmark.py
 
+check:
+	ruff check .
+	ruff format --check .
+	mypy chargeback_risk_engine
+	python -m pytest -q
+	python scripts/verify_release.py
+	python scripts/generate_report.py
+	git diff --exit-code -- README.md artifacts docs ':!docs/*.png'
+
 verify:
 	python -m pytest -q
 	python scripts/verify_release.py
