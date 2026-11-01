@@ -529,7 +529,7 @@ def compute_strategy_comparison(cases: list[dict], oracle_data: dict, seed: int 
 def format_strategy_table_markdown(strat_comp: dict) -> str:
     table = strat_comp["strategy_table"]
     lines = [
-        "| Strategy | Auto Share | Review Share | Contested Precision | Lost Contests | Net Value (p = 0) | Net Value (p = ₹4,150) | Strategy Notes |",
+        "| Strategy | Auto Share | Review Share | Contested Precision | Lost contests (actual or expected) | Net Value (p = 0) | Net Value (p = ₹4,150) | Strategy Notes |",
         "|---|---:|---:|---:|---:|---:|---:|---|",
     ]
     for row in table:
@@ -543,16 +543,23 @@ def format_strategy_table_markdown(strat_comp: dict) -> str:
         else:
             name_md = strat_name
         lost_val = float(row["lost_contest_count"])
-        lost_str = (
-            f"{int(round(lost_val)):,}"
-            if abs(lost_val - round(lost_val)) < 1e-4
-            else f"{lost_val:,.1f}"
-        )
+        is_expected = abs(lost_val - round(lost_val)) > 1e-4 or "(Scenario a" in strat_name
+        if is_expected:
+            lost_str = f"{int(round(lost_val)):,} (expected)"
+        else:
+            lost_str = f"{int(round(lost_val)):,}"
         lines.append(
             f"| {name_md} | {row['auto_contest_share'] * 100:.1f}% | {row['human_review_share'] * 100:.1f}% | "
             f"{row['contested_precision'] * 100:.1f}% | {lost_str} | **₹{row['realized_net_value_p0_lakh']:.2f} lakh** | "
             f"**₹{row['realized_net_value_base_p_lakh']:.2f} lakh** | {row['cost_assumptions']} |"
         )
+    lines.append("")
+    lines.append(
+        "*Note on counts: Contest Everything, Live Policy (Automated-Only), Scenario b (Observed Rate), "
+        "and Theoretical Oracle Ceiling report exact observed outcomes from the 5,000-case test set. "
+        "Scenario a (Model Rate) reports expected lost contests by evaluating reviewed cases at the "
+        "model's calibrated win probability, rounded to a whole number for display.*"
+    )
     return "\n".join(lines)
 
 
