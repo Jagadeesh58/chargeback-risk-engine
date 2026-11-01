@@ -1,6 +1,13 @@
 # Security Policy & Architecture
 
-## 1. Responsible Disclosure Policy
+## 1. Responsible Disclosure Policy & Supported Versions
+
+### Supported Versions
+
+| Version | Supported | Notes |
+|---|---|---|
+| `1.0.x` | :white_check_mark: | Current active release with cryptographic audit chain and fail-closed policy. |
+| `< 1.0` | :x: | Legacy development prototypes; no security patches provided. |
 
 The `chargeback-risk-engine` project values the contributions of the security research community. If you discover a vulnerability or potential security risk, please report it privately and responsibly so we can resolve the issue before public disclosure.
 
@@ -117,3 +124,19 @@ When `CHARGEBACK_AI_ANALYST_URL` is configured, dispute notes and evidence detai
 ## 10. Secrets & Credentials Management
 
 Do not commit API keys, secrets, or certificates to source control. The repository relies entirely on environment variable configuration (`CHARGEBACK_API_KEYS`, `CHARGEBACK_ANCHOR_SECRET`). Production deployments should inject secrets from a dedicated secrets manager (e.g. HashiCorp Vault, AWS Secrets Manager, or Kubernetes Secrets).
+
+---
+
+## 11. Production Hardening Checklist
+
+Before exposing the service to untrusted network traffic:
+- [ ] **Mode**: `CHARGEBACK_ENV=production` is set (enforces fail-safe startup checks).
+- [ ] **Auth**: `CHARGEBACK_API_KEY` (or `CHARGEBACK_API_KEYS`) is configured with a high-entropy secret (>= 32 characters).
+- [ ] **Provenance**: `CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE=false` (strictly enforced in production).
+- [ ] **Persistence**: `CHARGEBACK_AUDIT_DB_PATH` points to a persistent absolute path outside the application directory.
+- [ ] **Anchoring**: Audit head hash anchoring cron is active (`scripts/export_audit_head.py`).
+- [ ] **Model Integrity**: Model weights hash sidecar (`artifacts/ml_scorer_model.json.sha256`) is verified at startup.
+- [ ] **CORS**: CORS origins (`CHARGEBACK_CORS_ORIGINS`) are explicitly configured without wildcards.
+- [ ] **Rate Limits**: Rate limits (`CHARGEBACK_RATE_LIMIT`) are configured appropriate for your reverse proxy topology.
+- [ ] **Telemetry Security**: Prometheus metrics endpoint (`/metrics`) is authenticated via `CHARGEBACK_METRICS_KEY` or bound to an internal network interface.
+

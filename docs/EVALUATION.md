@@ -63,7 +63,8 @@ The production-facing policy profile is selected from `dev.csv` only. The curren
 - auto-contest threshold: `0.65`
 - accept-loss threshold: `0.30`
 - minimum evidence completeness: `0.50`
-- contest cost: `₹150`
+- monetary ceiling: `₹50,000` (configurable internal parameter)
+- contest cost: `₹150` (configurable internal parameter)
 - objective: maximize expected net value subject to precision >= 0.72 and auto-contest rate <= 0.40
 
 The profile is serialized in `artifacts/policy_profile.json`.

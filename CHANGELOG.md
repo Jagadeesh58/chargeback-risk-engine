@@ -10,24 +10,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2026-11-01
 
 ### Added
+- **Production Readiness & Audit Probes**: Hardened `/readyz` probe to verify database connectivity, JSON model loading and SHA-256 checksum verification, audit chain head readability, and cryptographic verification of the last N rows (returns 503 Service Unavailable with machine-readable diagnostic errors on failure).
+- **Authenticated Metrics**: Secured `/metrics` Prometheus endpoint in production mode with API key authentication or dedicated `CHARGEBACK_METRICS_KEY` (returns 401 Unauthorized without credentials).
+- **Measured Production Load Test Benchmark**: Added real ASGI load testing across 1,000, 10,000, and 100,000 pre-seeded audit/graph rows with 16 concurrent workers, demonstrating sub-linear graph retrieval scaling (~35 ms 2-hop CTE execution; 0.67x P95 ratio at 100k vs 1k) recorded in `artifacts/load_test_report.json` and `docs/OPERATIONS.md`.
+- **Prometheus Alert Rules**: Added `deploy/alert_rules.yml` defining production firing rules for error rate surges, latency spikes, rate limiting, and audit integrity verification failures, verified against live metric names in `tests/test_prometheus_alerts.py`.
+- **Examples & Quickstart**: Added `examples/request_verified.json`, `examples/request_unverified.json`, `examples/python_client.py`, and `examples/quickstart.sh`, backed by automated verification in `tests/test_examples.py`.
+- **Regression Hardening Test Suite**: Converted ad-hoc hardening probes into automated pytest test cases in `tests/test_hardening_probes.py` (replay conflicts, oversized body rejection, unauthenticated rejection, audit tampering, concurrent writes).
+- **Working Tree Cleanliness Enforcement**: Added conftest session tracking and `tests/test_working_tree_clean.py` ensuring test execution never modifies tracked repository files in place.
+- **Packaging Verification**: Added `tests/test_packaging_deps.py` verifying AST-based third-party imports match `pyproject.toml`, version synchronization, and single-source package metadata.
 - **Unified Operational CLI (`chargeback-cli`)**: Introduced entry point supporting `serve`, `verify-audit`, `train`, and `evaluate` subcommands.
 - **Enterprise Settings & Key Management**: Added `pydantic-settings` integration with support for multi-key authentication (`CHARGEBACK_API_KEYS`), zero-downtime key rotation, and role-based access control (`read`, `write`, `admin`).
-- **Production Observability**: Added `/metrics` Prometheus endpoint exposing decision counts, evaluation durations, audit write counters, and rate-limiting metrics.
-- **Production Readiness Probes**: Implemented `/healthz` (liveness) and `/readyz` (readiness) endpoints with startup configuration and database connectivity verification.
-- **SQLite Audit Store Protocol**: Standardized `AuditStore` protocol with Write-Ahead Logging (`WAL`), serialized transactions (`_AUDIT_WRITE_LOCK`), automated versioned schema migrations, and external HMAC-SHA256 head anchoring.
-- **Container Infrastructure**: Added multi-stage production `Dockerfile` and `docker-compose.yml` configuration.
-- **Synthetic Load Testing Suite**: Added `scripts/load_test.py` for concurrent throughput and latency benchmarking.
-- **Evaluation Validity Framework**: Implemented `scripts/run_ablations.py` testing 6 ablation variants, 1,000 bootstrap resamples with 95% confidence intervals, and `scripts/evaluate_real_data.py` for evaluating external dispute datasets.
-- **Type Annotations**: Shipped `chargeback_risk_engine/py.typed` and achieved 100% strict `mypy` type checking across all source modules.
+- **Code of Conduct**: Added Contributor Covenant 2.1 in `CODE_OF_CONDUCT.md`.
 
 ### Changed
+- **Lean Documentation Hierarchy**: Streamlined repository documentation into `docs/` (`ARCHITECTURE.md`, `DECISIONS.md`, `MODEL_CARD.md`, `EVALUATION.md`, `OPERATIONS.md`, `THREAT_MODEL.md`, `DATA_DICTIONARY.md`). Merged `BASELINE.md`, `EVALUATION_PROTOCOL.md`, and `EVALUATION_REPORT.md` into a single canonical `docs/EVALUATION.md`. Folded "Why Not Contest Everything" into `docs/ARCHITECTURE.md`.
+- **Honesty & Measurement Gating**: Removed all unmeasured "throughput >= 1,000/s" and "P95 < 8 ms" claims from `docs/OPERATIONS.md`, replacing them with empirical load test tables and clearly labelled suggested SLOs.
+- **Dependency Segregation**: Slimmed core dependencies in `pyproject.toml` to runtime necessities (`fastapi`, `uvicorn`, `pydantic`, `pydantic-settings`, `scikit-learn`, `numpy`, `pandas`, `prometheus-client`), moving `streamlit`, `altair`, and `matplotlib` to optional extras `[ui]` and `[reports]`.
 - **Eliminated Arbitrary Deserialization**: Removed all pickle-based model weights in favor of transparent, human-readable JSON parameters (`ml_scorer_model.json`) verified against SHA-256 sidecar hashes at startup.
 - **Currency & Economic Alignment**: Standardized all monetary figures across documentation, scripts, and tests to Indian Rupees (`₹`), enforcing symmetric lost-contest penalties.
-- **Documentation Condensation**: Streamlined `README.md` to under 250 lines with a comprehensive decision table, architecture diagram, and empirical results snapshot.
-- **Enhanced Security Middleware**: Integrated streaming request body size caps (64 KB) and pre-parsing rate limiting.
+- **CI Hardening**: Enhanced `.github/workflows/ci.yml` with blocking `pip-audit`, secret scanning, markdown link checking, wheel building, and fresh-venv clean install verification.
 
 ### Fixed
 - **Candidate Benchmark Reproducibility**: Fixed non-deterministic candidate benchmark execution to ensure byte-exact reproducibility across independent test runs.
-- **FastAPI Request Timeout Handling**: Configured resilient request timeouts to prevent gateway timeouts under test tracing overhead.
-- **Audit Tamper Detection**: Ensured cryptographic failure detection when historical records are modified or truncated.
+- **Audit Tamper Detection**: Ensured cryptographic failure detection and immediate 503 readiness failure when historical records are modified or truncated.
 - **Graph Merchant Linkage**: Eliminated buyer-side lockouts caused by multi-dispute merchant identifier sharing.
+- **SQLite Subquery Rowid Execution**: Fixed SQLite outer query rowid resolution when reading recent audit log decisions.

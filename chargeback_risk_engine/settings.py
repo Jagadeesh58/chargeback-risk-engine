@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     # Authentication
     api_key: str = ""
     api_keys: str = ""
+    metrics_key: str = ""
 
     # Paths & storage
     audit_db_path: str = Field(default_factory=lambda: str(REPO_ROOT / "audit_log.db"))

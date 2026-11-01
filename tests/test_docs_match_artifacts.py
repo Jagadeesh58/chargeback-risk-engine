@@ -237,9 +237,7 @@ def test_fees_and_penalties_have_rupee_or_source_citation():
 
 def test_operations_doc_matches_load_test_report():
     """Assert measured load test latency and throughput in OPERATIONS.md match load_test_report.json."""
-    ops_path = REPO_ROOT / "OPERATIONS.md"
-    if not ops_path.exists():
-        ops_path = REPO_ROOT / "docs" / "OPERATIONS.md"
+    ops_path = REPO_ROOT / "docs" / "OPERATIONS.md"
     load_test_path = ARTIFACTS_DIR / "load_test_report.json"
     if not load_test_path.exists() or not ops_path.exists():
         return
@@ -251,3 +249,85 @@ def test_operations_doc_matches_load_test_report():
         assert row_str in ops_text, (
             f"Load test row for scale {row['pre_seeded_rows']} missing from OPERATIONS.md:\nExpected: {row_str}"
         )
+
+
+def test_version_string_matches_across_repo():
+    """Assert package version, pyproject.toml, CHANGELOG, and health probe agree."""
+    import tomllib
+
+    import chargeback_risk_engine
+
+    pyproject_text = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    pyproject_data = tomllib.loads(pyproject_text)
+    pyproject_version = pyproject_data["project"]["version"]
+
+    assert chargeback_risk_engine.__version__ == pyproject_version
+    changelog = (REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert f"## [{pyproject_version}]" in changelog
+
+
+def test_env_vars_documented_match_settings():
+    """Assert all Settings fields mapped from CHARGEBACK_* are documented in docs/OPERATIONS.md."""
+    from chargeback_risk_engine.settings import Settings
+
+    ops_doc = (REPO_ROOT / "docs" / "OPERATIONS.md").read_text(encoding="utf-8")
+    readme_doc = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    combined_docs = ops_doc + "\n" + readme_doc
+
+    # Check key env vars derived from Settings fields
+    for field_name in Settings.model_fields.keys():
+        env_var_name = f"CHARGEBACK_{field_name.upper()}"
+        assert env_var_name in combined_docs, (
+            f"{env_var_name} from Settings is not documented in README or OPERATIONS.md"
+        )
+
+
+def test_internal_markdown_links_resolve():
+    """Assert all internal relative markdown links in repository docs point to existing files."""
+    link_pattern = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+    doc_paths = [
+        REPO_ROOT / "README.md",
+        REPO_ROOT / "CONTRIBUTING.md",
+        REPO_ROOT / "SECURITY.md",
+        REPO_ROOT / "CODE_OF_CONDUCT.md",
+        *sorted((REPO_ROOT / "docs").glob("*.md")),
+    ]
+
+    broken_links = []
+    for doc in doc_paths:
+        if not doc.exists():
+            continue
+        content = doc.read_text(encoding="utf-8")
+        for match in link_pattern.finditer(content):
+            target_str = match.group(2).split("#")[0].strip()
+            if not target_str or target_str.startswith(("http://", "https://", "mailto:")):
+                continue
+
+            target_path = (doc.parent / target_str).resolve()
+            root_path = (REPO_ROOT / target_str).resolve()
+            if not target_path.exists() and not root_path.exists():
+                broken_links.append(f"{doc.name}: [{match.group(1)}]({target_str})")
+
+    assert not broken_links, "Found broken relative markdown links:\n" + "\n".join(broken_links)
+
+
+def test_policy_thresholds_match_artifacts(artifacts):
+    """Assert policy thresholds in docs match policy_profile.json."""
+    profile = artifacts["profile"]
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    eval_doc = (REPO_ROOT / "docs" / "EVALUATION.md").read_text(encoding="utf-8")
+
+    auto_str = f"{profile['auto_contest_threshold']:.2f}"
+    accept_str = f"{profile['accept_loss_threshold']:.2f}"
+    evidence_str = f"{profile['min_evidence_completeness']:.2f}"
+    ceiling_str = f"₹{int(profile['monetary_ceiling']):,}"
+    fee_str = f"₹{int(profile['contest_cost'])}"
+
+    for doc_name, doc_text in [("README.md", readme), ("docs/EVALUATION.md", eval_doc)]:
+        assert auto_str in doc_text, f"auto_contest_threshold {auto_str} missing from {doc_name}"
+        assert accept_str in doc_text, f"accept_loss_threshold {accept_str} missing from {doc_name}"
+        assert evidence_str in doc_text, (
+            f"min_evidence_completeness {evidence_str} missing from {doc_name}"
+        )
+        assert ceiling_str in doc_text, f"monetary_ceiling {ceiling_str} missing from {doc_name}"
+        assert fee_str in doc_text, f"contest_cost {fee_str} missing from {doc_name}"

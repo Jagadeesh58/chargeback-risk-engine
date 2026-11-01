@@ -1,92 +1,76 @@
 # Chargeback Risk Engine
 
 [![CI](https://github.com/username/chargeback-risk-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/username/chargeback-risk-engine/actions/workflows/ci.yml)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-AI-assisted, evidence-aware chargeback decision system where ML and AI only provide signals, while a deterministic policy alone routes financial actions.
+Auditable, evidence-aware chargeback dispute decision system where machine learning and heuristic models provide advisory signals, while a deterministic policy alone routes financial actions (`AUTO-CONTEST`, `HUMAN-REVIEW`, `ACCEPT-LOSS`). All monetary values and evaluations are synthetic.
 
 ```mermaid
 flowchart LR
-    subgraph Inputs[Dispute Inputs]
-        A[Dispute Payload]
-    end
-    subgraph Signals[Advisory Signals]
-        B[ML Win Probability]
-        C[Evidence Completeness]
-        D[Entity Risk Graph]
-        E[AI Case Context]
-    end
-    subgraph Policy[Authoritative Boundary]
-        F[Deterministic Policy Engine<br/>policy.decide]
-    end
-    subgraph Actions[Financial Actions]
-        G[AUTO-CONTEST]
-        H[HUMAN-REVIEW]
-        I[ACCEPT-LOSS]
-    end
-    subgraph Storage[Audit Trail]
-        J[(SQLite WAL Store<br/>SHA-256 Hash Chain)]
-    end
-
-    A --> B & C & D & E
-    B & C & D & E --> F
-    F --> G & H & I
-    F --> J
+    A[Dispute Payload] --> B[Advisory Signals<br/>ML · Evidence · Graph · Context]
+    B --> C[Authoritative Boundary<br/>policy.decide]
+    C --> D[AUTO-CONTEST]
+    C --> E[HUMAN-REVIEW]
+    C --> F[ACCEPT-LOSS]
+    C --> G[(SQLite WAL Store<br/>SHA-256 Hash Chain)]
 ```
 
 ---
 
-## Core Safety Invariants
+## 60-Second Quickstart
 
-| Invariant | Rule | Failure Behavior |
-|---|---|---|
-| **1. Ground before mutating** | Strict input schema validation on types, ranges, reason codes | Rejects request with HTTP 422 |
-| **2. Stay in declared scope** | Monetary ceiling enforcement (`MONETARY_CEILING = ₹50,000`) | Routes to `HUMAN-REVIEW` |
-| **3. Fresh evidence required** | Completeness verification (`confirmed > 0.50`, 0 unverified fields) | Routes to `HUMAN-REVIEW` |
-| **4. Fail closed on anomaly** | Graph network risk threshold (`cluster_score < 0.60`) | Routes to `HUMAN-REVIEW` |
-| **5. Positive unit economics** | Expected net value gate ($EV > 0$ after filing fee ₹150) | Routes to `ACCEPT-LOSS` |
-| **6. Immutable audit trail** | Append-only SQLite WAL table with SHA-256 hash chaining | Aborts write on integrity failure |
+```bash
+# 1. Clean environment install
+python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+
+# 2. Start API server in development mode
+CHARGEBACK_ENV=development uvicorn chargeback_risk_engine.api:app --host 127.0.0.1 --port 8000
+
+# 3. Authenticated decision request with fail-closed evidence provenance
+curl -s -X POST http://127.0.0.1:8000/decision \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: test-api-key" \
+  -d @examples/request_verified.json
+```
 
 ---
 
-## Deterministic Policy Decision Rules
+## Deterministic Decision Rules
 
-Financial actions are chosen exclusively by `chargeback_risk_engine.policy.decide()`:
+Financial actions are chosen strictly by `chargeback_risk_engine.policy.decide()` using thresholds frozen in `artifacts/policy_profile.json`:
 
 | Action | Gate Criteria Required | Operational Rationale |
 |---|---|---|
-| **AUTO-CONTEST** | Win probability $\ge 0.65$<br/>• Evidence quality $> 0.50$ (0 unverified fields)<br/>• Graph risk $< 0.60$<br/>• Amount $\le ₹50,000$<br/>• Expected Net Value $> 0$ | High-probability, fully evidenced claims automated for recovery without merchant operational overhead. |
-| **HUMAN-REVIEW** | Ambiguous probability (0.30 < p < 0.65)<br/>• Missing or unverified evidence<br/>• Network graph risk $\ge 0.60$<br/>• Amount $> ₹50,000$ | Protects against false rejections, compliance penalties, and edge-case disputes needing human judgment. |
-| **ACCEPT-LOSS** | Win probability $\le 0.30$ **AND** Expected Net Value $\le 0$ | Low-probability disputes where contesting cost (₹150) exceeds expected recovery. |
+| **AUTO-CONTEST** | Win probability ≥ 0.65<br/>• Evidence completeness ≥ 0.50 (0 unverified fields)<br/>• Graph risk < 0.60<br/>• Amount ≤ ₹50,000 (configurable internal parameter)<br/>• Expected Net Value > 0 (after configurable ₹150 filing fee) | High-probability, evidenced claims automated for recovery without merchant operational overhead. |
+| **HUMAN-REVIEW** | Ambiguous probability (0.30 < p < 0.65)<br/>• Missing or unverified evidence provenance<br/>• Network graph risk ≥ 0.60<br/>• Amount > ₹50,000 (configurable ceiling) | Protects against false rejections, dispute penalties, and edge cases requiring human review. |
+| **ACCEPT-LOSS** | Win probability ≤ 0.30 **AND** Expected Net Value ≤ 0 | Low-probability disputes where contesting cost (₹150) exceeds expected recovery. |
 
 ---
 
-## Quickstart
+## Configuration Reference
 
-```bash
-# 1. Install dependencies in editable mode
-pip install -e ".[dev]"
+Runtime configuration via environment variables (`Settings` class):
 
-# 2. Run REST API server (or via unified CLI: chargeback-cli serve)
-uvicorn chargeback_risk_engine.api:app --host 0.0.0.0 --port 8000
-
-# 3. Launch interactive demo
-chargeback-demo
-# or launch Streamlit UI: streamlit run scripts/demo.py
-
-# 4. Verify cryptographic audit chain integrity
-chargeback-cli verify-audit
-
-# 5. Evaluate an external dispute dataset
-chargeback-cli evaluate --csv data/sample_external_disputes.csv
-```
+| Variable | Default | Production Requirement |
+|---|---|---|
+| `CHARGEBACK_ENV` | `production` | Set to `production` (enforces strict security gates; use `development` for local testing). |
+| `CHARGEBACK_API_KEY` | `""` | Mandatory 32+ character secret token in production mode. |
+| `CHARGEBACK_API_KEYS` | `""` | Optional comma-separated multi-actor credentials (`id:secret:role`). |
+| `CHARGEBACK_METRICS_KEY` | `""` | Optional dedicated token for `/metrics` in production mode. |
+| `CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE` | `false` | Must remain `false` in production (ignored/overridden to enforce provenance). |
+| `CHARGEBACK_AUDIT_DB_PATH` | `<root>/audit_log.db` | Absolute path outside package directory with persistent storage. |
+| `CHARGEBACK_MODEL_PATH` | `<artifacts>/ml_scorer_model.json` | Path to valid model weights with corresponding `.sha256` sidecar file. |
+| `CHARGEBACK_CORS_ORIGINS` | `http://localhost:3000...` | Explicit allowed origins (wildcards like `*` are rejected in production). |
+| `CHARGEBACK_RATE_LIMIT` | `60` | In-memory requests/minute limit per client key (tunable). |
+| `CHARGEBACK_REQUEST_TIMEOUT_SECONDS` | `5.0` | Maximum request execution window in seconds. |
 
 ---
 
 ## Key Evaluation Snapshot
 
-*(Evaluated on 5,000 held-out synthetic test disputes; synthetic evaluation only, not a production performance guarantee)*
+*(Evaluated on 5,000 held-out synthetic disputes from `data/test.csv`; synthetic data circular by construction, not a real financial guarantee)*
 
 | Metric | Result |
 |---|---:|
@@ -127,9 +111,21 @@ Evaluated on `data/test.csv` (5,000 held-out disputes) under identical operation
 
 ---
 
-## Security & Known Limitations
+## Known Limitations and What This Is Not
 
-- **Synthetic Evaluation**: Benchmark figures are generated from synthetic dispute distributions and do not represent production performance guarantees.
-- **Fail-Closed Boundary**: Ambiguous, incomplete, or corrupted inputs route to `HUMAN-REVIEW`.
-- **Authoritative Separation**: Machine learning, graph clustering, and AI models produce advisory signals only.
-- **References**: Review our [SECURITY.md](SECURITY.md), [OPERATIONS.md](OPERATIONS.md), and [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for detailed policies.
+- **What this is not**: Not an automated gateway payment executor (creates structured contest drafts, does not auto-submit externally); not a payment processor or acquirer; not legal or compliance advice.
+- **Synthetic Circularity**: The bundled dataset is synthetic; models learn distributions embedded in the data generator. Real validation requires processor outcome logs.
+- **Storage & Rate Limiting**: The SQLite WAL audit log is optimized for single-host deployments (~50-100 writes/sec); rate limiting is local in-memory per process.
+- **Fail-Closed Guarantees**: Any malformed, missing, unverified, or ambiguous input routes to `HUMAN-REVIEW`, never `AUTO-CONTEST`.
+
+---
+
+## Documentation Links
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — System boundaries, data flow, and threat model integration
+- [docs/EVALUATION.md](docs/EVALUATION.md) — Full benchmark methodology, ablations, robustness tests, and BYOD harness
+- [docs/OPERATIONS.md](docs/OPERATIONS.md) — Production runbook, deployment, backups, anchoring, and measured load tests
+- [docs/MODEL_CARD.md](docs/MODEL_CARD.md) — ML model characteristics, features, training data, and offline challengers
+- [docs/DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md) — Schema reference for dispute inputs, evidence items, and decisions
+- [docs/DECISIONS.md](docs/DECISIONS.md) — Architecture decision records (ADRs)
+- [SECURITY.md](SECURITY.md) — Security policy, vulnerability reporting, and hardening checklist

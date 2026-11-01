@@ -493,7 +493,7 @@ def metrics(
     settings = get_settings()
     env = settings.env.lower().strip()
     if env == "production":
-        metrics_key = os.getenv("CHARGEBACK_METRICS_KEY", "").strip()
+        metrics_key = settings.metrics_key or os.getenv("CHARGEBACK_METRICS_KEY", "").strip()
         auth_header = request.headers.get("Authorization", "")
         token = ""
         if auth_header.startswith("Bearer "):

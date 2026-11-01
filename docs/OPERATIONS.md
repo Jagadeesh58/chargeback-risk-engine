@@ -63,17 +63,24 @@ The engine provides dedicated probe endpoints for health checkers and load balan
 | Variable | Type | Default | Production Requirement | Description |
 |---|---|---|---|---|
 | `CHARGEBACK_ENV` | string | `production` | **Required** (`production`) | Application runtime mode (`production`, `development`, `demo`). |
-| `CHARGEBACK_API_KEY` | string | `""` | **Required** ($\ge 32$ chars) | Default admin API secret key. |
+| `CHARGEBACK_DEBUG` | boolean | `false` | Must be `false` | Debug mode; forbidden in production mode. |
+| `CHARGEBACK_API_KEY` | string | `""` | **Required** (>= 32 chars) | Default admin API secret key. |
 | `CHARGEBACK_API_KEYS` | string | `""` | Optional | Multi-key rotation mapping (`id:secret:role,...`). |
 | `CHARGEBACK_METRICS_KEY` | string | `""` | Optional | Dedicated secret key for scraping `/metrics` in production. |
 | `CHARGEBACK_AUDIT_DB_PATH` | string | `data/audit_log.db` | **Required** (Absolute path) | Path to persistent SQLite audit database. |
+| `CHARGEBACK_DB_PATH` | string | `""` | Legacy alias | Backwards-compatible alias for `CHARGEBACK_AUDIT_DB_PATH`. |
 | `CHARGEBACK_MODEL_PATH` | string | `artifacts/ml_scorer_model.json` | Default | Safe JSON logistic regression model file. |
 | `CHARGEBACK_MODEL_SHA256` | string | Sidecar `.sha256` | **Required** (Sidecar or env) | SHA-256 digest of approved model artifact. |
+| `CHARGEBACK_REQUIRE_MODEL_HASH` | boolean | `false` | Recommended (`true`) | Enforce model hash verification strictly. |
 | `CHARGEBACK_RATE_LIMIT` | integer | `60` | Optional | Requests per minute per client key (0 to disable). |
 | `CHARGEBACK_REQUEST_TIMEOUT_SECONDS` | float | `5.0` | Default (`5.0`s) | Maximum request processing deadline. |
 | `CHARGEBACK_MAX_BODY_BYTES` | integer | `65536` | Default (64 KB) | HTTP request payload size cap. |
 | `CHARGEBACK_CORS_ORIGINS` | string | `""` | Explicit list (no `*`) | Allowed Cross-Origin Resource Sharing origins. |
 | `CHARGEBACK_READYZ_AUDIT_ROWS` | integer | `100` | Default (`100`) | Number of recent audit records checked by `/readyz`. |
+| `CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE` | boolean | `false` | Must be `false` | Allows unverified evidence items in development mode only. |
+| `CHARGEBACK_MAX_EVIDENCE_AGE_DAYS` | float | `365.0` | Default (`365.0`) | Maximum age in days for evidence item timestamp validity. |
+| `CHARGEBACK_ALLOW_TEST_CLIENT_HEADER` | boolean | `false` | Must be `false` | Allow test client IP spoofing header; dev only. |
+| `CHARGEBACK_ANCHOR_SECRET` | string | `""` | Optional | Shared HMAC secret for signing external audit head anchors. |
 
 ---
 
