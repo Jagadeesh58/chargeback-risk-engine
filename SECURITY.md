@@ -13,9 +13,7 @@ The `chargeback-risk-engine` project values the contributions of the security re
 
 ### Reporting a Vulnerability
 
-- **Preferred Reporting Path**: Use GitHub Private Vulnerability Reporting on this repository.
-- **Security Contact**: Email `security@example.com` with the subject line `[SECURITY] chargeback-risk-engine Vulnerability Report`.
-- **GPG Key**: Available upon request or via public keyservers.
+GitHub Private Vulnerability Reporting is the only reporting channel for this repository. Please open the repository's Security tab and choose "Report a vulnerability".
 
 Please include the following information in your report:
 1. Detailed description of the vulnerability, including affected endpoints or modules.
@@ -23,12 +21,9 @@ Please include the following information in your report:
 3. Potential impact assessment (e.g., authorization bypass, integrity failure, denial of service).
 4. Any potential mitigations or remediations identified.
 
-### Response Timelines & SLAs
+### Response Timelines
 
-- **Initial Acknowledgment**: Within 48 hours of report receipt.
-- **Triage & Severity Assessment**: Within 5 business days.
-- **Fix & Patch Deployment**: Targeted within 14 business days for critical vulnerabilities.
-- **Public Disclosure**: Coordinated disclosure after release of fix or 90 days following initial report, whichever occurs first.
+As an open-source reference project maintained on a best-effort basis by a solo maintainer, reports are reviewed and addressed as time permits. Fixes will be prepared in private security advisories and coordinated prior to public release.
 
 ---
 
