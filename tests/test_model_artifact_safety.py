@@ -101,6 +101,47 @@ def test_wrong_sklearn_or_feature_version_rejected():
             load_or_fit_ml_scorer(path=path_sk, train_csv=train_csv)
 
 
+def test_sklearn_patch_bump_accepted_and_minor_mismatch_rejected():
+    """Loader accepts patch version variations on major.minor, but rejects major/minor mismatch with make train guidance."""
+    import sklearn
+
+    import chargeback_risk_engine.ml_scorer as ml_module
+    from chargeback_risk_engine.ml_scorer import load_or_fit_ml_scorer, save_ml_scorer
+
+    with tempfile.TemporaryDirectory() as tmp:
+        train_csv = "data/train.csv"
+        path = os.path.join(tmp, "model.json")
+        save_ml_scorer(path=path, train_csv=train_csv)
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        # 1. Patch bump (e.g. 1.9.99 when runtime is 1.9.1) -> must load successfully
+        runtime_mm = ".".join(sklearn.__version__.split(".")[:2])
+        data["sklearn_version"] = f"{runtime_mm}.99"
+        raw_bytes = json.dumps(data).encode("utf-8")
+        with open(path, "wb") as f:
+            f.write(raw_bytes)
+        with open(path + ".sha256", "w", encoding="utf-8", newline="\n") as f:
+            f.write(hashlib.sha256(raw_bytes).hexdigest() + "\n")
+
+        ml_module._cached_scorer = None
+        scorer = load_or_fit_ml_scorer(path=path, train_csv=train_csv)
+        assert scorer is not None
+
+        # 2. Minor mismatch (e.g. 1.8.0 when runtime is 1.9.1) -> must raise RuntimeError with 'make train'
+        data["sklearn_version"] = "1.8.0" if runtime_mm != "1.8" else "1.7.0"
+        raw_bytes = json.dumps(data).encode("utf-8")
+        with open(path, "wb") as f:
+            f.write(raw_bytes)
+        with open(path + ".sha256", "w", encoding="utf-8", newline="\n") as f:
+            f.write(hashlib.sha256(raw_bytes).hexdigest() + "\n")
+
+        ml_module._cached_scorer = None
+        with pytest.raises(RuntimeError) as exc_info:
+            load_or_fit_ml_scorer(path=path, train_csv=train_csv)
+        assert "make train" in str(exc_info.value)
+
+
 def test_malformed_calibration_falls_back_safely():
     """If calibration points are non-monotonic, non-finite, or malformed, fall back to raw probability."""
     with tempfile.TemporaryDirectory() as tmp:

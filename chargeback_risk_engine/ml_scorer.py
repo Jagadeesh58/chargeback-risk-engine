@@ -193,11 +193,16 @@ def load_or_fit_ml_scorer(
         raise RuntimeError(f"Incompatible live model artifact: {bundle.get('model_version')}")
     if bundle.get("feature_version") not in (None, FEATURE_VERSION):
         raise RuntimeError(f"Incompatible feature artifact: {bundle.get('feature_version')}")
-    if bundle.get("sklearn_version") not in (None, sklearn.__version__):
-        raise RuntimeError(
-            f"Live model was trained with scikit-learn {bundle.get('sklearn_version')}, "
-            f"runtime has {sklearn.__version__}"
-        )
+    model_sklearn = bundle.get("sklearn_version")
+    if model_sklearn is not None:
+        model_parts = str(model_sklearn).split(".")[:2]
+        runtime_parts = sklearn.__version__.split(".")[:2]
+        if model_parts != runtime_parts:
+            raise RuntimeError(
+                f"Live model was trained with scikit-learn {model_sklearn} "
+                f"(major.minor {'.'.join(model_parts)}), runtime has {sklearn.__version__} "
+                f"(major.minor {'.'.join(runtime_parts)}). Re-train with safe JSON representation via 'make train'."
+            )
 
     scorer = MLScorer()
     models_dict = bundle.get("models")

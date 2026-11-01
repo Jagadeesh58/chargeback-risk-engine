@@ -73,8 +73,14 @@ jobs:
           python -m venv /tmp/clean-venv
           /tmp/clean-venv/bin/pip install dist/*.whl
           /tmp/clean-venv/bin/python -c "import chargeback_risk_engine.api; print('Core import OK')"
-          /tmp/clean-venv/bin/uvicorn chargeback_risk_engine.api:app --port 8000 &
+          CHARGEBACK_ENV=development /tmp/clean-venv/bin/uvicorn chargeback_risk_engine.api:app --port 8000 &
           API_PID=$!
-          sleep 2
+          sleep 3
           curl -f http://127.0.0.1:8000/healthz || (kill $API_PID && exit 1)
+          DECISION_RESP=$(curl -s -f -X POST http://127.0.0.1:8000/decision \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: test-api-key" \
+            -d @examples/request_verified.json)
+          echo "Decision response: $DECISION_RESP"
+          echo "$DECISION_RESP" | grep -q '"action"' || (kill $API_PID && exit 1)
           kill $API_PID

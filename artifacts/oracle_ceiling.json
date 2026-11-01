@@ -66,25 +66,25 @@
       }
     },
     "hgb": {
-      "roc_auc": 0.6971638353243209,
-      "pr_auc": 0.7254448859761069,
-      "brier": 0.21694436700812939,
+      "roc_auc": 0.6972423541388935,
+      "pr_auc": 0.7261860371606774,
+      "brier": 0.21686805646343418,
       "net_value": 10895802.59,
-      "pct_of_oracle_roc": 85.48181094783082,
-      "chance_adjusted_roc_skill": 62.47867659799171,
-      "pct_of_oracle_pr": 91.62908473351078,
-      "chance_adjusted_pr_skill": 70.79392921250826,
+      "pct_of_oracle_roc": 85.491438427231,
+      "chance_adjusted_roc_skill": 62.50355819767487,
+      "pct_of_oracle_pr": 91.72269764057535,
+      "chance_adjusted_pr_skill": 71.1205440572787,
       "pct_of_oracle_net_value": 99.95947091106282,
       "bootstrap_ci": {
         "roc_auc_pct": {
-          "mean": 85.38809643561417,
-          "ci_lower": 83.80470303109827,
-          "ci_upper": 87.35434143071086
+          "mean": 85.39440692157761,
+          "ci_lower": 83.84436657829232,
+          "ci_upper": 87.4042194797457
         },
         "pr_auc_pct": {
-          "mean": 91.59492285487445,
-          "ci_lower": 89.8999314595565,
-          "ci_upper": 93.43079268097122
+          "mean": 91.68349617868803,
+          "ci_lower": 89.83490223608278,
+          "ci_upper": 93.50429343831483
         },
         "net_value_pct": {
           "mean": 99.95499605003099,
@@ -94,30 +94,30 @@
       }
     },
     "hybrid": {
-      "roc_auc": 0.696776285983586,
-      "pr_auc": 0.7266025589470423,
-      "brier": 0.21699829139848262,
-      "net_value": 10895714.02,
-      "pct_of_oracle_roc": 85.43429210391051,
-      "chance_adjusted_roc_skill": 62.35586721012546,
-      "pct_of_oracle_pr": 91.7753074401535,
-      "chance_adjusted_pr_skill": 71.30409931756732,
-      "pct_of_oracle_net_value": 99.95865835868172,
+      "roc_auc": 0.6965114375468672,
+      "pr_auc": 0.7264885395915455,
+      "brier": 0.21697165344852484,
+      "net_value": 10896135.419999998,
+      "pct_of_oracle_roc": 85.40181806717725,
+      "chance_adjusted_roc_skill": 62.271940156271896,
+      "pct_of_oracle_pr": 91.76090594751354,
+      "chance_adjusted_pr_skill": 71.25385260020155,
+      "pct_of_oracle_net_value": 99.96252433557454,
       "bootstrap_ci": {
         "roc_auc_pct": {
-          "mean": 85.31812026182325,
-          "ci_lower": 83.7611241905143,
-          "ci_upper": 87.3706756049507
+          "mean": 85.28178689404969,
+          "ci_lower": 83.71098146011,
+          "ci_upper": 87.32972769499499
         },
         "pr_auc_pct": {
-          "mean": 91.7335418016904,
-          "ci_lower": 89.86241829267718,
-          "ci_upper": 93.70362905411878
+          "mean": 91.71675212626947,
+          "ci_lower": 89.76916857813211,
+          "ci_upper": 93.74039210873559
         },
         "net_value_pct": {
-          "mean": 99.95329327687894,
-          "ci_lower": 99.91103510865067,
-          "ci_upper": 100.00430156680213
+          "mean": 99.95731612960442,
+          "ci_lower": 99.91396588822192,
+          "ci_upper": 100.00459611929747
         }
       }
     }

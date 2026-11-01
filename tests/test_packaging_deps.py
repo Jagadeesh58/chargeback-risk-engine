@@ -164,3 +164,52 @@ def test_py_typed_marker_present():
     """py.typed marker must exist in chargeback_risk_engine/ for PEP 561 compliance."""
     py_typed = PKG_DIR / "py.typed"
     assert py_typed.exists(), "chargeback_risk_engine/py.typed must exist"
+
+
+def test_sklearn_version_consistency():
+    """Assert model artifact's sklearn_version major.minor matches pyproject range and lockfile."""
+    import json
+
+    from packaging.specifiers import SpecifierSet
+    from packaging.version import Version
+
+    model_path = REPO_ROOT / "artifacts" / "ml_scorer_model.json"
+    assert model_path.exists(), "artifacts/ml_scorer_model.json must exist"
+    model_data = json.loads(model_path.read_text(encoding="utf-8"))
+    model_ver = model_data.get("sklearn_version")
+    assert model_ver, "sklearn_version must be stamped in model artifact"
+    model_mm = ".".join(str(model_ver).split(".")[:2])
+
+    # 1. pyproject.toml check
+    pyproject_text = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    m = re.search(r'["\']scikit-learn\s*([><=~!^0-9.,\s]+)["\']', pyproject_text)
+    assert m, "scikit-learn specifier must exist in pyproject.toml"
+    spec = m.group(1).strip()
+    spec_set = SpecifierSet(spec)
+    assert Version(model_ver) in spec_set, (
+        f"Model sklearn_version {model_ver} is outside pyproject specifier '{spec}'"
+    )
+
+    # 2. requirements.lock check
+    req_lock = REPO_ROOT / "requirements.lock"
+    if req_lock.exists():
+        lock_text = req_lock.read_text(encoding="utf-8")
+        lock_m = re.search(r"scikit-learn==([0-9.]+)", lock_text)
+        assert lock_m, "scikit-learn must be pinned in requirements.lock"
+        lock_ver = lock_m.group(1)
+        lock_mm = ".".join(lock_ver.split(".")[:2])
+        assert model_mm == lock_mm, (
+            f"Model sklearn_version major.minor ({model_mm}) does not match requirements.lock ({lock_mm})"
+        )
+
+    # 3. requirements-dev.lock check
+    dev_lock = REPO_ROOT / "requirements-dev.lock"
+    if dev_lock.exists():
+        dev_lock_text = dev_lock.read_text(encoding="utf-8")
+        dev_m = re.search(r"scikit-learn==([0-9.]+)", dev_lock_text)
+        assert dev_m, "scikit-learn must be pinned in requirements-dev.lock"
+        dev_lock_ver = dev_m.group(1)
+        dev_lock_mm = ".".join(dev_lock_ver.split(".")[:2])
+        assert model_mm == dev_lock_mm, (
+            f"Model sklearn_version major.minor ({model_mm}) does not match requirements-dev.lock ({dev_lock_mm})"
+        )

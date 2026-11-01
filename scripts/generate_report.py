@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 import tempfile
 import time
 from pathlib import Path
+
+os.environ.setdefault("CHARGEBACK_ENV", "development")
+os.environ.setdefault("CHARGEBACK_ALLOW_UNVERIFIED_EVIDENCE", "1")
 
 import numpy as np
 import pandas as pd
