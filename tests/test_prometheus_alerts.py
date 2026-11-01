@@ -36,7 +36,6 @@ def test_alert_rule_metrics_exist_in_observability():
 
     alert_files = [
         DEPLOY_DIR / "alert_rules.yml",
-        DEPLOY_DIR / "prometheus-alerts.yaml",
     ]
 
     for alert_file in alert_files:

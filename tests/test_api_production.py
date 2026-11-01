@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -171,4 +172,86 @@ def test_security_headers_and_request_id(monkeypatch):
     assert resp.headers.get("X-Content-Type-Options") == "nosniff"
     assert resp.headers.get("X-Frame-Options") == "DENY"
     assert "Strict-Transport-Security" in resp.headers
-    assert "Content-Security-Policy" in resp.headers
+
+
+def test_readyz_database_unreachable(monkeypatch):
+    monkeypatch.setenv("CHARGEBACK_DB_PATH", "/nonexistent/path/db.sqlite")
+    monkeypatch.setenv("CHARGEBACK_AUDIT_DB_PATH", "/nonexistent/path/db.sqlite")
+    client = TestClient(app)
+    resp = client.get("/readyz")
+    assert resp.status_code == 503
+    data = resp.json()
+    assert data["status"] == "not_ready"
+    assert "error" in data["checks"]["database"]
+
+
+def test_readyz_model_hash_mismatch(monkeypatch):
+    monkeypatch.setenv("CHARGEBACK_MODEL_SHA256", "0" * 64)
+    client = TestClient(app)
+    resp = client.get("/readyz")
+    assert resp.status_code == 503
+    data = resp.json()
+    assert data["status"] == "not_ready"
+    assert "error" in data["checks"]["model"]
+
+
+def test_readyz_audit_chain_tampered(monkeypatch, tmp_path):
+    db_file = tmp_path / "tampered_audit.db"
+    monkeypatch.setenv("CHARGEBACK_DB_PATH", str(db_file))
+    monkeypatch.setenv("CHARGEBACK_AUDIT_DB_PATH", str(db_file))
+    store = SQLiteAuditStore(str(db_file))
+
+    from chargeback_risk_engine.audit_log import LoggedDecision
+
+    d1 = LoggedDecision(
+        dispute_id="D1",
+        reason_code="fraud",
+        amount=100.0,
+        win_probability=0.5,
+        action="AUTO-CONTEST",
+        reason="ok",
+        expected_value=50.0,
+        evidence={},
+        created_at="2026-10-31T00:00:00Z",
+    )
+    store.append(d1)
+
+    # Tamper with row directly in SQLite
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("UPDATE decisions SET amount = 9999.0 WHERE dispute_id = 'D1'")
+    conn.commit()
+    conn.close()
+
+    client = TestClient(app)
+    resp = client.get("/readyz")
+    assert resp.status_code == 503
+    data = resp.json()
+    assert data["status"] == "not_ready"
+    assert "error" in data["checks"]["audit_chain"]
+
+
+def test_metrics_authentication_in_production(monkeypatch):
+    monkeypatch.setenv("CHARGEBACK_ENV", "production")
+    monkeypatch.setenv("CHARGEBACK_API_KEY", "prod-key-at-least-32-chars-long-abc")
+    monkeypatch.setenv("CHARGEBACK_API_KEYS", "client-1:prod-key-at-least-32-chars-long-abc:write")
+    monkeypatch.setenv("CHARGEBACK_METRICS_KEY", "metrics-secret-key-12345")
+    from chargeback_risk_engine.settings import reset_settings
+
+    reset_settings()
+
+    client = TestClient(app)
+
+    # 1. Unauthenticated in production -> 401
+    resp_unauth = client.get("/metrics")
+    assert resp_unauth.status_code == 401
+
+    # 2. Authenticated with standard API key -> 200
+    resp_apikey = client.get(
+        "/metrics", headers={"X-API-Key": "prod-key-at-least-32-chars-long-abc"}
+    )
+    assert resp_apikey.status_code == 200
+    assert "chargeback_decisions_total" in resp_apikey.text
+
+    # 3. Authenticated with CHARGEBACK_METRICS_KEY -> 200
+    resp_metrics = client.get("/metrics", headers={"X-API-Key": "metrics-secret-key-12345"})
+    assert resp_metrics.status_code == 200

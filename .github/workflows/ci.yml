@@ -13,8 +13,8 @@ jobs:
       matrix:
         python-version: ['3.11', '3.12', '3.13']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -33,17 +33,33 @@ jobs:
       - name: Run verification workflow
         run: make verify
       - name: Security audit with pip-audit
-        run: pip-audit || echo "::warning::pip-audit completed with warnings"
+        run: pip-audit
       - name: Build package
         run: python -m build
       - name: Check package metadata with twine
         run: twine check dist/*
 
+  security-and-links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - name: Run Gitleaks secret scan
+        uses: gitleaks/gitleaks-action@7f35734e700b46e01a881cb5175402636a0d4c13 # v2.3.8
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check markdown links
+        uses: gaurav-nelson/github-action-markdown-link-check@d53a906aa6b22b8979d33bc86170567e619495ec # v1
+        with:
+          use-quiet-mode: 'yes'
+          use-verbose-mode: 'no'
+
   wheel-smoke-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
         with:
           python-version: '3.11'
       - name: Build wheel and test clean install
@@ -58,4 +74,3 @@ jobs:
           sleep 2
           curl -f http://127.0.0.1:8000/healthz || (kill $API_PID && exit 1)
           kill $API_PID
-

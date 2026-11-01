@@ -17,78 +17,44 @@ This runbook covers deployment, monitoring, secret management, audit log verific
 | **Storage** | 1.0 GB persistent volume | 20.0 GB NVMe persistent volume |
 | **Operating System** | Alpine / Debian Slim | Alpine 3.19+ / distroless |
 
-### 1.2 Docker Deployment
+### 1.2 Production ASGI Service Deployment
 
-Build and run using the optimized multi-stage `Dockerfile`:
-
-```bash
-# Build the production image
-docker build -t chargeback-risk-engine:1.0.0 .
-
-# Run with environment configuration
-docker run -d \
-  --name chargeback-service \
-  -p 8000:8000 \
-  -v chargeback_data:/app/data \
-  -e CHARGEBACK_ENV=production \
-  -e CHARGEBACK_API_KEYS="prod-key-1:secret_alpha_99:admin,client-key-1:secret_beta_88:write" \
-  -e CHARGEBACK_ANCHOR_SECRET="production_hmac_anchor_secret_32bytes" \
-  -e CHARGEBACK_RATE_LIMIT_RPS=50 \
-  -e CHARGEBACK_MAX_BODY_BYTES=65536 \
-  -e CHARGEBACK_REQUEST_TIMEOUT_SECONDS=5.0 \
-  chargeback-risk-engine:1.0.0
-```
-
-### 1.3 Docker Compose Deployment
-
-A complete production-ready stack is defined in `docker-compose.yml`:
+Deploy the engine using Uvicorn or a process supervisor (e.g., systemd, supervisord) directly in a dedicated Python environment:
 
 ```bash
-# Start service stack
-docker compose up -d
+# 1. Install production package in a virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Or on Windows: .venv\Scripts\activate
+pip install .
 
-# Verify service logs
-docker compose logs -f api
+# 2. Configure production environment
+export CHARGEBACK_ENV=production
+export CHARGEBACK_API_KEY="prod-admin-secret-at-least-32-chars-long"
+export CHARGEBACK_API_KEYS="prod-key-1:secret_alpha_99:admin,client-key-1:secret_beta_88:write"
+export CHARGEBACK_AUDIT_DB_PATH="/var/lib/chargeback/audit_log.db"
+export CHARGEBACK_ANCHOR_SECRET="production_hmac_anchor_secret_32bytes"
+export CHARGEBACK_RATE_LIMIT=120
+export CHARGEBACK_REQUEST_TIMEOUT_SECONDS=5.0
+
+# 3. Launch with Uvicorn
+uvicorn chargeback_risk_engine.api:app --host 0.0.0.0 --port 8000 --workers 2
 ```
 
-### 1.4 Kubernetes Deployment & Probes
+### 1.3 Health & Readiness Probes
 
-For Kubernetes deployments, configure container probes:
+The engine provides dedicated probe endpoints for health checkers and load balancers:
 
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: chargeback-risk-engine
-spec:
-  replicas: 3
-  template:
-    spec:
-      containers:
-      - name: chargeback-api
-        image: chargeback-risk-engine:1.0.0
-        ports:
-        - containerPort: 8000
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 8000
-          initialDelaySeconds: 5
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /readyz
-            port: 8000
-          initialDelaySeconds: 5
-          periodSeconds: 10
-        volumeMounts:
-        - name: audit-volume
-          mountPath: /app/data
-      volumes:
-      - name: audit-volume
-        persistentVolumeClaim:
-          claimName: chargeback-audit-pvc
-```
+- **Liveness Probe (`/healthz`)**:
+  Returns HTTP 200 `{"status": "ok", "version": "1.0.0"}` confirming the process is alive.
+  ```bash
+  curl -f http://localhost:8000/healthz
+  ```
+
+- **Readiness Probe (`/readyz`)**:
+  Verifies database connectivity (`SELECT 1`), model artifact integrity, audit head hash readability, and cryptographic integrity of the last N audit rows. Returns HTTP 200 when ready or HTTP 503 if any check fails:
+  ```bash
+  curl -f http://localhost:8000/readyz
+  ```
 
 ---
 
@@ -150,7 +116,7 @@ Roles:
    ```bash
    CHARGEBACK_API_KEYS="prod-2026-v1:old_secret:write,prod-2026-v2:secret_new_value:write"
    ```
-3. **Reload Configuration**: Update Kubernetes secret or restart container. The service accepts both keys simultaneously.
+3. **Reload Configuration**: Update environment configuration or restart the service process. The service accepts both keys simultaneously.
 4. **Migrate Upstream Clients**: Update client services to send `X-API-Key: prod-2026-v2:secret_new_value:write`.
 5. **Retire Old Key**: Once telemetry indicates zero traffic on `prod-2026-v1`, remove the old key from `CHARGEBACK_API_KEYS` and re-deploy.
 

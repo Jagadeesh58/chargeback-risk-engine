@@ -23,6 +23,7 @@ from chargeback_risk_engine import __version__
 from chargeback_risk_engine.audit_log import (
     DB_PATH,
     PayloadConflictError,
+    SQLiteAuditStore,
     _get_connection,
     verify_audit_integrity,
 )
@@ -431,10 +432,30 @@ def readyz():
 
     # 2. Model check
     try:
-        load_or_fit_ml_scorer()
+        load_or_fit_ml_scorer(reload=True)
         checks["model"] = "ok"
     except Exception as e:
         checks["model"] = f"error: {e}"
+        is_ready = False
+
+    # 3. Audit chain integrity check (head readability + last N rows verification)
+    try:
+        audit_rows_check = int(os.getenv("CHARGEBACK_READYZ_AUDIT_ROWS", "100"))
+        store = SQLiteAuditStore(effective_db)
+        head_val = store.head()
+        checks["audit_head"] = "ok" if head_val is not None else "empty_or_new"
+
+        audit_verif = verify_audit_integrity(effective_db, limit=audit_rows_check)
+        if not audit_verif.get("valid"):
+            err_msg = audit_verif.get("error") or "tampered_hash_chain"
+            failed_id = audit_verif.get("failed_dispute_id")
+            detail = f"{err_msg} at dispute {failed_id}" if failed_id else err_msg
+            checks["audit_chain"] = f"error: {detail}"
+            is_ready = False
+        else:
+            checks["audit_chain"] = "ok"
+    except Exception as e:
+        checks["audit_chain"] = f"error: {e}"
         is_ready = False
 
     status_code = 200 if is_ready else 503
@@ -465,7 +486,39 @@ def health():
 
 
 @app.get("/metrics", summary="Prometheus metrics exposition")
-def metrics():
+def metrics(
+    request: Request,
+    x_api_key: str | None = Header(None, alias="X-API-Key"),
+):
+    settings = get_settings()
+    env = settings.env.lower().strip()
+    if env == "production":
+        metrics_key = os.getenv("CHARGEBACK_METRICS_KEY", "").strip()
+        auth_header = request.headers.get("Authorization", "")
+        token = ""
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
+        candidate = x_api_key or token
+
+        authenticated = False
+        if metrics_key and candidate:
+            authenticated = hmac.compare_digest(
+                candidate.encode("utf-8"), metrics_key.encode("utf-8")
+            )
+
+        if not authenticated and candidate:
+            configured_keys = settings.get_parsed_api_keys()
+            for secret in configured_keys:
+                if hmac.compare_digest(candidate.encode("utf-8"), secret.encode("utf-8")):
+                    authenticated = True
+                    break
+
+        if not authenticated:
+            raise HTTPException(
+                status_code=401,
+                detail="Authentication required for /metrics in production mode",
+            )
+
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 

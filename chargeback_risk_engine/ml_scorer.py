@@ -47,6 +47,7 @@ def _encode_evidence(df: pd.DataFrame, fields: list[str]) -> pd.DataFrame:
 class MLScorer:
     def __init__(self):
         self.models = {}
+        self.model_hash: str | None = None
 
     def fit(self, train_df: pd.DataFrame):
         for reason in REASON_CODES:
@@ -112,12 +113,25 @@ def save_ml_scorer(path: str = MODEL_PATH, train_csv: str | None = None) -> MLSc
     return scorer
 
 
-def load_or_fit_ml_scorer(path: str = MODEL_PATH, train_csv: str | None = None) -> MLScorer:
+def reset_cached_ml_scorer() -> None:
+    """Clear memory-cached MLScorer instance."""
+    global _cached_scorer
+    _cached_scorer = None
+
+
+def load_or_fit_ml_scorer(
+    path: str = MODEL_PATH, train_csv: str | None = None, reload: bool = False
+) -> MLScorer:
     global _cached_scorer
     if train_csv is None:
         train_csv = str(DATA_DIR / "train.csv")
-    if _cached_scorer is not None:
-        return _cached_scorer
+
+    expected_hash = os.getenv("CHARGEBACK_MODEL_SHA256")
+    if not reload and _cached_scorer is not None:
+        if expected_hash and getattr(_cached_scorer, "model_hash", None) != expected_hash:
+            pass  # Expected hash changed, force verification and reload!
+        else:
+            return _cached_scorer
 
     env = os.getenv("CHARGEBACK_ENV", "production").lower().strip()
 
@@ -196,6 +210,7 @@ def load_or_fit_ml_scorer(path: str = MODEL_PATH, train_csv: str | None = None) 
         lr.classes_ = np.array(m_data["classes"], dtype=int)
         scorer.models[reason] = lr
 
+    scorer.model_hash = actual_hash
     _cached_scorer = scorer
     return _cached_scorer
 

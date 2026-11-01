@@ -200,7 +200,7 @@ class AuditStore(Protocol):
 
     def append(self, entry: LoggedDecision) -> LoggedDecision: ...
 
-    def verify(self) -> AuditVerificationResult: ...
+    def verify(self, limit: int | None = None) -> AuditVerificationResult: ...
 
     def get(self, dispute_id: str) -> LoggedDecision | None: ...
 
@@ -375,12 +375,25 @@ class SQLiteAuditStore:
             finally:
                 conn.close()
 
-    def verify(self) -> AuditVerificationResult:
+    def verify(self, limit: int | None = None) -> AuditVerificationResult:
         conn = _get_connection(self.db_path)
         try:
-            rows = conn.execute("SELECT * FROM decisions ORDER BY rowid ASC").fetchall()
+            # Check if decisions table exists
+            table_check = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='decisions'"
+            ).fetchone()
+            if not table_check:
+                return AuditVerificationResult(valid=True, checked=0, head_hash="")
+
+            if limit is not None and limit > 0:
+                rows = conn.execute(
+                    "SELECT * FROM decisions ORDER BY rowid DESC LIMIT ?", (limit,)
+                ).fetchall()
+                rows.reverse()
+            else:
+                rows = conn.execute("SELECT * FROM decisions ORDER BY rowid ASC").fetchall()
             cols = [d[0] for d in conn.execute("SELECT * FROM decisions LIMIT 0").description]
-            prev_hash = ""
+            prev_hash = None if (limit is not None and limit > 0) else ""
             checked = 0
             for row in rows:
                 rec = dict(zip(cols, row))
@@ -412,7 +425,14 @@ class SQLiteAuditStore:
                     json.dumps(expected_payload, sort_keys=True, separators=(",", ":")).encode()
                 ).hexdigest()
 
-                if rec.get("prev_hash", "") != prev_hash or rec.get("record_hash", "") != expected:
+                if prev_hash is not None and rec.get("prev_hash", "") != prev_hash:
+                    return AuditVerificationResult(
+                        valid=False,
+                        checked=checked,
+                        failed_dispute_id=rec["dispute_id"],
+                        error="Hash chain verification mismatch",
+                    )
+                if rec.get("record_hash", "") != expected:
                     return AuditVerificationResult(
                         valid=False,
                         checked=checked,
@@ -421,7 +441,7 @@ class SQLiteAuditStore:
                     )
                 prev_hash = expected
                 checked += 1
-            return AuditVerificationResult(valid=True, checked=checked, head_hash=prev_hash)
+            return AuditVerificationResult(valid=True, checked=checked, head_hash=prev_hash or "")
         finally:
             conn.close()
 
@@ -496,8 +516,8 @@ def log_new_decision(
     return store.append(entry)
 
 
-def verify_audit_integrity(db_path: str = DB_PATH) -> dict[str, Any]:
-    res = SQLiteAuditStore(db_path).verify()
+def verify_audit_integrity(db_path: str = DB_PATH, limit: int | None = None) -> dict[str, Any]:
+    res = SQLiteAuditStore(db_path).verify(limit=limit)
     result: dict[str, Any] = {
         "valid": res.valid,
         "checked": res.checked,
