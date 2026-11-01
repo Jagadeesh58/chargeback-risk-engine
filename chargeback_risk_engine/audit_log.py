@@ -15,6 +15,7 @@ import sqlite3
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 from chargeback_risk_engine.paths import REPO_ROOT
@@ -22,6 +23,7 @@ from chargeback_risk_engine.paths import REPO_ROOT
 DB_PATH = os.getenv("CHARGEBACK_DB_PATH") or str(REPO_ROOT / "audit_log.db")
 
 _AUDIT_WRITE_LOCK = threading.Lock()
+_DB_INIT_LOCK = threading.Lock()
 
 
 class PayloadConflictError(Exception):
@@ -148,15 +150,17 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
 
 
 def _get_connection(db_path: str | None = None) -> sqlite3.Connection:
-    effective_path = db_path or os.getenv("CHARGEBACK_DB_PATH") or DB_PATH
-    conn = sqlite3.connect(effective_path, timeout=30)
-    # Production SQLite hardening pragmas
-    conn.execute("PRAGMA journal_mode = WAL")
-    conn.execute("PRAGMA busy_timeout = 5000")
-    conn.execute("PRAGMA synchronous = NORMAL")
-    conn.execute("PRAGMA foreign_keys = ON")
-
-    _run_migrations(conn)
+    effective_path = str(Path(db_path or os.getenv("CHARGEBACK_DB_PATH") or DB_PATH).resolve())
+    conn = sqlite3.connect(effective_path, timeout=30.0)
+    conn.execute("PRAGMA busy_timeout = 30000")
+    with _DB_INIT_LOCK:
+        try:
+            conn.execute("PRAGMA journal_mode = WAL")
+        except sqlite3.OperationalError:
+            pass
+        conn.execute("PRAGMA synchronous = NORMAL")
+        conn.execute("PRAGMA foreign_keys = ON")
+        _run_migrations(conn)
     return conn
 
 
@@ -466,6 +470,9 @@ class SQLiteAuditStore:
             "row_count": verification.checked,
             "signature": signature,
         }
+
+
+SqliteAuditStore = SQLiteAuditStore
 
 
 def get_existing_decision(dispute_id: str, db_path: str = DB_PATH) -> LoggedDecision | None:
