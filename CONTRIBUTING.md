@@ -31,3 +31,14 @@ Thank you for contributing to `chargeback-risk-engine`.
    python -m build
    twine check dist/*
    ```
+
+## Useful Makefile Targets
+
+- `make check`: Run full linting, type-checking, test suite, and drift verification.
+- `make test`: Run pytest suite.
+- `make regen`: Regenerate all benchmark reports and evaluation artifacts.
+- `make train`: Train model weights and update JSON artifact.
+- `make data`: Regenerate synthetic train/dev/test datasets.
+- `make policy-optimize`: Optimize deterministic decision thresholds against development data.
+- `make release-zip`: Create clean source distribution archive from HEAD.
+- `make api`: Launch local development API server with auto-reload.

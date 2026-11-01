@@ -17,6 +17,7 @@ regen:
 	python scripts/benchmark.py
 	python scripts/evaluate_hard_cases.py
 	python scripts/oracle_ceiling.py
+	python scripts/run_ablations.py
 	python scripts/generate_report.py
 	python scripts/robustness_benchmark.py
 
@@ -33,9 +34,6 @@ verify:
 	python -m pytest -q
 	python scripts/verify_release.py
 	git diff --exit-code -- README.md artifacts docs ':!docs/*.png'
-
-latency:
-	python scripts/latency.py
 
 demo:
 	python scripts/demo.py

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -56,6 +57,26 @@ def main() -> int:
     if stray_files:
         print(f"ERROR: Stray test files found in repository root: {stray_files}", file=sys.stderr)
         return 1
+
+    # Verify no data leakage in synthetic data splits
+    leakage_check = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "verify_no_leakage.py")],
+        capture_output=True,
+        text=True,
+    )
+    if leakage_check.returncode != 0:
+        print(f"ERROR: Leakage verification failed:\n{leakage_check.stderr}", file=sys.stderr)
+        return 1
+
+    # Verify required ablation and evaluation artifacts are present
+    for artifact_name in (
+        "ablations.json",
+        "calibration_assessment.json",
+        "evaluation_confidence_intervals.json",
+    ):
+        if not (ARTIFACTS_DIR / artifact_name).exists():
+            print(f"ERROR: Required ablation artifact missing: {artifact_name}", file=sys.stderr)
+            return 1
 
     profile = load_policy_profile()
     results = []

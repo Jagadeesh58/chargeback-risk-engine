@@ -12,7 +12,6 @@
 *.txt text eol=lf
 *.lock text eol=lf
 *.sh text eol=lf
-Dockerfile text eol=lf
 Makefile text eol=lf
 LICENSE text eol=lf
 
