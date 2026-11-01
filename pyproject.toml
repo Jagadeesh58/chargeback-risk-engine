@@ -20,10 +20,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ui = [
-  "streamlit>=1.30.0,<2.0.0",
-  "altair>=5.0.0,<7.0.0",
-]
 reports = [
   "matplotlib>=3.7.0,<4.0.0",
 ]
@@ -39,12 +35,10 @@ dev = [
   "twine>=4.0.0",
   "cyclonedx-bom>=3.11.0",
   "types-requests>=2.28.0",
-  "streamlit>=1.30.0,<2.0.0",
-  "altair>=5.0.0,<7.0.0",
   "matplotlib>=3.7.0,<4.0.0",
 ]
 all = [
-  "chargeback-risk-engine[ui,reports,dev]",
+  "chargeback-risk-engine[reports,dev]",
 ]
 
 [tool.setuptools.packages.find]

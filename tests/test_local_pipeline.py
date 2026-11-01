@@ -1,7 +1,5 @@
 """
-test_local_pipeline.py — real, runnable tests for local_pipeline.py.
-Deliberately kept separate from app_deployed.py's UI code so importing
-this module for testing never triggers Streamlit's page rendering.
+test_local_pipeline.py — unit tests for local_pipeline.py.
 """
 
 import os

@@ -35,10 +35,7 @@ train:
 	python training/train_models.py
 
 api:
-	uvicorn apps.api:app --reload
-
-dashboard:
-	streamlit run apps/app_deployed.py
+	uvicorn chargeback_risk_engine.api:app --reload
 
 release-zip:
 	git archive --format=zip --output=chargeback-risk-engine.zip HEAD

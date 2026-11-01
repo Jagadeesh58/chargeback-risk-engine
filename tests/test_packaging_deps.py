@@ -102,7 +102,7 @@ def test_core_imports_declared_in_pyproject():
 
 def test_no_forbidden_dependencies_in_core():
     """Non-core dependencies must NOT be imported anywhere in chargeback_risk_engine/."""
-    forbidden = {"pytest", "streamlit", "altair", "matplotlib", "requests", "httpx"}
+    forbidden = {"pytest", "matplotlib", "requests", "httpx"}
     core_imports = _extract_imported_modules(PKG_DIR)
     violation = core_imports & forbidden
     assert not violation, (

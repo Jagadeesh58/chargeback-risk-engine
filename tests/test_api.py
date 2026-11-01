@@ -333,10 +333,10 @@ def test_live_api_graph_uses_persisted_relationship_history():
     assert data["graph_analysis"]["historical_disputed_value"] >= 6000.0
 
 
-def test_apps_api_audit_verify_endpoint_uses_canonical_audit_checker():
-    """The deployable apps.api wrapper must expose the audit verifier without
+def test_api_audit_verify_endpoint_uses_canonical_audit_checker():
+    """The API must expose the audit verifier without
     duplicating or breaking the canonical audit implementation."""
-    from apps.api import app as deployed_app
+    from chargeback_risk_engine.api import app as deployed_app
 
     deployed_client = TestClient(deployed_app)
     response = deployed_client.get("/audit/verify")
