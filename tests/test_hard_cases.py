@@ -13,6 +13,6 @@ def test_hard_case_suite_has_safety_coverage():
         assert required in names
 
 
-def test_hard_case_report_passes():
-    report = main()
+def test_hard_case_report_passes(tmp_path):
+    report = main(output_dir=tmp_path)
     assert report["passed"] >= 6
