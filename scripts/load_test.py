@@ -237,7 +237,9 @@ def benchmark_scale(
     print(f"  Requests:   {total_reqs} ({throughput:.1f} req/s)")
     print(f"  Success:    {success_count} | Errors: {error_count}")
     print(f"  Latency:    p50={p50} ms, p95={p95} ms, p99={p99} ms (mean={mean_lat} ms)")
-    print(f"  95% CIs:    p50={cis['latency_p50_ci_95']}, p95={cis['latency_p95_ci_95']}, p99={cis['latency_p99_ci_95']}")
+    print(
+        f"  95% CIs:    p50={cis['latency_p50_ci_95']}, p95={cis['latency_p95_ci_95']}, p99={cis['latency_p99_ci_95']}"
+    )
 
     return {
         "pre_seeded_rows": n_rows,
