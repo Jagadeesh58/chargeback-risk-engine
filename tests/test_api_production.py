@@ -142,7 +142,8 @@ def test_healthz_and_readyz_probes(monkeypatch, tmp_path):
     # Liveness probe
     liveness = client.get("/healthz")
     assert liveness.status_code == 200
-    assert liveness.json() == {"status": "ok"}
+    assert liveness.json()["status"] == "ok"
+    assert "version" in liveness.json()
 
     # Readiness probe
     readiness = client.get("/readyz")

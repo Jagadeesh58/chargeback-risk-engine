@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from chargeback_risk_engine import __version__
 from chargeback_risk_engine.audit_log import (
     DB_PATH,
     PayloadConflictError,
@@ -59,7 +60,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Chargeback Risk Engine API",
-    version="1.0.0",
+    version=__version__,
     lifespan=lifespan,
 )
 
@@ -407,7 +408,7 @@ class DecisionResponse(BaseModel):
 
 @app.get("/healthz", summary="Liveness probe")
 def healthz():
-    return {"status": "ok"}
+    return {"status": "ok", "version": __version__}
 
 
 @app.get("/readyz", summary="Readiness probe")
@@ -456,6 +457,7 @@ def health():
     )
     return {
         "status": "ok",
+        "version": __version__,
         "auth": auth_mode,
         "environment": env,
         "allow_unverified_evidence": allow_unverified,

@@ -6,6 +6,8 @@ import argparse
 import json
 import sys
 
+from chargeback_risk_engine import __version__
+
 
 def cmd_serve(args: argparse.Namespace) -> int:
     import uvicorn
@@ -62,6 +64,7 @@ def main(argv: list[str] | None = None) -> int:
         prog="chargeback-cli",
         description="Unified management and operational CLI for Chargeback Risk Engine",
     )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # serve
